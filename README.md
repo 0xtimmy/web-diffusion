@@ -6,4 +6,6 @@ a fork of [webgpu-torch](https://github.com/praeclarum/webgpu-torch) by [praecla
 
 run to get started:
 
-```npm run serve```
+```
+    npm run serve
+```
