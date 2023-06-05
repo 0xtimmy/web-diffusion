@@ -1,24 +1,9 @@
-# diffuser
+# ts-torch
 
-## Project setup
-```
-yarn install
-```
+a fork of [webgpu-torch](https://github.com/praeclarum/webgpu-torch) by [praeclarum](https://twitter.com/praeclarum)
 
-### Compiles and hot-reloads for development
-```
-yarn serve
-```
+---
 
-### Compiles and minifies for production
-```
-yarn build
-```
+run to get started:
 
-### Lints and fixes files
-```
-yarn lint
-```
-
-### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).
+```npm run serve```

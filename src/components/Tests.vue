@@ -1,6 +1,7 @@
 <template>
     <div>
-        <h3>Diffuser</h3>
+        <h3>Tests</h3>
+        <p>open the console -></p>
     </div>
 </template>
 
@@ -13,6 +14,9 @@ export default defineComponent({
     name: "Diffuser",
     mounted: async function() {
         await init_device();
+
+        // Tests
+        tests();
     },
 })
 </script>
