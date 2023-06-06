@@ -1,6 +1,99 @@
 import { KernelSpec } from "./kernel";
 
 export const kernels: { [name: string]: KernelSpec } = {
+    upsample: {
+        name: "upsample",
+        config: [
+            {
+                name: "dtype"
+            }
+        ],
+        parameters: [
+            {
+                name: "mode",
+                shaderType: "u32"
+            },
+            {
+                name: "w_in",
+                shaderType: "u32"
+            },
+            {
+                name: "h_in",
+                shaderType: "u32"
+            },
+            {
+                name: "d_in",
+                shaderType: "u32"
+            },
+            {
+                name: "w_out",
+                shaderType: "u32"
+            },
+            {
+                name: "h_out",
+                shaderType: "u32"
+            },
+            {
+                name: "d_out",
+                shaderType: "u32"
+            },
+            {
+                name: "outputSize",
+                shaderType: "u32"
+            }
+        ],
+        inputs: [
+            {
+                name: "input",
+                shaderType: "array<f32>"
+            }
+        ],
+        outputs: [
+            {
+                name: "output",
+                shaderType: "array<f32>",
+                size: "outputSize"
+            }
+        ],
+        workgroupSize: [4, 1, 1],
+        workgroupCount: ["outputSize / 4", 1, 1],
+        shader: `
+            //const output_idx = x * parameters.h_out * parameters.d_out + y * parameters.d_out + z;
+            if (global_id.x >= parameters.outputSize) {
+                return;
+            }
+
+            switch (parameters.mode) {
+                case 0: { // nearest
+                    const x = floor(global_id.x / parameters.h_out / parameters.d_out);
+                    const y = floor(global_id.x / parameters.d_out) % parameters.h_out;
+                    const z = global_id.x % parameters.d_out;
+                    const x_map = floor(x * parameters.w_in / parameters.w_out);
+                    const y_map = floor(y * parameters.h_in / parameters.h_out);
+                    const d_map = floor(z * parameters.d_in / parameters.d_out);
+                    const idx_map = x_map * parameters.h_in * parameters.d_in + y_map * parameters.d_in + d_map;
+                    output[global_id.x] = input[idx_map]; 
+                    break;
+                }
+                case 1: { // linear
+                    output[global_id.x] = 1;
+                    break;
+                }
+                case 2: { // bilinear
+                    output[global_id.x] = 2;
+                    break;
+                }
+                case 3: { //bicubic
+                    output[global_id.x] = 3;
+                    break;
+                }
+                case 4: { //trilinear
+                    output[global_id.x] = 4;
+                    break;
+                }
+            }
+        `
+    },
     maxpool2d: {
         name:"maxpool2d",
         config: [

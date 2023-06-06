@@ -137,6 +137,57 @@ export function maxpool2d(input: Tensor, kernel_size: [number, number], stride: 
         [output_shape]
     )[0];
 }
+
+export function upsample(
+    input: Tensor, 
+    size: number | [number, number] | [number, number, number] | null,
+    scale_factor: number | [number, number] | [number, number, number] | null ,
+    mode: "nearest" | "linear" | "bilinear" | "bicubic" | "trilinear",
+    align_corners: boolean,
+    recompute_scale_factor: boolean
+) {
+    let output_shape;
+    let use_size;
+    if(size == null) {
+        if(scale_factor == null) throw new Error("both size and scale factor cannot be undefined at once");
+        if(typeof(scale_factor) == 'number') scale_factor = (new Array(input.shape.length - 2)).fill(scale_factor) as any
+        else if(scale_factor.length != input.shape.length - 2) throw new Error(`Expects a ${input.shape.length - 2}D scale factor for a ${input.shape.length}D input`);
+        output_shape = input.shape.map((v, i) => {
+            if(i < 2) return v;
+            return Math.floor(v * scale_factor[i-2]);
+        })
+    } else {
+        if(scale_factor != null) throw new Error("both size and scale factor cannot be defined at once");
+        if(typeof(size) == 'number') size = (new Array(input.shape.length - 2)).fill(size) as any
+        else if(size.length != input.shape.length - 2) throw new Error(`Expects a ${input.shape.length - 2}D scale factor for a ${input.shape.length}D input`);
+        output_shape = input.shape.map((v, i) => {
+            if(i < 2) return v;
+            return size[i-2]
+        })
+    }
+    if(input.shape.length == 3 && !(mode == "nearest" || mode == "linear")) throw new Error("The only acceptable modes for a 3D tensor are \"nearest\" and \"linear\"");
+    else if(input.shape.length == 4 && !(mode == "nearest" || mode == "bilinear" || mode == "bicubic")) throw new Error("The only acceptable modes for a 4D tensor are \"bilinear\" and \"bicubic\"");
+    else if(input.shape.length == 5 && !(mode == "nearest" || mode == "trilinear")) throw new Error("The only acceptable mode for a 5D tensor is \"trilinear\"");
+    
+    const params = {
+        mode: ["nearest", "linear", "bilinear", "bicubic", "trilinear"].indexOf(mode),
+        w_in: input.shape[2],
+        h_in: input.shape[3] ? input.shape[3] : 1,
+        d_in: input.shape[4] ? input.shape[4] : 1,
+        w_out: output_shape[2],
+        h_out: output_shape[3] ? output_shape[3] : 1,
+        d_out: output_shape[4] ? output_shape[4] : 1,
+        outputSize: Tensor.getSize(output_shape)
+    }
+    console.log("params: ", params);
+    console.log("output shape: ", output_shape);
+    return input.runKernel(
+        "upsample",
+        { dtype: input.dtype},
+        params,
+        [output_shape]
+    )[0]
+}
 // ------------------------------------
 // End Custom
 // ------------------------------------

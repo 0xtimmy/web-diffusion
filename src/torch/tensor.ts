@@ -1850,6 +1850,16 @@ export class Tensor extends TensorBase {
         return aops.maxpool2d(this, kernel_size, stride, padding, dilation);
     }
 
+    upsample(
+        size: number | [number, number] | [number, number, number] | null,
+        scale_factor: number | [number, number] | [number, number, number] | null,
+        mode: "nearest" | "linear" | "bilinear" | "bicubic" | "trilinear" = "nearest",
+        align_corners: boolean,
+        recompute_scale_factor: boolean
+    ) {
+        return aops.upsample(this, size, scale_factor, mode, align_corners, recompute_scale_factor);
+    }
+
     // ------------------------------------
     // End Custom
     // ------------------------------------

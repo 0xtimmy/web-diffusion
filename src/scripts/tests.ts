@@ -9,7 +9,8 @@ import {
 } from "./utils"
 
 export default async function() {
-    await test_maxpool2d();
+    await test_upsample();
+    //await test_maxpool2d();
     //await test_layernorm();
     //await test_conv();
     //await test_repeat();
@@ -56,6 +57,54 @@ async function check(res: torch.Tensor, expected: torch.Tensor): Promise<boolean
     console.log("Got: ", res_data, "\nExpected: ", actual_data);
     return false;
     
+}
+
+const UPSAMPLE_INPUT        = torch.tensor([[[1, 2, 3, 4]]]);
+const UPSAMPLE_RESULT       = torch.tensor([[[1, 1, 2, 2, 3, 3, 4, 4]]])
+const UPSAMPLE_2D_INPUT     = torch.tensor([[[[1, 2], [3, 4]]]]);
+const UPSAMPLE_2D_RESULT    = torch.tensor([[[[1, 1, 1, 2, 2, 2], [1, 1, 1, 2, 2, 2], [3, 3, 3, 4, 4, 4], [3, 3, 3, 4, 4, 4]]]]);
+const UPSAMPLE_3D_INPUT     = torch.tensor([[[[[0.1, 0.2], [0.3, 0.4]], [[0.5, 0.6], [0.7, 0.8]]]]]);
+const UPSAMPLE_3D_RESULT    = torch.tensor([[[[[0.1000, 0.1000, 0.2000, 0.2000],
+                                                [0.1000, 0.1000, 0.2000, 0.2000],
+                                                [0.3000, 0.3000, 0.4000, 0.4000],
+                                                [0.3000, 0.3000, 0.4000, 0.4000]],
+
+                                            [[0.1000, 0.1000, 0.2000, 0.2000],
+                                                [0.1000, 0.1000, 0.2000, 0.2000],
+                                                [0.3000, 0.3000, 0.4000, 0.4000],
+                                                [0.3000, 0.3000, 0.4000, 0.4000]],
+
+                                            [[0.5000, 0.5000, 0.6000, 0.6000],
+                                                [0.5000, 0.5000, 0.6000, 0.6000],
+                                                [0.7000, 0.7000, 0.8000, 0.8000],
+                                                [0.7000, 0.7000, 0.8000, 0.8000]],
+
+                                            [[0.5000, 0.5000, 0.6000, 0.6000],
+                                                [0.5000, 0.5000, 0.6000, 0.6000],
+                                                [0.7000, 0.7000, 0.8000, 0.8000],
+                                                [0.7000, 0.7000, 0.8000, 0.8000]]]]]);
+
+async function test_upsample() {
+    let input = UPSAMPLE_INPUT;
+    let input_data = await input.toArrayAsync();
+    console.log("🔨 Testing upsample: nearest neighbor with input: ", input_data);
+    let up = new torch.nn.UpSample(null, 2, "nearest");
+    let output = up.forward(input);
+    await check(output, UPSAMPLE_RESULT);
+
+    input = UPSAMPLE_2D_INPUT;
+    input_data = await input.toArrayAsync();
+    console.log("🔨 Testing upsample: nearest neighbor with input: ", input_data);
+    up = new torch.nn.UpSample(null, [2, 3], "nearest");
+    output = up.forward(input);
+    await check(output, UPSAMPLE_2D_RESULT);
+
+    input = UPSAMPLE_3D_INPUT;
+    input_data = await input.toArrayAsync();
+    console.log("🔨 Testing upsample: nearest neighbor with input: ", input_data);
+    up = new torch.nn.UpSample(null, 2, "nearest");
+    output = up.forward(input);
+    await check(output, UPSAMPLE_3D_RESULT);
 }
 
 const MAXPOOL2D_INPUT       = torch.tensor([[[[ 0.2399,  0.6513,  1.1319,  0.9944],

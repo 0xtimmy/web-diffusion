@@ -54,6 +54,34 @@ export class MaxPool2d extends Module {
     }
 }
 
+export class UpSample extends Module {
+    
+    size: number | [number, number] | [number, number, number] | null;
+    scale_factor: number | [number, number] | [number, number, number] | null;
+    mode: "nearest" | "linear" | "bilinear" | "bicubic" | "trilinear";
+    align_corners: boolean;
+    recompute_scale_factor: boolean;
+
+    constructor(
+        size: number | [number, number] | [number, number, number] | null = null,
+        scale_factor: number | [number, number] | [number, number, number] | null = null,
+        mode: "nearest" | "linear" | "bilinear" | "bicubic" | "trilinear" = "nearest",
+        align_corners = false,
+        recompute_scale_factor = false
+    ) {
+        super();
+        this.size = size;
+        this.scale_factor = scale_factor;
+        this.mode = mode;
+        this.align_corners = align_corners;
+        this.recompute_scale_factor = recompute_scale_factor;
+    }
+
+    forward(input: Tensor): Tensor {
+        return input.upsample(this.size, this.scale_factor, this.mode, this.align_corners, this.recompute_scale_factor);
+    }
+}
+
 // ------------------------------------
 // Start Custom
 // ------------------------------------
