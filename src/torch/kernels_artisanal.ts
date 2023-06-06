@@ -55,28 +55,40 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        workgroupSize: [4, 1, 1],
-        workgroupCount: ["outputSize / 4", 1, 1],
+        workgroupSize: [8, 1, 1],
+        workgroupCount: ["outputSize / 8", "h_out", "d_out"],
         shader: `
-            //const output_idx = x * parameters.h_out * parameters.d_out + y * parameters.d_out + z;
+            const output_idx = global_id.x * parameters.h_out * parameters.d_out + global_id.y * parameters.d_out + global_id.z;
             if (global_id.x >= parameters.outputSize) {
                 return;
             }
 
             switch (parameters.mode) {
                 case 0: { // nearest
-                    const x = floor(global_id.x / parameters.h_out / parameters.d_out);
-                    const y = floor(global_id.x / parameters.d_out) % parameters.h_out;
-                    const z = global_id.x % parameters.d_out;
-                    const x_map = floor(x * parameters.w_in / parameters.w_out);
-                    const y_map = floor(y * parameters.h_in / parameters.h_out);
-                    const d_map = floor(z * parameters.d_in / parameters.d_out);
+                    const x_map = floor(global_id.x * parameters.w_in / parameters.w_out);
+                    const y_map = floor(global_id.y * parameters.h_in / parameters.h_out);
+                    const d_map = floor(global_id.z * parameters.d_in / parameters.d_out);
                     const idx_map = x_map * parameters.h_in * parameters.d_in + y_map * parameters.d_in + d_map;
-                    output[global_id.x] = input[idx_map]; 
+                    output[output_idx] = input[idx_map]; 
                     break;
                 }
                 case 1: { // linear
-                    output[global_id.x] = 1;
+                    const scale_factor = parameters.w_out / parameters.w_in;
+                    //const x_l = floor((global_id.x - scale_factor / 2 + 0.0000001) / scale_factor);
+                    //const x_r = ceil((global_id.x - scale_factor / 2 + 0.0000001) / scale_factor);
+                    const x_l = floor((global_id.x - floor(scale_factor / 2)) / scale_factor + 0.0000001);
+                    const x_r = ceil((global_id.x - ceil(scale_factor / 2)) / scale_factor + 0.0000001);
+                    if(x_l < 0) {
+                        output[output_idx] = input[x_r];
+                        return;
+                    }
+                    if(x_r >= parameters.w_in) {
+                        output[output_idx] = input[x_l];
+                        return;
+                    }
+                    const diff = (input[x_r] - input[x_l]);
+                    output[output_idx] = input[x_l] + diff * ((2*global_id.x + scale_factor + 1) % (scale_factor*2))  /  (scale_factor*2);
+                    //output[output_idx] = x_r;
                     break;
                 }
                 case 2: { // bilinear

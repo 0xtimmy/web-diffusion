@@ -83,6 +83,14 @@ const UPSAMPLE_3D_RESULT    = torch.tensor([[[[[0.1000, 0.1000, 0.2000, 0.2000],
                                                 [0.5000, 0.5000, 0.6000, 0.6000],
                                                 [0.7000, 0.7000, 0.8000, 0.8000],
                                                 [0.7000, 0.7000, 0.8000, 0.8000]]]]]);
+const UPSAMPLE_LINEAR_INPUT     = torch.tensor([[[1, 9, 8, 7]]]);
+const UPSAMPLE_LINEAR_RESULT    = torch.tensor([[[1.0, 3.0, 7.0, 8.75, 8.25, 7.75, 7.25, 7.0]]]);
+const UPSAMPLE_LINEAR_INPUT7    = torch.tensor([[[0.1, 0.9,  0.8, 0.7]]]);
+const UPSAMPLE_LINEAR_RESULT7   = torch.tensor([[[0.1000, 0.1000, 0.1000, 0.1000, 0.2143, 0.3286, 0.4429, 0.5571,
+                                                    0.6714, 0.7857, 0.9000, 0.8857, 0.8714, 0.8571, 0.8429, 0.8286,
+                                                    0.8143, 0.8000, 0.7857, 0.7714, 0.7571, 0.7429, 0.7286, 0.7143,
+                                                    0.7000, 0.7000, 0.7000, 0.7000]]]);
+
 
 async function test_upsample() {
     let input = UPSAMPLE_INPUT;
@@ -105,6 +113,20 @@ async function test_upsample() {
     up = new torch.nn.UpSample(null, 2, "nearest");
     output = up.forward(input);
     await check(output, UPSAMPLE_3D_RESULT);
+
+    input = UPSAMPLE_LINEAR_INPUT;
+    input_data = await input.toArrayAsync();
+    console.log("🔨 Testing upsample: linear with input: ", input_data);
+    up = new torch.nn.UpSample(null, 2, "linear");
+    output = up.forward(input);
+    await check(output, UPSAMPLE_LINEAR_RESULT);
+
+    input = UPSAMPLE_LINEAR_INPUT7;
+    input_data = await input.toArrayAsync();
+    console.log("🔨 Testing upsample: linear with input: ", input_data);
+    up = new torch.nn.UpSample(null, 7, "linear");
+    output = up.forward(input);
+    await check(output, UPSAMPLE_LINEAR_RESULT7);
 }
 
 const MAXPOOL2D_INPUT       = torch.tensor([[[[ 0.2399,  0.6513,  1.1319,  0.9944],
