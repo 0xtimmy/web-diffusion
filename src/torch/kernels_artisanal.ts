@@ -56,8 +56,10 @@ export const kernels: { [name: string]: KernelSpec } = {
             }
         ],
         workgroupSize: [8, 1, 1],
-        workgroupCount: ["outputSize / 8", "h_out", "d_out"],
+        workgroupCount: ["outputSize / h_out / 8", "h_out", "d_out"],
         shader: `
+            //inputIdx = x*parameters.h_in*parameters.d_in + y*parameters.d_in + z;
+
             const output_idx = global_id.x * parameters.h_out * parameters.d_out + global_id.y * parameters.d_out + global_id.z;
             if (global_id.x >= parameters.outputSize) {
                 return;
@@ -74,25 +76,108 @@ export const kernels: { [name: string]: KernelSpec } = {
                 }
                 case 1: { // linear
                     const scale_factor = parameters.w_out / parameters.w_in;
-                    //const x_l = floor((global_id.x - scale_factor / 2 + 0.0000001) / scale_factor);
-                    //const x_r = ceil((global_id.x - scale_factor / 2 + 0.0000001) / scale_factor);
-                    const x_l = floor((global_id.x - floor(scale_factor / 2)) / scale_factor + 0.0000001);
-                    const x_r = ceil((global_id.x - ceil(scale_factor / 2)) / scale_factor + 0.0000001);
-                    if(x_l < 0) {
-                        output[output_idx] = input[x_r];
+                    const offset = (scale_factor - 1) / 2;
+                    const x_l = floor((global_id.x - offset) / scale_factor);
+                    const x_r = x_l + 1
+                    if(x_r % parameters.w_in < abs(x_l) % parameters.w_in) {
+                        if(global_id.x % parameters.w_out < scale_factor) {
+                            output[output_idx] = input[x_r];
+                        } else {
+                            output[output_idx] = input[x_l];
+                        }
                         return;
                     }
-                    if(x_r >= parameters.w_in) {
-                        output[output_idx] = input[x_l];
-                        return;
-                    }
-                    const diff = (input[x_r] - input[x_l]);
-                    output[output_idx] = input[x_l] + diff * ((2*global_id.x + scale_factor + 1) % (scale_factor*2))  /  (scale_factor*2);
-                    //output[output_idx] = x_r;
+                    
+                    const diff = (input[x_r] - input[x_l]) / scale_factor;
+                    output[output_idx] = input[x_l] + diff * ((2*(global_id.x - offset)) % (2*scale_factor))/2;
                     break;
                 }
                 case 2: { // bilinear
-                    output[global_id.x] = 2;
+                    const xscale_factor = parameters.w_out / parameters.w_in;
+                    const xoffset = (xscale_factor - 1) / 2;
+                    const yscale_factor = parameters.h_out / parameters.h_in;
+                    const yoffset = (yscale_factor - 1) / 2;
+
+                    const x1_map = floor((global_id.x - xoffset) / xscale_factor);
+                    const x2_map = floor(x1_map + 1);
+                    const y1_map = floor((global_id.y - yoffset) / yscale_factor);
+                    const y2_map = floor(y1_map + 1);
+
+                    /*
+                    if(x_r % parameters.w_in < abs(x_l) % parameters.w_in) {
+                        if(global_id.x % parameters.w_out < scale_factor) {
+                            output[output_idx] = input[x_r];
+                        } else {
+                            output[output_idx] = input[x_l];
+                        }
+                        return;
+                    }
+                    */
+
+                    const x_oob = x2_map % parameters.w_in < abs(x1_map) % parameters.w_in;
+                    const y_oob = y2_map % parameters.w_in < abs(y1_map);
+                    if(x_oob && y_oob) {
+                        if(global_id.x % parameters.w_out < xscale_factor) {
+                            if(global_id.y < yscale_factor) {
+                                const idx = x2_map*parameters.h_in + y2_map;
+                                output[output_idx] = input[idx];
+                            } else {
+                                const idx = x2_map*parameters.h_in + y1_map;
+                                output[output_idx] = input[idx];
+                            }
+                        } else {
+                            if(global_id.y < yscale_factor) {
+                                const idx = x1_map*parameters.h_in + y2_map;
+                                output[output_idx] = input[idx];
+                            } else {
+                                const idx = x1_map*parameters.h_in + y1_map;
+                                output[output_idx] = input[idx];
+                            }
+                        }
+                        return;
+                    } else if(x_oob && !y_oob) {
+                        let p1Idx;
+                        let p2Idx;
+                        if(global_id.x % parameters.w_out < xscale_factor) {
+                            p1Idx = x2_map*parameters.h_in + y1_map;
+                            p2Idx = x2_map*parameters.h_in + y2_map;
+                        } else {
+                            p1Idx = x1_map*parameters.h_in + y1_map;
+                            p2Idx = x1_map*parameters.h_in + y2_map;
+                        }
+                        const diff = (input[p2Idx] - input[p1Idx]) / yscale_factor;
+                        output[output_idx] = input[p1Idx] + diff * ((2*(global_id.y - yoffset)) % (2*yscale_factor))/2;
+                        return;
+                    } else if(!x_oob && y_oob) {
+                        let p1Idx;
+                        let p2Idx;
+                        if(global_id.y < yscale_factor) {
+                            p1Idx = x1_map*parameters.h_in + y2_map;
+                            p2Idx = x2_map*parameters.h_in + y2_map;
+                        } else {
+                            p1Idx = x1_map*parameters.h_in + y1_map;
+                            p2Idx = x2_map*parameters.h_in + y1_map;
+                        }
+                        const diff = (input[p2Idx] - input[p1Idx]) / xscale_factor;
+                        output[output_idx] = input[p1Idx] + diff * ((2*(global_id.x - xoffset)) % (2*xscale_factor))/2;
+                        return;
+                    }
+
+                    // [ ... p1, x, ..., x, p2 ... ]
+                    // [ ...        ...        ... ]
+                    // [ ... p3, x, ..., x, p4 ... ]
+
+                    const p1Idx = x1_map*parameters.h_in*parameters.d_in + y1_map*parameters.d_in;
+                    const p2Idx = x1_map*parameters.h_in*parameters.d_in + y2_map*parameters.d_in;
+                    const p3Idx = x2_map*parameters.h_in*parameters.d_in + y1_map*parameters.d_in;
+                    const p4Idx = x2_map*parameters.h_in*parameters.d_in + y2_map*parameters.d_in;
+                    const diff1 = (input[p2Idx] - input[p1Idx]) / yscale_factor;
+                    const diff2 = (input[p4Idx] - input[p3Idx]) / yscale_factor;
+                    const p5    = input[p1Idx] + diff1 * ((2*(global_id.y - yoffset)) % (2*yscale_factor))/2;
+                    const p6    = input[p3Idx] + diff2 * ((2*(global_id.y - yoffset)) % (2*yscale_factor))/2;
+                    const diff = (p6 - p5) / xscale_factor;
+                    
+                    output[output_idx] = p5 + diff * ((2*(global_id.x - xoffset)) % (2*xscale_factor))/2;
                     break;
                 }
                 case 3: { //bicubic
