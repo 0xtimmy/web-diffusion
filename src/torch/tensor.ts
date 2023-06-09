@@ -47,6 +47,9 @@ export class Tensor extends TensorBase {
     get shape(): Shape {
         return this._shape;
     }
+    get dim(): number {
+        return this._shape.length;
+    }
     get size(): number {
         return Tensor.getSize(this.shape);
     }
@@ -1846,6 +1849,10 @@ export class Tensor extends TensorBase {
         return aops.layernorm(this, normalized_shape, eps);
     }
 
+    box_muller(mean: number, std: number): Tensor {
+        return aops.box_muller(this, mean, std);
+    }
+
     maxpool2d(kernel_size: [number, number], stride: [number, number], padding: [number, number], dilation: [number, number]): Tensor {
         return aops.maxpool2d(this, kernel_size, stride, padding, dilation);
     }
@@ -1856,8 +1863,46 @@ export class Tensor extends TensorBase {
         mode: "nearest" | "linear" | "bilinear" | "bicubic" | "trilinear" = "nearest",
         align_corners: boolean,
         recompute_scale_factor: boolean
-    ) {
+    ): Tensor {
         return aops.upsample(this, size, scale_factor, mode, align_corners, recompute_scale_factor);
+    }
+
+    uniform(
+        a: number,
+        b: number
+    ): Tensor {
+        const storage = this.device.allocFor(this.shape, this.dtype);
+        const array = storage.getTypedArray(this.dtype);
+        const diff = b - a;
+        for(let i = 0; i < array.length; i++) {
+            array[i] = Math.random()*diff + a;
+        }
+        return new Tensor({
+            data: storage,
+            dtype: this.dtype,
+            shape: this.shape,
+            strides: defaultStrides(this.shape),
+            device: this.device,
+        });
+    }
+
+    normal(
+        mean: number,
+        std: number
+    ): Tensor {
+        const storage = this.device.allocFor(this.shape, this.dtype);
+        const array = storage.getTypedArray(this.dtype);
+        for(let i = 0; i < array.length; i++) {
+            array[i] = Math.random();
+        }
+        const t = new Tensor({
+            data: storage,
+            dtype: this.dtype,
+            shape: this.shape,
+            strides: defaultStrides(this.shape),
+            device: this.device,
+        });
+        return t.box_muller(mean, std)
     }
 
     // ------------------------------------

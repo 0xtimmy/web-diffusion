@@ -146,8 +146,10 @@ export function upsample(
     align_corners: boolean,
     recompute_scale_factor: boolean
 ) {
+    if(align_corners) throw new Error("align_corners not implemented!");
+    if(recompute_scale_factor) throw new Error("recompute_scale_factor not implemented!");
+    if(mode == "trilinear") throw new Error("trilinear not implemented!");
     let output_shape;
-    let use_size;
     if(size == null) {
         if(scale_factor == null) throw new Error("both size and scale factor cannot be undefined at once");
         if(typeof(scale_factor) == 'number') scale_factor = (new Array(input.shape.length - 2)).fill(scale_factor) as any
@@ -167,7 +169,7 @@ export function upsample(
     }
     if(input.shape.length == 3 && !(mode == "nearest" || mode == "linear")) throw new Error("The only acceptable modes for a 3D tensor are \"nearest\" and \"linear\"");
     else if(input.shape.length == 4 && !(mode == "nearest" || mode == "bilinear" || mode == "bicubic")) throw new Error("The only acceptable modes for a 4D tensor are \"bilinear\" and \"bicubic\"");
-    else if(input.shape.length == 5 && !(mode == "nearest" || mode == "trilinear")) throw new Error("The only acceptable mode for a 5D tensor is \"trilinear\"");
+    else if(input.shape.length == 5 && !(mode == "nearest" /* ||  mode == "trilinear" */)) throw new Error("The only acceptable mode for a 5D tensor is \"trilinear\"");
     
     const params = {
         mode: ["nearest", "linear", "bilinear", "bicubic", "trilinear"].indexOf(mode),
@@ -188,6 +190,51 @@ export function upsample(
         [output_shape]
     )[0]
 }
+
+export function box_muller(
+    input: Tensor,
+    mean: number,
+    std: number
+): Tensor {
+    const output_shape = input.shape;
+    const params = {
+        mean: mean,
+        std: std,
+        outputSize: input.size
+    }
+
+    return input.runKernel(
+        "box_muller",
+        { dtype: input.dtype },
+        params,
+        [output_shape],
+    )[0];
+}
+
+/*
+export function multihead_attention(
+    query: Tensor,
+    key: Tensor,
+    value: Tensor,
+    embed_dim: number,
+    num_heads: number
+) {
+    const output_shape = input.shape;
+    const params = {
+        embed_dim: embed_dim,
+        num_heads: num_heads,
+    }
+
+    return input.runKernel(
+        "multihead_attention",
+        { dtype: input.dtype },
+        params,
+        [output_shape],
+
+    )[0];
+}
+*/
+
 // ------------------------------------
 // End Custom
 // ------------------------------------

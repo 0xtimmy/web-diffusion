@@ -193,6 +193,15 @@ export class Module {
             }
         }
     }
+    registerParameter(
+        name: string,
+        param: Parameter,
+    ) {
+        if(name.includes["."]) throw new Error("parameter cannot be registered with \".\" in the name");
+        if(name.length <= 0) throw new Error("parameter name cannot be empty");
+        if(this._parameters[name] != undefined) throw new Error(`parameter of name: "${name}" already exists`);
+        this._parameters[name] = param;
+    }
     /**
      * Gets this module and its descendants' (if `recurse = true`) parameters along with their prefixed names.
      * @param prefix is prependended to the names of the parameters

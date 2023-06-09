@@ -1,6 +1,52 @@
 import { KernelSpec } from "./kernel";
 
 export const kernels: { [name: string]: KernelSpec } = {
+    box_muller: {
+        name: "box_muller",
+        config: [
+            {
+                name: "dtype"
+            }
+        ],
+        parameters: [
+            {
+                name: "mean",
+                shaderType: "f32"
+            },
+            {
+                name: "std",
+                shaderType: "f32"
+            },
+            {
+                name: "outputSize",
+                shaderType: "u32"
+            }
+        ],
+        inputs: [
+            {
+                name: "input",
+                shaderType: "array<f32>"
+            }
+        ],
+        outputs: [
+            {
+                name: "output",
+                shaderType: "array<f32>",
+                size: "outputSize"
+            }
+        ],
+        workgroupSize: [8, 1, 1],
+        workgroupCount: ["outputSize / 8", 1, 1],
+        shader: `
+            if (global_id.x >= parameters.outputSize) {
+                return;
+            }
+
+            const pi = 3.1415
+
+            output[global_id.x] = sqrt(-2 * log(input[global_id.x])) * cos(2 * pi * input[global_id.x]) * parameters.std + parameters.mean;
+        `
+    },
     upsample: {
         name: "upsample",
         config: [
@@ -61,7 +107,7 @@ export const kernels: { [name: string]: KernelSpec } = {
             //inputIdx = x*parameters.h_in*parameters.d_in + y*parameters.d_in + z;
 
             const output_idx = global_id.x * parameters.h_out * parameters.d_out + global_id.y * parameters.d_out + global_id.z;
-            if (global_id.x >= parameters.outputSize) {
+            if (output_idx >= parameters.outputSize) {
                 return;
             }
 

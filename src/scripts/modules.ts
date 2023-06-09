@@ -22,6 +22,7 @@ class SelfAttention extends torch.nn.Module {
             new torch.nn.GeLU(),
             new torch.nn.Linear(channels, channels)
         ])
+        
     }
 
     forward(x) {
@@ -103,7 +104,7 @@ class Up extends torch.nn.Module {
     constructor(in_channels: number, out_channels: number, emb_dim=256) {
         super();
 
-        this.up = new torch.nn.UpSample(scale_factor=20, mode="bilinear", align_corners=true);
+        this.up = new torch.nn.UpSample(null, 20, "bilinear");
         this.conv = new torch.nn.Sequential([
             new DoubleConv(in_channels, in_channels, undefined, true),
             new DoubleConv(in_channels, out_channels, Math.floor(in_channels / 2)),

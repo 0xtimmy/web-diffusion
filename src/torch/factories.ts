@@ -43,3 +43,22 @@ export function zeros(
         device: d,
     });
 }
+
+export function empty(
+    shape: Shapeish,
+    dtype?: Dtype,
+    device?: Deviceish 
+): Tensor {
+    const d = getDevice(device);
+    const s = getShape(shape);
+    const dt = getDtype(dtype);
+    const storage = d.allocFor(s, dt);
+    const array = storage.getTypedArray(dt);
+    return new Tensor({
+        data: storage,
+        dtype: dt,
+        shape: s,
+        strides: defaultStrides(s),
+        device: d,
+    });
+}

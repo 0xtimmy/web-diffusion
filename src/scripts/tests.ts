@@ -8,8 +8,19 @@ import {
     repeat
 } from "./utils"
 
+//
+// Imports for testing private functions
+//
+/*
+import {
+    _calculate_fan_in_fan_out
+} from "@/torch/nn_utils"
+*/
+
 export default async function() {
-    await test_upsample();
+    await test_normal();
+    //await test_fanin_fanout();
+    //await test_upsample();
     //await test_maxpool2d();
     //await test_layernorm();
     //await test_conv();
@@ -58,6 +69,37 @@ async function check(res: torch.Tensor, expected: torch.Tensor): Promise<boolean
     return false;
     
 }
+
+
+const NORMAL_INPUT  = torch.tensor([0.8000, 0.0000, 0.7000, 0.2000, 0.6000, 0.1000, 0.1000, 0.8000, 0.5000,
+                                    0.3000, 0.1000, 0.3000, 0.8000, 0.6000, 0.2000, 0.5000, 0.8000, 0.9000,
+                                    0.7000, 0.7000, 0.8000, 0.6000, 0.7000, 0.1000, 0.3000, 0.1000, 0.7000,
+                                    0.5000, 0.7000, 0.0000, 0.1000, 0.8000, 0.6000, 0.2000, 0.5000, 0.6000,
+                                    0.0000, 0.1000, 0.9000, 0.7000, 0.9000, 0.5000, 0.5000, 0.7000, 0.6000,
+                                    0.4000, 0.1000, 0.1000, 0.0000, 0.9000, 0.4000, 0.8000, 0.9000, 0.5000,
+                                    0.2000, 0.3000, 0.7000, 0.3000, 0.0000, 0.2000, 0.4000, 0.8000, 0.9000,
+                                    0.8000, 0.7000, 0.4000, 0.0000, 0.9000, 0.8000, 0.3000, 0.5000, 0.3000,
+                                    0.8000, 0.6000, 0.4000, 0.2000, 0.8000, 0.2000, 0.7000, 0.8000, 0.7000,
+                                    0.9000, 0.6000, 0.5000, 0.0000, 0.4000, 0.2000, 0.2000, 0.2000, 0.9000,
+                                    0.8000, 0.4000, 0.8000, 0.5000, 0.8000, 0.4000, 0.6000, 0.9000, 0.2000,
+                                    0.6000]);
+
+async function test_normal() {
+    const input = NORMAL_INPUT;
+    console.log("🔨 Testing noram with 20 inputs");
+    const output = input.normal(0, 5);
+    const output_data = await output.toArrayAsync();
+    
+    const res = [];
+    output_data.forEach((v: number) => {
+        const i = Math.floor(v);
+        if(res[i] == undefined) res[i] = [];
+        res[i].push(0);
+    })
+    console.log("output bucket");
+    console.log(res);
+}
+
 
 const UPSAMPLE_INPUT        = torch.tensor([[[1, 2, 3, 4]]]);
 const UPSAMPLE_RESULT       = torch.tensor([[[1, 1, 2, 2, 3, 3, 4, 4]]])
@@ -462,3 +504,21 @@ export async function test_clamp() {
     const data = await res.toArrayAsync();
     console.log("Result: \n", data, "\n---\n");
 }
+
+//
+// Tests for private function
+//
+/*
+const FANIN_FANOUT_INPUT    = torch.tensor([[[0, 0], [1, 1], [2, 2]],
+                                             [[6, 6], [7, 7], [8, 8]]])
+const FANIN_FANOUT_RESULT   = { fan_in: 6, fan_out: 4 };
+
+async function test_fanin_fanout() {
+    let input = FANIN_FANOUT_INPUT;
+    let input_data = await input.toArrayAsync();
+    console.log("🔨 Testing calc_fan_in_fan_out with input: ", input_data);
+    let res = _calculate_fan_in_fan_out(input);
+    if(res.fan_in != FANIN_FANOUT_RESULT.fan_in || res.fan_out != FANIN_FANOUT_RESULT.fan_out) console.warn("‼️ FAILED - content doesn't match");
+    else console.log("✅ PASSED");
+}
+*/
