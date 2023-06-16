@@ -5,15 +5,12 @@ import {
     GradientFunctionOutput,
 } from "./autograd";
 import type { Tensor } from "./tensor";
+import * as aops from "./ops_artisanal";
 
 export class LinearFunction extends AutoFunction {
     static forward(inputs: FunctionInput[]): Tensor {
         const [input, weight, bias] = inputs as [Tensor, Tensor, Tensor];
-        const output = input.mm(weight.t());
-        if (bias) {
-            output.add_(bias);
-        }
-        return output;
+        return aops.linear(input, weight, bias);
     }
     static setupContext(
         ctx: GradientContext,
