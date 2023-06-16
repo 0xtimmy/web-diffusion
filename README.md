@@ -34,3 +34,9 @@ All the torch files are held in `/torch`. We try to match pytorch's API as best 
 - `nn_*`: modules, such as Linear and MultiheadAttention (WIP)
 - `op(s)_*`: operations definitions, you'll find a lot of the custom code in `ops_artisanal`
 - `kernels_*`: GPU operation (kernel) definitions, this where functions are typically implemented
+
+## Contribution Notes
+- ALWAYS BRANCH before writing new code, then make a PR to get it put into master
+- ff to ping me anytime
+- [pytorch ource code](https://github.com/pytorch/pytorch/tree/main), for reference
+- [webGPU shading language](https://www.w3.org/TR/WGSL/), for reference
