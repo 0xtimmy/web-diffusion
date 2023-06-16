@@ -64,43 +64,6 @@ export class GeluFunction extends AutoFunction {
         return input.runKernel("reluGrad", {"dtype":"float32"}, params, [input.shape], outputGrad);
     }
 }
-/*
-export class CatFunction extends AutoFunction {
-    static forward(inputs: FunctionInput[]): Tensor {
-        const [inputa, inputb, dim] = inputs as [Tensor, Tensor, 0 | 1];
-        const params = {
-            size: shapeSize(inputa.shape),
-        };
-        if (!inputa.isContiguous) { throw new Error("Input must be contiguous"); }
-        if (!inputb.isContiguous) { throw new Error("Input must be contiguous"); }
-        if ((dim == 0 && inputa.shape[1] != inputb.shape[1]) || (dim == 1 && inputa.shape[0] != inputb.shape[0])) { throw new Error("Inputs must have the same shape in every dimension except the cat dimension"); }
-        const output_shape = inputa.shape.map((size: number, i: number) => {
-            if(i == dim) return inputa.shape[dim] + inputb.shape[dim];
-            else return size;
-        })
-        return inputa.runKernel("cat", {"dtype":"float32", "dim":dim}, params, [output_shape], inputb)[0];
-    }
-    // DOES NOT WORK
-    static setupContext(
-        ctx: GradientContext,
-        inputs: FunctionInput[],
-        output: Tensor
-    ): void {
-        console.warn("‼️ THIS HAS NOT BEEN IMPLEMENTED");
-        const [input] = inputs as [Tensor];
-        ctx.saveForBackward(input);
-    }
-    // DOES NOT WORK
-    static backward(ctx: GradientContext, outputGrad: Tensor): GradientFunctionOutput[] {
-        console.warn("‼️ THIS HAS NOT BEEN IMPLEMENTED");
-        const [input] = ctx.savedTensors as [Tensor];
-        const params = {
-            size: shapeSize(input.shape),
-        };
-        return input.runKernel("floorGrad", {"dtype":"float32"}, params, [input.shape], outputGrad);
-    }
-}
-*/
 
 export class ScalarMulFunction extends AutoFunction {
     static forward(inputs: FunctionInput[]): Tensor {

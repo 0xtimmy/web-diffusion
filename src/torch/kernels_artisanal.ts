@@ -1,6 +1,100 @@
 import { KernelSpec } from "./kernel";
 
 export const kernels: { [name: string]: KernelSpec } = {
+    softmax: {
+        name: "softmax",
+        config: [
+            {
+                name: "dtype"
+            }
+        ],
+        parameters: [
+            {
+                name: "stride",
+                shaderType: "u32"
+            },
+            {
+                name: "outputSize",
+                shaderType: "u32"
+            }
+        ],
+        inputs: [
+            {
+                name: "input",
+                shaderType: "array<f32>"
+            },
+            {
+                name: "sums",
+                shaderType: "array<f32>"
+            }
+        ],
+        outputs: [
+            {
+                name: "output",
+                shaderType: "array<f32>",
+                size: "outputSize"
+            }
+        ],
+        workgroupSize: [4, 4, 1],
+        workgroupCount: ["stride / 4", "outputSize / stride / 4", 1],
+        shader: `
+            if(global_id.x > stride || global_id.y > floor(outputSize / stride)) {
+                return;
+            }
+
+            const idx = global_id.x + global_id.y*stride;
+            output[idx] = input[idx] / sum[global_id.y];
+        `
+    },
+    chunk: {
+        name: "chunk",
+        config: [
+            {
+                name: "dtype"
+            }
+        ],
+        parameters: [
+            {
+                name: "chunkSize",
+                shaderType: "u32"
+            },
+            {
+                name: "stride",
+                shaderType: "u32"
+            },
+            {
+                name: "strides",
+                shaderType: "u32"
+            },
+            {
+                name: "offset",
+                shaderType: "u32"
+            }
+        ],
+        inputs: [
+            {
+                name: "input",
+                shaderType: "array<f32>"
+            }
+        ],
+        outputs: [
+            {
+                name: "output",
+                shaderType: "array<f32>",
+                size: "chunkSize * strides"
+            }
+        ],
+        workgroupSize: [4, 4, 1],
+        workgroupCount: ["chunkSize / 4", "strides / 4", 1],
+        shader: `
+            if (global_id.x >= parameters.chunkSize || global_id.y >= parameters.strides) {
+                return;
+            }
+
+            const chunk_idx = global_id.y*parameters.chunkSize;
+            output[global_id.x + chunk_idx] = input[global_id.x + chunk_idx*parameters.stride];
+        `
+    },
     box_muller: {
         name: "box_muller",
         config: [
@@ -35,16 +129,27 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        workgroupSize: [8, 1, 1],
-        workgroupCount: ["outputSize / 8", 1, 1],
+        workgroupSize: [4, 2, 1],
+        workgroupCount: ["outputSize / 8", 2, 1],
         shader: `
-            if (global_id.x >= parameters.outputSize) {
+            if (global_id.x + global_id.y*(parameters.outputSize / 2) >= parameters.outputSize) {
                 return;
             }
 
             const pi = 3.1415
-
-            output[global_id.x] = sqrt(-2 * log(input[global_id.x])) * cos(2 * pi * input[global_id.x]) * parameters.std + parameters.mean;
+            let u1;
+            let u2;
+            let idx;
+            if(global_id.y == 0) {
+                u1 = input[global_id.x];
+                u2 = input[global_id.x + (parameters.outputSize / 2)];
+                idx = global_id.x;
+            } else {
+                u1 = input[global_id.x + (parameters.outputSize / 2)];
+                u2 = input[global_id.x];
+                idx = global_id.x + (parameters.outputSize / 2);
+            }
+            output[idx] = sqrt(-2 * log(u1)) * cos(2 * pi * u2) * parameters.std + parameters.mean;
         `
     },
     upsample: {

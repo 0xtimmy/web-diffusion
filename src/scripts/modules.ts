@@ -6,7 +6,7 @@ class SelfAttention extends torch.nn.Module {
 
     channels: number;
     size: number;
-    mha: torch.nn.Module;
+    mha: torch.nn.MultiheadAttention;
     ln: torch.nn.LayerNorm;
     ff_self: torch.nn.Sequential;
 
@@ -179,36 +179,36 @@ class UNet extends torch.nn.Module {
             torch.scalar_div(torch.ones(range.shape), 10000),
             range
         );
-        const pos_enc_a = torch.sin(torch.mul(torch.repeat(t, 1, Math.floor(channels / 2)), inv_freq));
-        const pos_enc_b = torch.cos(torch.mul(torch.repeat(t, 1, Math.floor(channels / 2)), inv_freq));
+        const pos_enc_a = torch.sin(torch.mul(torch.repeat(t, [1, Math.floor(channels / 2)]), inv_freq));
+        const pos_enc_b = torch.cos(torch.mul(torch.repeat(t, [1, Math.floor(channels / 2)]), inv_freq));
         const pos_enc = torch.cat(pos_enc_a, pos_enc_b, 1);
         return pos_enc;
     }
 
     forward(x: torch.Tensor, t: torch.Tensor) {
-        //t = torch.unsqueeze(t, -1);
+        t = torch.unsqueeze(t, -1);
         t = this.pos_encoding(t, this.time_dim);
 
-        let x1 = this.inc(x);
-        let x2 = this.down1(x1, t);
-        x2 = this.sa1(x2)
-        let x3 = this.down2(x2, t);
-        x3 = this.sa2(x3);
-        let x4 = this.down3(x3, t);
-        x4 = this.sa3(x4);
+        let x1 = this.inc.forward(x);
+        let x2 = this.down1.forward(x1, t);
+        x2 = this.sa1.forward(x2)
+        let x3 = this.down2.forward(x2, t);
+        x3 = this.sa2.forward(x3);
+        let x4 = this.down3.forward(x3, t);
+        x4 = this.sa3.forward(x4);
 
-        x4 = this.bot1(x4);
-        x4 = this.bot2(x4);
-        x4 = this.bot3(x4);
+        x4 = this.bot1.forward(x4);
+        x4 = this.bot2.forward(x4);
+        x4 = this.bot3.forward(x4);
 
-        x = this.up1(x4, x3, t);
-        x = this.sa4(x);
-        x = this.up2(x, x2, t);
-        x = this.sa5(x);
-        x = this.up3(x, x1, t);
-        x = this.sa6(x)
+        x = this.up1.forward(x4, x3, t);
+        x = this.sa4.forward(x);
+        x = this.up2.forward(x, x2, t);
+        x = this.sa5.forward(x);
+        x = this.up3.forward(x, x1, t);
+        x = this.sa6.forward(x)
 
-        const output = this.outc(x)
+        const output = this.outc.forward(x)
         return output
 
     }

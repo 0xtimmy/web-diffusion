@@ -1,7 +1,10 @@
 import { Tensor } from "./tensor";
 import { Module, Parameter } from "./nn_module";
 import { Shape } from "./shape";
-import { empty } from "./factories";
+import { empty, constant } from "./factories";
+import { xavier_uniform, xavier_normal } from "./nn_utils";
+import { Linear } from "./nn_cnn";
+import * as aops from "./ops_artisanal";
 // ------------------------------------
 // Start Custom
 // ------------------------------------
@@ -82,7 +85,7 @@ export class UpSample extends Module {
         return input.upsample(this.size, this.scale_factor, this.mode, this.align_corners, this.recompute_scale_factor);
     }
 }
-/*
+
 export class MultiheadAttention extends Module {
 
     embed_dim: number;
@@ -106,7 +109,7 @@ export class MultiheadAttention extends Module {
     bias_k: Parameter | null = null;
     bias_v: Parameter | null = null;
 
-    add_zer_attn: boolean;
+    add_zero_attn: boolean;
 
     constructor(embed_dim: number, num_heads: number, dropout=0, bias=true, add_bias_kv=false, add_zero_attn=false, kdim=null, vdim=null, batch_first=false) {
         super();
@@ -135,41 +138,123 @@ export class MultiheadAttention extends Module {
         
         if(bias) this.in_proj_bias = new Parameter(empty(3 * embed_dim));
         else this.registerParameter("in_proj_bias", null);
-        this.out_proj = NotDynamicallyQuantizableLinear(embed_dim, embed_dim, bias);
+        this.out_proj = new Linear(embed_dim, embed_dim);
 
         if(add_bias_kv) {
             this.bias_k = new Parameter(empty([1, 1, embed_dim]));
             this.bias_v = new Parameter(empty([1, 1, embed_dim]));
         }
 
-        this.add_zer_attn = add_zero_attn;
+        this.add_zero_attn = add_zero_attn;
 
         this._reset_parameters();
-
-        function _reset_paramteres() {
-            if(this._qkv_same_embed_dim) {
-                xavier_uniform(this.in_proj_weight);
-            } else {
-                xavier_uniform(this.q_proj_weight);
-                xavier_uniform(this.k_proj_weight);
-                xavier_uniform(this.v_proj_weight);
-            }
-
-            if(this.in_proj_bias != null) {
-                constant_(this.in_proj_bias, 0.0);
-                constant_(this.out_proj.bias, 0.0);
-            }
-            if(this.bias_k != null) xavier_normal(this.bias_k);
-            if(this.bias_v != null) xavier_normal(this.bias_v);
-        }
     }
 
-    forward(input: Tensor): Tensor {
-        return input;
+    _reset_parameters() {
+        if(this._qkv_same_embed_dim) {
+            xavier_uniform(this.in_proj_weight);
+        } else {
+            xavier_uniform(this.q_proj_weight);
+            xavier_uniform(this.k_proj_weight);
+            xavier_uniform(this.v_proj_weight);
+        }
+
+        if(this.in_proj_bias != null) {
+            constant(this.in_proj_bias.shape, 0.0);
+            constant(this.out_proj.bias, 0.0);
+        }
+        if(this.bias_k != null) xavier_normal(this.bias_k);
+        if(this.bias_v != null) xavier_normal(this.bias_v);
+    }
+
+    forward(
+        query: Tensor,
+        key: Tensor,
+        value: Tensor,
+        key_padding_mask: Tensor | null = null,
+        need_weights=true,
+        attn_mask: Tensor | null = null,
+        average_attn_weights=true,
+        is_casual=false
+    ): { output: Tensor, weights: Tensor } {
+
+        const is_batched = query.dim == 3;
+
+        /*
+        key_padding_mask = canonical_mask(
+            key_padding_mask,
+            "key_padding_mask",
+            attn_mask ? attn_mask.dtype : null,
+            "attn_mask",
+            query.dtype
+        ); 
+
+        attn_mask = canonical_mask(
+            attn_mask,
+            "attn_mask",
+            null,
+            "",
+            query.dtype,
+            false
+        );
+        */
+
+        let why_not_fast_path = "";
+        if(!is_batched) why_not_fast_path = `input not batched, expexted dim of 3 but got ${query.dim}`;
+        else if(query != key || key != value) why_not_fast_path = `non self attention used`;
+        else if (this.in_proj_bias != null && query.dtype != this.in_proj_bias.dtype) why_not_fast_path = `dtypes of query (${query.dtype}) and self.in_proj_bias (${this.in_proj_bias.dtype}) don't match`
+        else if(this.in_proj_weight == null) why_not_fast_path = "in_proj_weight was null"
+        else if(query.dtype != this.in_proj_weight.dtype) why_not_fast_path = `dtypes of query (${query.dtype}) and self.in_proj_weight (${this.in_proj_weight.dtype}) don't match`
+        else if(this.training) why_not_fast_path = "training is enabled";
+        else if(this.num_heads % 2 != 0) why_not_fast_path = "num heads is not even";
+        else if(!this.batch_first) why_not_fast_path = "batch_first was false";
+        else if(this.bias_k != null) why_not_fast_path = "bias_k was nt null";
+        else if(this.bias_v != null) why_not_fast_path = "bias_v was nt null";
+        else if(this.add_zero_attn) why_not_fast_path = "add_zero_attn was enabled";
+        else if(!this._qkv_same_embed_dim) why_not_fast_path = "qkv_same_embed_dim was not true";
+
+        let res;
+        
+
+        if (!this._qkv_same_embed_dim) {
+            res = aops.multihead_attention(
+                query, key, value, this.embed_dim, this.num_heads,
+                this.in_proj_weight, this.in_proj_bias,
+                this.add_zero_attn,
+                this.dropout, this.out_proj.weight, this.out_proj.bias,
+                /*
+                training=this.training,
+                key_padding_mask=key_padding_mask, need_weights=need_weights,
+                attn_mask=attn_mask,
+                use_separate_proj_weight=True,
+                q_proj_weight=self.q_proj_weight, k_proj_weight=self.k_proj_weight,
+                v_proj_weight=self.v_proj_weight,
+                average_attn_weights=average_attn_weights,
+                is_causal=is_causal
+                */
+            )
+        } else {
+            res = aops.multihead_attention(
+                query, key, value, this.embed_dim, this.num_heads,
+                this.in_proj_weight, this.in_proj_bias,
+                this.add_zero_attn,
+                this.dropout, this.out_proj.weight, this.out_proj.bias,
+                /*
+                training=self.training,
+                key_padding_mask=key_padding_mask,
+                need_weights=need_weights,
+                attn_mask=attn_mask,
+                average_attn_weights=average_attn_weights,
+                is_causal=is_causal
+                */
+            )
+        }
+            
+
+        return { output: res.output, weights: res.weights };
         //return input.multihead_attention(this.embed_dim, this.num_heads);
     }
 }
-*/
 
 // ------------------------------------
 // Start Custom

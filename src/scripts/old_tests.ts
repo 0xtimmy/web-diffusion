@@ -7,6 +7,7 @@ import {
     clamp,
     repeat
 } from "./utils"
+import { uniform } from "@/torch/factories"
 
 //
 // Imports for testing private functions
@@ -18,7 +19,9 @@ import {
 */
 
 export default async function() {
-    await test_normal();
+    //await test_unsqueeze_squeeze();
+    //await test_rand();
+    //await test_normal();
     //await test_fanin_fanout();
     //await test_upsample();
     //await test_maxpool2d();
@@ -68,6 +71,51 @@ async function check(res: torch.Tensor, expected: torch.Tensor): Promise<boolean
     console.log("Got: ", res_data, "\nExpected: ", actual_data);
     return false;
     
+}
+
+async function test_unsqueeze_squeeze() {
+    console.log("🔨 Testing unsqueeze with dim 0 and input:");
+    let input = torch.tensor([1, 2, 3, 4]);
+    let input_data = await input.toArrayAsync();
+    console.log(input_data);
+    let output = input.unsqueeze(0);
+    let output_data = await output.toArrayAsync();
+    console.log("res: ", output_data);
+
+    console.log("🔨 Testing unsqueeze with dim 1");
+    console.log(input_data);
+    output = input.unsqueeze(1);
+    output_data = await output.toArrayAsync();
+    console.log("res: ", output_data);
+
+    console.log("🔨 Testing squeeze");
+    input = torch.tensor([[[[1], [2]]], [[[3], [4]]]]);
+    input_data = await input.toArrayAsync();
+    console.log(input_data);
+    output = input.squeeze();
+    output_data = await output.toArrayAsync();
+    console.log("res: ", output_data);
+
+    console.log("🔨 Testing squeeze with dim 1");
+    console.log(input_data);
+    output = input.squeeze(1);
+    output_data = await output.toArrayAsync();
+    console.log("res: ", output_data);
+}
+
+async function test_rand() {
+    console.log("🔨 Testing rand with size [100]");
+    const size = [200];
+    let output = uniform(size);
+    let output_data = await output.toArrayAsync();
+    console.log("res: ", output_data);
+    console.log(JSON.stringify(output_data));
+
+    console.log("🔨 Testing box-muller on uniform dist");
+    output = output.box_muller(0, 1);
+    output_data = await output.toArrayAsync();
+    console.log("res: ", output_data);
+    console.log(JSON.stringify(output_data));
 }
 
 

@@ -1,7 +1,7 @@
 import type { Device, Deviceish } from "./device";
 import { getDevice } from "./devices";
 import { Shape, Strides, defaultStrides, shapeSize } from "./shape";
-import { ones } from "./factories";
+import { ones, uniform, normal } from "./factories";
 import { ATypedArray, Dtype, getDtype } from "./dtype";
 import {
     TensorArrayData,
@@ -51,10 +51,7 @@ export class Tensor extends TensorBase {
         return this._shape.length;
     }
     get size(): number {
-        return Tensor.getSize(this.shape);
-    }
-    static getSize(shape: Shape) {
-        return shape.reduce((acc ,v) => { return acc * v }, 1);
+        return shapeSize(this.shape);
     }
     get strides(): Strides {
         return this._strides;
@@ -159,6 +156,9 @@ export class Tensor extends TensorBase {
             shape,
             strides,
         });
+    }
+    view(shape: Shape): Tensor {
+        return this.withShape(shape, defaultStrides(shape));
     }
 
     get [Symbol.toStringTag]() {
@@ -359,6 +359,17 @@ export class Tensor extends TensorBase {
     }
     zero_(): Tensor {
         throw new Error("Tensor zero_ is not implemented");
+    }
+
+    // Squeeze & Unsqueeze
+    squeeze(dim?: number): Tensor {
+        return aops.squeeze(this, dim);
+    }
+    unsqueeze(dim: number): Tensor {
+        return aops.unsqueeze(this, dim);
+    }
+    chunk(chunks: number, dim?: number): Array<Tensor> {
+        return aops.chunk(this, chunks, dim);
     }
 
     // Codegen marker
@@ -1871,38 +1882,20 @@ export class Tensor extends TensorBase {
         a: number,
         b: number
     ): Tensor {
-        const storage = this.device.allocFor(this.shape, this.dtype);
-        const array = storage.getTypedArray(this.dtype);
-        const diff = b - a;
-        for(let i = 0; i < array.length; i++) {
-            array[i] = Math.random()*diff + a;
-        }
-        return new Tensor({
-            data: storage,
-            dtype: this.dtype,
-            shape: this.shape,
-            strides: defaultStrides(this.shape),
-            device: this.device,
-        });
+        return uniform(this.shape, a, b, this.dtype, this.device);
     }
 
     normal(
         mean: number,
         std: number
     ): Tensor {
-        const storage = this.device.allocFor(this.shape, this.dtype);
-        const array = storage.getTypedArray(this.dtype);
-        for(let i = 0; i < array.length; i++) {
-            array[i] = Math.random();
-        }
-        const t = new Tensor({
-            data: storage,
-            dtype: this.dtype,
-            shape: this.shape,
-            strides: defaultStrides(this.shape),
-            device: this.device,
-        });
-        return t.box_muller(mean, std)
+        return normal(this.shape, mean, std, this.dtype, this.device)
+    }
+
+    permute(
+        dims: Array<number>
+    ): Tensor {
+        return aops.permute(this, dims);
     }
 
     // ------------------------------------

@@ -8,6 +8,8 @@ import {
     clamp
 } from "./utils";
 
+export 
+
 class Diffusion {
     noise_steps: number;
     beta_start: number;

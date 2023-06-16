@@ -3,9 +3,9 @@ import type { Dtype } from "./dtype";
 import { Tensor } from "./tensor";
 import { shouldCreateGradient } from "./autograd";
 import type { TensorData, TensorSpec } from "./tensor";
-import { Shape } from "./shape";
+import { Shape, defaultStrides, shapeSize } from "./shape";
 import { ones } from "./factories";
-import { scalar_mul } from "./ops_opgen";
+import * as ops from "./ops_opgen";
 
 // ------------------------------------
 // Start Custom
@@ -106,12 +106,12 @@ export function maxpool2d(input: Tensor, kernel_size: [number, number], stride: 
     if(padding[0] != 0) {
         let zero_shape = Array.from(input.shape);
         zero_shape[shape_len-1] = padding[0];
-        input = cat(cat(scalar_mul(ones(zero_shape), -256), input, 3), scalar_mul(ones(zero_shape), -256), 3);
+        input = cat(cat(ops.scalar_mul(ones(zero_shape), -256), input, 3), ops.scalar_mul(ones(zero_shape), -256), 3);
     }
     if(padding[1] != 0) {
         let zero_shape = Array.from(input.shape);
         zero_shape[shape_len-2] = padding[1];
-        input = cat(cat(scalar_mul(ones(zero_shape), -256), input, 2), scalar_mul(ones(zero_shape), -256), 2);
+        input = cat(cat(ops.scalar_mul(ones(zero_shape), -256), input, 2), ops.scalar_mul(ones(zero_shape), -256), 2);
     }
     const params = {
         kernel_size_x: kernel_size[0],
@@ -128,7 +128,7 @@ export function maxpool2d(input: Tensor, kernel_size: [number, number], stride: 
         channel_width: shape_len > 2 ? input.shape[shape_len-3] : 1,
         channel_height: shape_len > 3 ? input.shape[shape_len-4] : 1,
         channel_size: input.shape[shape_len-1] * input.shape[shape_len-2],
-        outputSize: Tensor.getSize(output_shape)
+        outputSize: shapeSize(output_shape)
     };
     return input.runKernel(
         "maxpool2d",
@@ -179,7 +179,7 @@ export function upsample(
         w_out: output_shape[2],
         h_out: output_shape[3] ? output_shape[3] : 1,
         d_out: output_shape[4] ? output_shape[4] : 1,
-        outputSize: Tensor.getSize(output_shape)
+        outputSize: shapeSize(output_shape)
     }
     console.log("params: ", params);
     console.log("output shape: ", output_shape);
@@ -189,6 +189,27 @@ export function upsample(
         params,
         [output_shape]
     )[0]
+}
+
+export function rand(
+    input: Tensor,
+    seed: number,
+): { output: Tensor, next_seed: number } {
+
+    const params = {
+        seed: seed,
+        outputSize: input.size
+    }
+    console.log(params);
+    return {
+        output: input.runKernel(
+            "rand",
+            { dtype: input.dtype },
+            params,
+            [input.shape]
+        )[0],
+        next_seed: seed + params.outputSize
+    }
 }
 
 export function box_muller(
@@ -202,7 +223,6 @@ export function box_muller(
         std: std,
         outputSize: input.size
     }
-
     return input.runKernel(
         "box_muller",
         { dtype: input.dtype },
@@ -211,29 +231,282 @@ export function box_muller(
     )[0];
 }
 
-/*
+export function squeeze(
+    input: Tensor,
+    dim?: number
+): Tensor {
+    if(dim <= -input.dim || dim > input.dim) throw new Error(`"dim" out of bounds; must be on the interval:  [${-input.dim}, ${input.dim}) for input tensor with dim: ${input.dim}`);
+    if(dim < 0) dim = dim + input.dim + 1;
+    let new_shape = input.shape;
+    if(dim) {
+        if(input.shape[dim] == 1) new_shape = [...input.shape.slice(0,dim), ...input.shape.slice(dim + 1)];
+    } else {
+        new_shape = input.shape.filter((size: number) => { return size != 1 });
+    }
+    return input.withShape(new_shape, defaultStrides(new_shape));
+}
+
+export function unsqueeze(
+    input: Tensor,
+    dim: number
+): Tensor {
+    if(dim <= -input.dim - 1 || dim > input.dim + 1) throw new Error(`"dim" out of bounds; must be on the interval:  [${-input.dim - 1}, ${input.dim + 1}) for input tensor with dim: ${input.dim}`);
+    if(dim < 0) dim = dim + input.dim + 1;
+    const new_shape = [...input.shape.slice(0, dim), 1, ...input.shape.slice(dim)];
+    return input.withShape(new_shape, defaultStrides(new_shape));
+}
+
+export function linear(
+    input: Tensor,
+    weight: Tensor,
+    bias?: Tensor,
+): Tensor {
+    let output = input.mm(weight.t());
+    if(bias) return ops.add(output, bias);
+    else return output;
+}
+
+export function softmax(
+    input: Tensor,
+    dim?: number,
+): Tensor {
+
+    const exp = input.exp();
+    const sum_exp = exp.sum(dim);
+
+    const params = {
+        stride: shapeSize(input.shape.slice(dim)),
+        outputSize: input.size
+    };
+    return exp.runKernel(
+        "softmax",
+        { dtype: input.dtype },
+        params,
+        [input.shape],
+        sum_exp
+    )[0]
+}
+
+export function permute(
+    input: Tensor,
+    dims: Array<number>,
+): Tensor {
+    if(dims.length != input.shape.length) throw new Error("permute need the same number of dimentions as it's input");
+    const seen = [];
+    dims.forEach((v) => {
+        if(seen.includes(v)) throw new Error(`Permute cannot take duplicate dimentions (${dims})`);
+        if(v < 0 || v >= dims.length) throw new Error(`No dimention ${v} in input shape: ${input.shape}`);
+    })
+    const output_shape = dims.map((v: number) => {
+        return input.shape[v];
+    });
+    return input.view(output_shape);
+}
+
+export function scaled_dot_product_attention(
+    query: Tensor,
+    key: Tensor,
+    value: Tensor,
+    attn_mask?: Tensor,
+    dropout?: number,
+    is_casual?: boolean,
+): Tensor {
+    if(attn_mask) console.error("attention does not support attention masks");
+    if(dropout) console.error("attention does not support dropout");
+    if(is_casual) console.error("attention does not support is_causal");
+    return mm(softmax(ops.scalar_div(mm(query, key.t()), Math.sqrt(key.size))), value);
+}
+
+
 export function multihead_attention(
     query: Tensor,
     key: Tensor,
     value: Tensor,
-    embed_dim: number,
-    num_heads: number
-) {
-    const output_shape = input.shape;
-    const params = {
-        embed_dim: embed_dim,
-        num_heads: num_heads,
+    embed_dim_to_check: number,
+    num_heads: number,
+
+    in_proj_weight: Tensor | null,
+    in_proj_bias: Tensor | null,
+    
+    add_zero_attn: boolean,
+    dropout_p: number,
+    out_proj_weight: Tensor,
+    out_proj_bias?: Tensor,
+
+    key_padding_mask?: Tensor,
+    attn_mask?: Tensor,
+
+    use_separate_proj_weight=false,
+    q_proj_weight?: Tensor,
+    k_proj_weight?: Tensor,
+    v_proj_weight?: Tensor,
+    need_weights=false,
+    is_causal=false
+): { output: Tensor, weights: Tensor | null } {
+
+    const is_batched = _mha_shape_check(query, key, value, num_heads, key_padding_mask, attn_mask);
+
+    if(!is_batched) {
+        query = query.unsqueeze(1);
+        key = key.unsqueeze(1);
+        value = value.unsqueeze(1);
+        if(key_padding_mask != null) key_padding_mask = key_padding_mask.unsqueeze(0);
     }
 
-    return input.runKernel(
-        "multihead_attention",
-        { dtype: input.dtype },
-        params,
-        [output_shape],
+    const tgt_len = query.shape[0];
+    const bsz = query.shape[1];
+    const embed_dim = query.shape[3];
+    const src_len = key.shape[0];
 
-    )[0];
+    
+    if(embed_dim != embed_dim_to_check) throw new Error(`was expeecting embedding dimension of ${embed_dim_to_check}, but got ${embed_dim}`);
+    const head_dim = embed_dim;
+
+    let q, k, v;
+    if(!use_separate_proj_weight) {
+        if(in_proj_weight == null) throw new Error("use_separate_proj_weight is False but in_proj_weight is null")
+
+        const unpacked_weights = in_proj_weight.chunk(3);
+        q_proj_weight = unpacked_weights[0];
+        k_proj_weight = unpacked_weights[1];
+        v_proj_weight = unpacked_weights[2];
+    }
+    if(q_proj_weight == null) throw new Error("use_separate_proj_weight is False but q_proj_weight is null");
+    if(k_proj_weight == null) throw new Error("use_separate_proj_weight is False but k_proj_weight is null");
+    if(v_proj_weight == null) throw new Error("use_separate_proj_weight is False but v_proj_weight is null");
+    let b_q, b_k, b_v;
+    if(in_proj_bias == null) {
+        b_q = null;
+        b_k = null;
+        b_v = null;
+    } else {
+        const chunks = in_proj_bias.chunk(3);
+        b_q = chunks[0];
+        b_k = chunks[1];
+        b_v = chunks[2]
+    }
+    const proj = _in_projection(query, key, value, q_proj_weight, k_proj_weight, v_proj_weight, b_q, b_k, b_v)
+    q = proj.q;
+    k = proj.k;
+    v = proj.v;
+
+
+    if (need_weights) {
+        console.error("need weights");
+    } else {
+        if(attn_mask != null) {
+            if(attn_mask.shape[0] == 1 && attn_mask.dim == 3) {
+                attn_mask = attn_mask.unsqueeze(0);
+            } else {
+                attn_mask = attn_mask.view([bsz, num_heads, -1, src_len]);
+            }
+        }
+
+        q = q.view(bsz, num_heads, tgt_len, head_dim);
+        k = k.view(bsz, num_heads, src_len, head_dim);
+        v = v.view(bsz, num_heads, src_len, head_dim);
+
+        let attn_output = scaled_dot_product_attention(q, k, v, attn_mask, dropout_p, is_causal);
+        attn_output = attn_output.permute([2, 0, 1, 3]).view([bsz * tgt_len, embed_dim]);
+
+        attn_output = linear(attn_output, out_proj_weight, out_proj_bias);
+        attn_output = attn_output.view([tgt_len, bsz, attn_output.shape[1]]);
+        if(!is_batched) {
+            attn_output = attn_output.squeeze(1);
+        }
+        return { output: attn_output, weights: null };
+    }
+    
+   return { output: query, weights: null };
 }
-*/
+
+function _in_projection(
+    q: Tensor,
+    k: Tensor,
+    v: Tensor,
+    w_q: Tensor,
+    w_k: Tensor,
+    w_v: Tensor,
+    b_q?: Tensor,
+    b_k?: Tensor,
+    b_v?: Tensor,
+): { q: Tensor, k: Tensor, v: Tensor } {
+
+    const Eq = q.shape[q.dim-1];
+    const Ek = k.shape[k.dim-1];
+    const Ev = v.shape[v.dim-1];
+    if(w_q.shape[0] != Eq || w_q.shape[1] != Eq) throw new Error(`expecting query weights shape of ${[Eq, Eq]}, but got ${w_q.shape}`);
+    if(w_k.shape[0] != Eq || w_k.shape[1] != Ek) throw new Error(`expecting key weights shape of ${[Eq, Ek]}, but got ${w_k.shape}`);
+    if(w_v.shape[0] != Eq || w_v.shape[1] != Ev) throw new Error(`expecting value weights shape of ${[Eq, Ev]}, but got ${w_v.shape}`);
+    if(b_q && b_q.shape[0] != Eq) throw new Error(`expecting query bias shape of ${[Eq]}, but got ${b_q.shape}`);
+    if(b_k && b_k.shape[0] != Eq) throw new Error(`expecting key bias shape of ${[Eq]}, but got ${b_k.shape}`);
+    if(b_v && b_v.shape[0] != Eq) throw new Error(`expecting value bias shape of ${[Eq]}, but got ${b_v.shape}`);
+    return { q: linear(q, w_q, b_q), k: linear(k, w_k, b_k), v: linear(v, w_v, b_v)}
+}
+
+export function chunk(
+    input: Tensor,
+    chunks: number,
+    dim=0
+): Array<Tensor> {
+    if(input.shape[dim] % chunks != 0) throw new Error(`cannot chunk input of shape: ${input.shape} into ${chunks} even chunks along dim: ${dim}`);
+    const output_shape = input.shape.map((v: number, i: number) => {
+        if(i == dim) return v / chunks;
+        return v;
+    })
+    const output_shapes: Array<Shape> = (new Array(chunks)).map(() => output_shape);
+
+    const params = {
+        chunkSize: output_shape.reduce((acc: number, v: number, i: number) => { return i > dim ? acc * v : acc; }, 1),
+        stride: chunks,
+        strides: output_shape.reduce((acc: number, v: number, i: number) => { return i < dim ? acc * v : acc; }, 1),
+    }
+
+    return (new Array(chunks)).map((_, i: number): Tensor => {
+        return input.runKernel(
+            "chunk",
+            { dtype: input.dtype },
+            {...params, offset: i},
+            output_shapes 
+        )[0]
+    });
+}
+
+function _mha_shape_check(query: Tensor, key: Tensor, value: Tensor, num_heads: number, key_padding_mask?: Tensor, attn_mask?: Tensor) {
+    let is_batched;
+
+    if (query.dim == 3) {
+        // batched input
+        is_batched = true;
+        if(key.dim != 3 || value.dim != 3) 
+            throw new Error(`For batched (3-D) "query", expected "key" and "value" to be 3-D but found ${key.dim}-D and ${value.dim}-D tensors respectively`);
+        if(key_padding_mask != undefined)
+            if(key_padding_mask.dim != 2) 
+                throw new Error(`For batched (3-D) "query", expected "key_padding_mask" to be "undefined" or 2-D but found ${key_padding_mask.dim}-D tensor instead`);
+        if(attn_mask != undefined)
+            if(attn_mask.dim != 2 && attn_mask.dim != 3)
+                throw new Error(`For batched (3-D) "query", expected "attn_mask" to be "None", 2-D or 3-D but found ${attn_mask.dim}-D tensor instead`);
+    } else if(query.dim == 2) {
+        // unbatched input
+        is_batched = false;
+        if(key.dim != 2 || value.dim != 2) 
+            throw new Error(`For unbatched (2-D) "query", expected "key" and "value" to be 2-D but found ${key.dim}-D and ${value.dim}-D tensors respectively`);
+        if(key_padding_mask != undefined)
+            if(key_padding_mask.dim != 1) 
+                throw new Error(`For unbatched (2-D) "query", expected "key_padding_mask" to be "undefined" or 1-D but found ${key_padding_mask.dim}-D tensor instead`);
+        if(attn_mask != undefined)
+            if(attn_mask.dim != 2 && attn_mask.dim != 3)
+                throw new Error(`For batched (2-D) "query", expected "attn_mask" to be "None", 2-D or 3-D but found ${attn_mask.dim}-D tensor instead`);
+            if(attn_mask.dim == 3) {
+                const expected_shape = [num_heads, query.shape[0], key.shape[0]];
+                if(expected_shape.length != attn_mask.shape.length || 0 == expected_shape.reduce((acc, v, i) => { return acc != 0 ? 1 : (v == attn_mask.shape[i] ? 0 : 1)}, 0))
+                    throw new Error(`Exptected "attn_mask" shape to be ${expected_shape} but got ${attn_mask.shape}`);
+            }
+    } else {
+        throw new Error(`"query" should be unbatched 2D or batched 3D tensor but received ${query.dim}-D query tensor`);
+    }
+    return is_batched;
+}
 
 // ------------------------------------
 // End Custom
