@@ -1,3 +1,5 @@
+import torch
+import numpy
 
 # Each gen function should return a json object of the below form
 # These will be passed to tester.ts and run against our ts-torch

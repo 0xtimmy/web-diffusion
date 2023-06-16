@@ -1,6 +1,5 @@
-import * as torch from "@/torch"
-import { arange } from "./utils";
-import { Conv2d } from "webgpu-torch/nn_cnn";
+import * as torch from "../torch"
+import { arange } from "../scripts/utils";
 
 class SelfAttention extends torch.nn.Module {
 

@@ -1,12 +1,12 @@
 
-import * as torch from "@/torch"
+import * as torch from "../torch"
 import {
     linspace,
     cumprod,
     randn,
     randint,
     clamp
-} from "./utils";
+} from "../scripts/utils";
 
 export 
 

@@ -8,7 +8,7 @@
 
 <script lang="ts">
 import { defineComponent } from "vue"
-import { init_device } from "@/scripts/device";
+import { init_device } from "./device";
 import tester from "@/scripts/tester";
 
 export default defineComponent({
