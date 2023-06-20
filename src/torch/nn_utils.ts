@@ -1,6 +1,6 @@
 import { Tensor } from "./tensor";
 
-function _calculate_fan_in_fan_out(tensor: Tensor) {
+export function _calculate_fan_in_fan_out(tensor: Tensor): { fan_in: number, fan_out: number } {
     const dimensions = tensor.dim;
     if (dimensions < 2) throw new Error("Fan in and fan out can not be computed for tensor with fewer than 2 dimensions");
 
@@ -34,5 +34,14 @@ export function xavier_normal(input: Tensor, gain=1.0) {
     const std = gain * Math.sqrt(2.0 / (fan_in + fan_out))
 
     return input.normal(0.0, std);
+}
+
+export function kaiming_uniform(input: Tensor, a: number) {
+    const { fan_in, fan_out } = _calculate_fan_in_fan_out(input);
+    const gain = Math.sqrt(2.0 / (1 + Math.pow(a, 2)));
+    const std = gain / Math.sqrt(fan_in);
+    const bound = Math.sqrt(3.0) * std;
+    return input.uniform(-bound, bound);
+
 }
 

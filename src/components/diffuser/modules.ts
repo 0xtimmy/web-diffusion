@@ -1,5 +1,4 @@
-import * as torch from "../torch"
-import { arange } from "../scripts/utils";
+import * as torch from "../../torch"
 
 class SelfAttention extends torch.nn.Module {
 
@@ -24,13 +23,13 @@ class SelfAttention extends torch.nn.Module {
         
     }
 
-    forward(x) {
-        x = x.view(-1, this.channels, this.size + this.size).swapaxes(1, 2);
+    forward(x: torch.Tensor): torch.Tensor {
+        x = x.view([-1, this.channels, this.size + this.size]).transpose(1, 2);
         let x_ln = this.ln.forward(x);
-        let attention_value, _ = this.mha.forward(x_ln, x_ln, x_ln);
-        attention_value = attention_value + x;
-        attention_value = this.ff_self.forward(attention_value) + attention_value;
-        return attention_value.swapaxes(2, 1).view(-1, this.channels, this.size, this.size);
+        let attention_value = this.mha.forward(x_ln, x_ln, x_ln).output;
+        attention_value = torch.add(attention_value, x);
+        attention_value = torch.add(this.ff_self.forward(attention_value), attention_value);
+        return attention_value.transpose(2, 1).view([-1, this.channels, this.size, this.size]);
 
     }
 }
@@ -47,10 +46,10 @@ class DoubleConv extends torch.nn.Module {
             mid_channels = out_channels;
         }
         this.double_conv = new torch.nn.Sequential([
-            new torch.nn.Conv2d(in_channels, mid_channels, 3, 1, 1, "float32"),
+            new torch.nn.Conv2d(in_channels, mid_channels, 3, 1, 1, null, 1, false),
             new torch.nn.GroupNorm(1, mid_channels),
             new torch.nn.GeLU(),
-            new torch.nn.Conv2d(mid_channels, out_channels, 3, 1, 1, "float32"),
+            new torch.nn.Conv2d(mid_channels, out_channels, 3, 1, 1, null, 1, false),
             new torch.nn.GroupNorm(1, out_channels)
         ])
     }
@@ -89,7 +88,8 @@ class Down extends torch.nn.Module {
     forward(x: torch.Tensor, t: torch.Tensor): torch.Tensor {
         x = this.maxpool_conv.forward(x)
         // scuffed
-        const emb = torch.repeat(this.emb_layer.forward(t), [1, 1, x.shape[-2], x.shape[-1]]);
+
+        const emb = torch.repeat(this.emb_layer.forward(t), [1, 1, x.shape[x.shape.length-2], x.shape[x.shape.length-1]]);
         return torch.add(x, emb);
     }
 }
@@ -125,7 +125,7 @@ class Up extends torch.nn.Module {
 }
 
 
-class UNet extends torch.nn.Module {
+export class UNet extends torch.nn.Module {
     time_dim: number;
 
     inc: DoubleConv;
@@ -169,17 +169,14 @@ class UNet extends torch.nn.Module {
         this.sa5 = new SelfAttention(64, 32);
         this.up3 = new Up(128, 64);
         this.sa6 = new SelfAttention(64, 64);
-        this.outc = new torch.nn.Conv2d(64, c_out, 1, 1, 0, "None");
+        this.outc = new torch.nn.Conv2d(64, c_out, 1, 1, 0, null, 1, false);
     }
 
     pos_encoding(t: torch.Tensor, channels: number) {
-        const range = torch.scalar_div(arange(0, channels, 2), channels);
-        const inv_freq = torch.pow(
-            torch.scalar_div(torch.ones(range.shape), 10000),
-            range
-        );
-        const pos_enc_a = torch.sin(torch.mul(torch.repeat(t, [1, Math.floor(channels / 2)]), inv_freq));
-        const pos_enc_b = torch.cos(torch.mul(torch.repeat(t, [1, Math.floor(channels / 2)]), inv_freq));
+        const range = torch.scalar_div(torch.arange(0, channels, 2), channels);
+        const inv_freq = torch.div(torch.ones(range.shape), torch.pow(torch.constant(range.shape, 10000), range));
+        const pos_enc_a = torch.sin(torch.mul(torch.repeat(t, [Math.floor(channels / 2)]), inv_freq));
+        const pos_enc_b = torch.cos(torch.mul(torch.repeat(t, [Math.floor(channels / 2)]), inv_freq));
         const pos_enc = torch.cat(pos_enc_a, pos_enc_b, 1);
         return pos_enc;
     }
@@ -187,6 +184,9 @@ class UNet extends torch.nn.Module {
     forward(x: torch.Tensor, t: torch.Tensor) {
         t = torch.unsqueeze(t, -1);
         t = this.pos_encoding(t, this.time_dim);
+
+        console.log("shape going into DoubleConv");
+        console.log(x.shape)
 
         let x1 = this.inc.forward(x);
         let x2 = this.down1.forward(x1, t);

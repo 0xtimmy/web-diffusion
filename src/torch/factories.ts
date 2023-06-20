@@ -1,4 +1,4 @@
-import { Shapeish, defaultStrides, getShape } from "./shape";
+import { Shapeish, defaultStrides, getShape, Shape } from "./shape";
 import { Deviceish } from "./device";
 import { getDevice } from "./devices";
 import { Dtype, getDtype } from "./dtype";
@@ -93,4 +93,35 @@ export function normal(
     device?: Deviceish 
 ): Tensor {
     return uniform(shape, 0, 1, dtype, device).box_muller(mean, std);
+}
+
+export function randn(
+    shape: Shape,
+): Tensor {
+    return normal(shape);
+}
+
+export function randint(low: number, high: number, shape: Shape) {
+    return uniform(shape, low, high).floor();
+}
+
+export function linspace(start: number, end: number, steps: number) {
+    if(Math.floor(steps) != steps) throw new Error("when calling linspace \"steps\" must be an integer");
+
+    return zeros(steps).runKernel(
+        "linspace",
+        { dtype: getDtype(undefined) },
+        { start: start, end: end, outputSize: steps },
+        [[steps]]
+    )[0]
+}
+
+export function arange(start: number, end: number, step: number) {
+    const outputSize = Math.floor((end - start) / step)
+    return zeros(outputSize).runKernel(
+        "arange",
+        { dtype: getDtype(undefined) },
+        { start: start, step: step, outputSize: outputSize },
+        [[outputSize]]
+    )[0]
 }

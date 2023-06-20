@@ -1,12 +1,18 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from "vue-router";
-import Home from "../views/Home.vue";
+import Tests from "../views/Tests.vue";
+import Diffuser from "../views/Diffuser.vue";
 
 const routes: Array<RouteRecordRaw> = [
   {
     path: "/",
-    name: "Home",
-    component: Home,
+    name: "Tests",
+    component: Tests,
   },
+  {
+    path: "/diffuser",
+    name: "Diffuser",
+    component: Diffuser
+  }
 ];
 
 const router = createRouter({

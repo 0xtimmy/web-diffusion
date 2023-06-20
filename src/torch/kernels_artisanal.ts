@@ -1,6 +1,216 @@
 import { KernelSpec } from "./kernel";
 
 export const kernels: { [name: string]: KernelSpec } = {
+    group_norm: {
+        name: "group_norm",
+        config: [
+            {
+                name: "dtype"
+            }
+        ],
+        parameters: [
+            {
+                name: "groupSize",
+                shaderType: "u32"
+            },
+            {
+                name: "eps",
+                shaderType: "f32"
+            },
+            {
+                name: "outputSize",
+                shaderType: "u32"
+            }
+        ],
+        inputs: [
+            {
+                name: "input",
+                shaderType: "array<f32>"
+            },
+            {
+                name: "weight",
+                shaderType: "array<f32>"
+            },
+            {
+                name: "bias",
+                shaderType: "array<f32>"
+            },
+        ],
+        outputs: [
+            {
+                name: "output",
+                shaderType: "array<f32>",
+                size: "outputSize"
+            }
+        ],
+        workgroupSize: [1, 1, 1],
+        workgroupCount: ["outputSize", 1, 1],
+        shader: `
+            if(global_id.x > parameters.outputSize) return;
+
+            const group = floor(global_id.x / parameters.groupSize);
+            const group_start = group * parameters.groupSize;
+
+            var mean = 0;
+            var mean_sqrd = 0;
+
+            for(let i = group * parameters.groupSize; i < (group + 1) * parameters.groupSize; i++) {
+                mean = mean + input[i];
+                mean_sqrd = mean_sqrd + input[i] * input[i];
+            }
+
+            mean = mean / parameters.groupSize;
+            const std = sqrt( (mean_sqrd / parameters.groupSize) - (mean * mean) + [parameters.eps]);
+
+            output[global_id.x] = (input[global_id.x] - mean) / std * weight[group] + bias[group];
+
+        `
+    },
+    arange: {
+        name: "arange",
+        config: [
+            {
+                name: "dtype"
+            }
+        ],
+        parameters: [
+            {
+                name: "start",
+                shaderType: "f32"
+            },
+            {
+                name: "step",
+                shaderType: "f32"
+            },
+            {
+                name: "outputSize",
+                shaderType: "u32"
+            }
+        ],
+        inputs: [
+            {
+                name: "input",
+                shaderType: "array<f32>"
+            }
+        ],
+        outputs: [
+            {
+                name: "output",
+                shaderType: "array<f32>",
+                size: "outputSize"
+            }
+        ],
+        workgroupSize: [8, 1, 1],
+        workgroupCount: ["outputSize / 8", 1, 1],
+        shader: `
+            if(global_id.x >= parameters.outputSize) return;
+
+            output[global_id.x] = parameters.step * global_id.x + parameters.start;
+        `  
+    },
+    linspace: {
+        name: "linspace",
+        config: [
+            {
+                name: "dtype"
+            }
+        ],
+        parameters: [
+            {
+                name: "start",
+                shaderType: "f32"
+            },
+            {
+                name: "end",
+                shaderType: "f32"
+            },
+            {
+                name: "outputSize",
+                shaderType: "u32"
+            }
+        ],
+        inputs: [
+            {
+                name: "input",
+                shaderType: "array<f32>"
+            }
+        ],
+        outputs: [
+            {
+                name: "output",
+                shaderType: "array<f32>",
+                size: "outputSize"
+            }
+        ],
+        workgroupSize: [8, 1, 1],
+        workgroupCount: ["outputSize / 8", 1, 1],
+        shader: `
+            if(global_id.x >= parameters.outputSize) return;
+
+            const diff = parameters.end - parameters.start;
+            output[global_id.x] = diff * global_id.x / (parameters.outputSize - 1) + parameters.start;
+        `  
+    },
+    transpose: {
+        name: "transpose",
+        config: [
+            {
+                name: "dtype"
+            }
+        ],
+        parameters: [
+            {
+                name: "dim0",
+                shaderType: "u32"
+            },
+            {
+                name: "dim1",
+                shaderType: "u32"
+            },
+            {
+                name: "batchSize",
+                shaderType: "u32"
+            },
+            {
+                name: "elSize",
+                shaderType: "u32"
+            },
+            {
+                name: "outputSize",
+                shaderType: "u32"
+            }
+        ],
+        inputs: [
+            {
+                name: "input",
+                shaderType: "array<f32>"
+            }
+        ],
+        outputs: [
+            {
+                name: "output",
+                shaderType: "array<f32>",
+                size: "outputSize * batchSize * elSize"
+            }
+        ],
+        workgroupSize: [1, 1, 1],
+        workgroupCount: ["batchSize / elSize", "outputSize / batchSize", "elSize"],
+        shader: `
+            if(global_id.x > parameters.batchSize / parameters.elSize) {
+                return;
+            }
+
+            const i = floor(global_id.x / parameters.stride / parameters.dim1);
+            const j = global_id.x % parameters.dim1;
+            const k = floor(global_id.x / parameters.dim1) % parameters.stride;
+
+            const win_idx = j * parameters.dim0 * parameters.stride + k * parameters.dim0 + i;
+
+            const output_idx = global_id.y * parameters.batchSize + win_idx * parameters.elSize + global_id.z;
+            const input_idx = global_id.y * parameters.batchSize + global_id.x * parameters.elSize + global_id.z
+            output[output_idx] = input[input_idx];
+        `
+    },
     softmax: {
         name: "softmax",
         config: [

@@ -133,7 +133,7 @@ export class UNetModel extends Module {
                     3,
                     1,
                     1,
-                    this.dtype
+                    this.dtype,
                 )
             ),
         ]);
@@ -416,6 +416,10 @@ function conv_nd(
             kernelSize,
             stride,
             padding,
+            null,
+            null,
+            null,
+            null,
             dtype
         );
     } else {
