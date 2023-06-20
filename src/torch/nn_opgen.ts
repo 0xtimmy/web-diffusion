@@ -161,7 +161,7 @@ export class MultiheadAttention extends Module {
 
         if(this.in_proj_bias != null) {
             constant(this.in_proj_bias.shape, 0.0);
-            constant(this.out_proj.bias, 0.0);
+            constant(this.out_proj.bias.shape, 0.0);
         }
         if(this.bias_k != null) xavier_normal(this.bias_k);
         if(this.bias_v != null) xavier_normal(this.bias_v);

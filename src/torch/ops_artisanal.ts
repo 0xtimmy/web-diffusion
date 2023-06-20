@@ -4,7 +4,7 @@ import { Tensor } from "./tensor";
 import { shouldCreateGradient } from "./autograd";
 import type { TensorData, TensorSpec } from "./tensor";
 import { Shape, defaultStrides, shapeSize } from "./shape";
-import { ones } from "./factories";
+import { ones, zeros } from "./factories";
 import * as ops from "./ops_opgen";
 
 // ------------------------------------
@@ -72,7 +72,7 @@ export function repeat(input: Tensor, shape: Shape): Tensor {
     return t3;
 }
 
-export function layernorm(input: Tensor, normalized_shape: Shape, eps=0.00001): Tensor {
+export function layernorm(input: Tensor, normalized_shape: Shape, eps=1e-5): Tensor {
     const params = {
         eps: eps,
         norm_size: normalized_shape.reduce((acc, v) => {
@@ -181,8 +181,6 @@ export function upsample(
         d_out: output_shape[4] ? output_shape[4] : 1,
         outputSize: shapeSize(output_shape)
     }
-    console.log("params: ", params);
-    console.log("output shape: ", output_shape);
     return input.runKernel(
         "upsample",
         { dtype: input.dtype},
@@ -200,7 +198,6 @@ export function rand(
         seed: seed,
         outputSize: input.size
     }
-    console.log(params);
     return {
         output: input.runKernel(
             "rand",
@@ -236,9 +233,10 @@ export function squeeze(
     dim?: number
 ): Tensor {
     if(dim <= -input.dim || dim > input.dim) throw new Error(`"dim" out of bounds; must be on the interval:  [${-input.dim}, ${input.dim}) for input tensor with dim: ${input.dim}`);
-    if(dim < 0) dim = dim + input.dim + 1;
+    if(dim < 0) dim = dim + input.dim;
     let new_shape = input.shape;
     if(dim) {
+        if(dim < 0) dim = input.shape.length + dim;
         if(input.shape[dim] == 1) new_shape = [...input.shape.slice(0,dim), ...input.shape.slice(dim + 1)];
     } else {
         new_shape = input.shape.filter((size: number) => { return size != 1 });
@@ -261,7 +259,7 @@ export function linear(
     weight: Tensor,
     bias?: Tensor,
 ): Tensor {
-    let output = input.mm(weight.t());
+    let output = mm(input.unsqueeze(0), weight.t()).squeeze(0);
     if(bias) return ops.add(output, bias);
     else return output;
 }
@@ -508,6 +506,28 @@ function _mha_shape_check(query: Tensor, key: Tensor, value: Tensor, num_heads: 
     return is_batched;
 }
 
+export function group_norm(input: Tensor, groups: number, weight?: Tensor, bias?: Tensor, eps=1e-5): Tensor {
+    if(input.dim < 2) throw new Error("group norm expects at least two dimenstions");
+
+    const params = {
+        eps: eps,
+        groupSize: input.shape[1] / groups,
+        outputSize: shapeSize(input.shape)
+    }
+
+    if(!weight) weight = ones([input.shape[0], groups]);
+    if(!bias) bias = zeros([input.shape[0], groups]);
+
+    return input.runKernel(
+        "group_norm",
+        { dtype: input.dtype },
+        params,
+        [input.shape],
+        weight,
+        bias
+    )[0]
+}
+
 // ------------------------------------
 // End Custom
 // ------------------------------------
@@ -529,39 +549,40 @@ function _mha_shape_check(query: Tensor, key: Tensor, value: Tensor, num_heads: 
  *     However, this mode can only be used when `stride` is 1.
  * @returns 
  */
-export function conv2d(input: Tensor, weight: Tensor, bias?: Tensor, stride?: number | [number, number], padding?: number | [number, number] | "valid" | "same"): Tensor {
+export function conv2d(input: Tensor, weight: Tensor, bias?: Tensor, stride?: number | [number, number], padding?: number | [number, number] | "valid" | "same", dilation?: number | [number, number], groups?: number): Tensor {
+   
     if (shouldCreateGradient(input, weight)) {
-        throw new Error("conv2d gradient not supported yet");
-    } else {
-        if (input.shape.length !== 4 || weight.shape.length !== 4) {
-            throw new Error(
-                `Expected image tensor, got ${input.shape} and kernel ${weight.shape}`
-            );
-        }
-        if (input.shape[1] !== weight.shape[1]) {
-            throw new Error(
-                `Expected number of chennels in input image to match number of channels in kernel, got ${input.shape} and ${weight.shape}`
-            );
-        }
-        const params = {
-            batchSize: input.shape[0],
-            inputChannels: input.shape[1],
-            outputChannels: weight.shape[0],
-            inputHeight: input.shape[2],
-            inputWidth: input.shape[3],
-            kernelHeight: weight.shape[2],
-            kernelWidth: weight.shape[3],
-            outputHeight: input.shape[2] - weight.shape[2] + 1,
-            outputWidth: input.shape[3] - weight.shape[3] + 1,
-        };
-        return input.runKernel(
-            "conv2d",
-            { dtype: input.dtype },
-            params,
-            [[params.batchSize, params.outputChannels, params.outputHeight, params.outputWidth]],
-            weight
-        )[0];
+        //throw new Error("conv2d gradient not supported yet");
+        console.error("conv2d gradient not supported yet");
     }
+    if (input.shape.length !== 4 || weight.shape.length !== 4) {
+        throw new Error(
+            `Expected image tensor, got input: [Cout, Cin], got ${input.shape} and kernel ${weight.shape}`
+        );
+    }
+    if (input.shape[1] !== weight.shape[1]) {
+        throw new Error(
+            `Expected number of channels in input image to match number of channels in kernel, got ${input.shape} and ${weight.shape}`
+        );
+    }
+    const params = {
+        batchSize: input.shape[0],
+        inputChannels: input.shape[1],
+        outputChannels: weight.shape[0],
+        inputHeight: input.shape[2],
+        inputWidth: input.shape[3],
+        kernelHeight: weight.shape[2],
+        kernelWidth: weight.shape[3],
+        outputHeight: input.shape[2] - weight.shape[2] + 1,
+        outputWidth: input.shape[3] - weight.shape[3] + 1,
+    };
+    return input.runKernel(
+        "conv2d",
+        { dtype: input.dtype },
+        params,
+        [[params.batchSize, params.outputChannels, params.outputHeight, params.outputWidth]],
+        weight
+    )[0];
 }
 
 export function mm(input: Tensor, other: Tensor): Tensor {
@@ -584,6 +605,7 @@ export function mm(input: Tensor, other: Tensor): Tensor {
             innerDim: input.shape[1],
             alpha: 1.0,
         };
+
         return input.runKernel(
             "mm",
             { resultDtype: input.dtype },
@@ -594,19 +616,29 @@ export function mm(input: Tensor, other: Tensor): Tensor {
     }
 }
 
-export function t(input: Tensor): Tensor {
-    if (input.shape.length !== 2) {
-        throw new Error(`Expected 2D tensor, got ${input.shape}`);
-    }
+export function transpose(input: Tensor, dim0=0, dim1=1): Tensor {
     if (shouldCreateGradient(input)) {
         throw new Error("t gradient not supported yet");
         // return TransposeFunction.apply(input, 0, 1);
     } else {
-        let newShape = input.shape.slice();
-        newShape.reverse();
-        let newStrides = input.strides.slice();
-        newStrides.reverse();
-        return input.withShape(newShape, newStrides);
+        const newShape = Array.from(input.shape);
+        newShape[dim0] = input.shape[dim1];
+        newShape[dim1] = input.shape[dim0];
+        const params = {
+            dim0: input.shape[dim0],
+            batchSize: shapeSize(Array.from(newShape).splice(dim0)),
+            dim1: input.shape[dim1],
+            elSize: shapeSize(Array.from(newShape).splice(dim1)) / newShape[dim1],
+            stride: dim1-dim0 == 1 ? 1 : shapeSize(Array.from(newShape).splice(dim0+1, dim1-dim0-1)),
+            outputSize: input.size
+        }
+        console.log("running transpose with params: ", params);
+        return input.runKernel(
+            "transpose", 
+            { dtype: input.dtype },
+            params,
+            [newShape]
+        )[0];
     }
 }
 

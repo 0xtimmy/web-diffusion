@@ -15,7 +15,7 @@ export const registry: AnOpSpec[] = [
         nnName: "GeLU",
         nnOp: true,
         type: "unary",
-        forward: "output = 0.5 * input (1 + tanh(sqrt(2 / 3.14159265359) * (x + 0.044715 * input*input*input)))",
+        forward: "output = 0.5 * input * (1 + tanh(sqrt(2 / 3.14159265359) * (input + 0.044715 * input*input*input)))",
         backward: "inputGrad = input > 0.0 ? outputGrad : 0.0",
     },
     // Cat

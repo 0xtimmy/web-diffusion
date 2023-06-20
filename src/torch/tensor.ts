@@ -110,7 +110,7 @@ export class Tensor extends TensorBase {
             this._dtype = dt;
             this._shape = array.shape;
             this._strides = array.strides;
-        } else if (arrayOrSpec.hasOwnProperty("data")) {
+        } else if (arrayOrSpec) {
             const jdata = arrayOrSpec as TensorSpec;
             dt = jdata.dtype ? getDtype(jdata.dtype) : dt;
             requiresGrad = requiresGrad || jdata.requiresGrad;
@@ -355,7 +355,10 @@ export class Tensor extends TensorBase {
         return aops.mm(this, other);
     }
     t(): Tensor {
-        return aops.t(this);
+        return this.transpose(0, 1);
+    }
+    transpose(dim0: number, dim1: number): Tensor {
+        return aops.transpose(this, dim0, dim1);
     }
     zero_(): Tensor {
         throw new Error("Tensor zero_ is not implemented");

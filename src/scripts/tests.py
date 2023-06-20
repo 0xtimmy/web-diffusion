@@ -13,12 +13,177 @@ import numpy
 #    "log_config"?: logconfig,  // whether to log the test arguements and output
 #}
 
+def gen_conv2d(message, input, weight, bias, log="always", log_config="fail"):
+    output = torch.conv2d(input, weight, bias)
+    if bias:
+        return {
+            "message": message,
+            "func": "conv2d",
+            "args": {
+                "input": input.numpy().tolist(),
+                "weight": weight.numpy().tolist(),
+                "bias": bias.numpy().tolist()
+            },
+            "target": output.numpy().tolist(),
+            "log": log,
+            "log_config": log_config
+        }
+    else:
+        return {
+            "message": message,
+            "func": "conv2d",
+            "args": {
+                "input": input.numpy().tolist(),
+                "weight": weight.numpy().tolist(),
+                "bias": None
+            },
+            "target": output.numpy().tolist(),
+            "log": log,
+            "log_config": log_config
+        }
+
+def gen_layer_norm(message, input, weight, bias, log="always", log_config="fail"):
+    output = torch.layer_norm(input)
+    return {
+        "message": message,
+        "func": "layer_norm",
+        "args": {
+            "input": input.numpy().tolist(),
+            "weight": weight.numpy().tolist(),
+            "bias": bias.numpy().tolist(),
+        },
+        "target": output.numpy().tolist(),
+        "log": log,
+        "log_config": log_config
+    }
+
+def gen_group_norm(message, input, groups, weight, bias, log="always", log_config="fail"):
+    output = torch.layer_norm(input)
+    return {
+        "message": message,
+        "func": "group_norm",
+        "args": {
+            "input": input.numpy().tolist(),
+            "groups": groups,
+            "weight": weight.numpy().tolist(),
+            "bias": bias.numpy().tolist(),
+        },
+        "target": output.numpy().tolist(),
+        "log": log,
+        "log_config": log_config
+    }
+
+def gen_linspace(message, start, end, steps, log="always", log_config="fail"):
+    output = torch.linspace(start, end, steps)
+    return {
+            "message": message,
+            "func": "linspace",
+            "args": {
+                "start": start,
+                "end": end,
+                "steps": steps
+            },
+            "target": output.numpy().tolist(),
+            "log": log,
+            "log_config": log_config
+    }
+
+
+def gen_transpose(message, input, dim0=0, dim1=1, log="always", log_config="fail"):
+    output = input.transpose(dim0, dim1)
+    return {
+        "message": message,
+        "func": "transpose",
+        "args": {
+            "input": input.numpy().tolist(),
+            "dim0": dim0,
+            "dim1": dim1,
+        },
+        "target": output.numpy().tolist(),
+        "log": log,
+        "log_config": log_config
+    }
+
+def gen_mm(message, input, weight, log="always", log_config="fail"):
+    output = input.mm(weight)
+    return {
+        "message": message,
+        "func": "mm",
+        "args": {
+            "input": input.numpy().tolist(),
+            "weight": weight.numpy().tolist(),
+        },
+        "target": output.numpy().tolist(),
+        "log": log,
+        "log_config": log_config
+    }
+
+def gen_nn_linear(message, in_channels, out_channels, input, log="always", log_config="fail"):
+    ln = torch.nn.Linear(in_channels, out_channels)
+    output = ln(input)
+    return {
+        "message": message,
+        "func": "nn_linear",
+        "args": {
+            "in_channels": in_channels,
+            "out_channels": out_channels,
+            "input": input.numpy().tolist()
+        },
+        "target": output.numpy().tolist(),
+        "log": log,
+        "log_config": log_config
+    }
+
+def gen_linear(message, input, weight, bias=None, log="always", log_config="fail"):
+    output = torch.nn.functional.linear(input, weight, bias)
+    if(bias is not None):
+        return {
+            "message": message,
+            "func": "linear",
+            "args": {
+                "input": input.numpy().tolist(),
+                "weight": weight.numpy().tolist(),
+                "bias": bias.numpy().tolist()
+            },
+            "target": output.numpy().tolist(),
+            "log": log,
+            "log_config": log_config
+        }
+    return {
+            "message": message,
+            "func": "linear",
+            "args": {
+                "input": input.numpy().tolist(),
+                "weight": weight.numpy().tolist(),
+                "bias": None
+            },
+            "target": output.numpy().tolist(),
+            "log": log,
+            "log_config": log_config
+        }
+    
+
 def gen_unsqueeze(message, shape, dim, log="always", log_config="fail"):
     input = torch.randint(0, 9, shape)
     output = input.unsqueeze(dim)
     return {
         "message": message,
         "func": "unsqueeze",
+        "args": { "input": input.numpy().tolist(), "dim": dim },
+        "target": output.numpy().tolist(),
+        "log": log,
+        "log_config": log_config
+    }
+
+def gen_squeeze(message, shape, dim=None, log="always", log_config="fail"):
+    input = torch.randint(0, 9, shape)
+    if dim : 
+        output = input.squeeze(dim)
+    else :
+        output = input.squeeze()
+    return {
+        "message": message,
+        "func": "squeeze",
         "args": { "input": input.numpy().tolist(), "dim": dim },
         "target": output.numpy().tolist(),
         "log": log,
