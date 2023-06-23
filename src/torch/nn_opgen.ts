@@ -222,6 +222,9 @@ export class MultiheadAttention extends Module {
                 this.in_proj_weight, this.in_proj_bias,
                 this.add_zero_attn,
                 this.dropout, this.out_proj.weight, this.out_proj.bias,
+                undefined,
+                undefined,
+                true
                 /*
                 training=this.training,
                 key_padding_mask=key_padding_mask, need_weights=need_weights,

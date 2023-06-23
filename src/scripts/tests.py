@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 import numpy
 
 # Each gen function should return a json object of the below form
@@ -12,6 +13,48 @@ import numpy
 #    "log"?: logconfig,         // whether to log the test or not
 #    "log_config"?: logconfig,  // whether to log the test arguements and output
 #}
+
+def gen_sum(message, input, log="always", log_config="fail"):
+    output = input.sum()
+    return {
+            "message": message,
+            "func": "sum",
+            "args": {
+                "input": input.numpy().tolist(),
+            },
+            "target": output.numpy().tolist(),
+            "log": log,
+            "log_config": log_config
+        }
+
+def gen_scaled_dot_product_attention(message, query, key, value, log="always", log_config="fail"):
+    output = F.scaled_dot_product_attention(query, key, value)
+    return {
+            "message": message,
+            "func": "scaled_dot_product_attention",
+            "args": {
+                "query": query.numpy().tolist(),
+                "key": key.numpy().tolist(),
+                "value": value.numpy().tolist(),
+            },
+            "target": output.numpy().tolist(),
+            "log": log,
+            "log_config": log_config
+        }
+
+def gen_max_pool2d(message, input, kernelSize, log="always", log_config="fail"):
+    output = torch.max_pool2d(input, kernelSize)
+    return {
+            "message": message,
+            "func": "max_pool2d",
+            "args": {
+                "input": input.numpy().tolist(),
+                "kernelSize": kernelSize,
+            },
+            "target": output.numpy().tolist(),
+            "log": log,
+            "log_config": log_config
+        }
 
 def gen_conv2d(message, input, weight, bias, log="always", log_config="fail"):
     output = torch.conv2d(input, weight, bias)

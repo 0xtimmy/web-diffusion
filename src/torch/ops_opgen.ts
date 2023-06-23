@@ -1335,9 +1335,9 @@ export function prod(input: Tensor): Tensor {
 * @param input the input tensor of any shape
 * @returns the output tensor
 */
-export function sum(input: Tensor): Tensor {
-    return unary(functions.SumFunction, input);
-}
+//export function sum(input: Tensor): Tensor {
+//    return unary(functions.SumFunction, input);
+//}
 /**
 * Calculates:
 * ```js

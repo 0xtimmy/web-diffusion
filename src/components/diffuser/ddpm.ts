@@ -34,8 +34,8 @@ class Diffusion {
         return torch.linspace(this.beta_start, this.beta_end, this.noise_steps);
     }
 
-    async calc_alpha_hat() {
-        this.alpha_hat = await torch.cumprod(this.alpha);
+    calc_alpha_hat() {
+        this.alpha_hat = torch.cumprod(this.alpha);
     }
 
     sample_timesteps(n: number) {
@@ -45,37 +45,28 @@ class Diffusion {
     sample(model, n=1): torch.Tensor {
         console.log(`Sampling ${n} new images...`);
         model.eval();
-        let x = torch.randn([n, 3, this.img_size, this.img_size]);
-        for(let i = this.noise_steps; i >= 0; i--) {
-            const t = torch.mul(torch.ones(n), torch.ones(n), i);
-            const predicted_noise = model.forward(x, t);
-            const alpha = this.alpha;
-            const alpha_hat = this.alpha_hat
-            const beta = this.beta
+        let x = torch.normal([n, 3, this.img_size, this.img_size]);
+        for(let i = this.noise_steps -1; i >= 0; i--) {
+            const t = torch.scalar_mul(torch.ones(n), i);
+            let predicted_noise = model.forward(x, t);
+            const alpha = this.alpha.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
+            const alpha_hat = this.alpha_hat.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
+            const beta = this.beta.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
             let noise;
             if(i > 1) {
                 noise = torch.randn(x.shape);
             } else {
                 noise = torch.zeros(x.shape);
             }
-            x = torch.add(
-                    torch.mul(
-                        torch.div(torch.ones(alpha.shape), torch.sqrt(alpha)),
-                        torch.sub(x, 
-                            torch.mul(
-                                torch.div(
-                                    torch.sub(torch.ones(alpha.shape), alpha),
-                                    torch.sqrt(torch.sub(torch.ones(alpha_hat.shape), alpha_hat))
-                                ),
-                                predicted_noise
-                            )
-                        )
-                    ),
-                    torch.mul(
-                        torch.sqrt(beta),
-                        noise
-                    )
-                );
+            let one_div_sqrt_alpha = torch.div(torch.ones(alpha.shape), torch.sqrt(alpha));
+            let sqrt_one_minus_alpha_hat = torch.sqrt(torch.scalar_add(torch.scalar_mul(alpha_hat, -1), 1));
+            let one_minus_alpha = torch.scalar_add(torch.scalar_mul(alpha_hat, -1), 1);
+            predicted_noise = torch.mul(predicted_noise, torch.div(one_minus_alpha, sqrt_one_minus_alpha_hat));
+            x = torch.sub(x, predicted_noise);
+            x = torch.mul(one_div_sqrt_alpha, x);
+            
+            let beta_noise = torch.mul(torch.sqrt(beta), noise)
+            x = torch.add(x, beta_noise);
         }
         
         model.train();

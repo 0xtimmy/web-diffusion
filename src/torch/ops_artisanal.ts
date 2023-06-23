@@ -10,10 +10,27 @@ import * as ops from "./ops_opgen";
 // ------------------------------------
 // Start Custom
 // ------------------------------------
+export function index(input: Tensor, index: Tensor): Tensor {
+    /*
+    if(input.shape.map((acc, v, i) => {
+        return acc || v != index.shape[i];
+    }, false)) throw new Error(`index expectes input and index tensors to be the same shape, instead got input shape: ${input.shape} and index shape: ${index.shape}`);
+    */
+    if(input.shape.length > 1) console.error("index hasn't been built of dimensions greater than 1");
+    return input.runKernel(
+        "index",
+        { dtype: input.dtype },
+        { size: index.size },
+        [index.shape],
+        index
+    )[0]
+}
+
 export function cat(a: Tensor, b: Tensor, dim: 0|1|2|3): Tensor {
     //throw new Error("cat not implemented yet");
     let part: number;
     let stride: number;
+    const shape_len = a.shape.length;
     const ashape = [1, 1, 1, 1].map((v, i) => { return typeof a.shape[i] == 'number' ? a.shape[i] : v});
     const bshape = [1, 1, 1, 1].map((v, i) => { return typeof b.shape[i] == 'number' ? b.shape[i] : v});
     if(dim == 0) {
@@ -42,7 +59,8 @@ export function cat(a: Tensor, b: Tensor, dim: 0|1|2|3): Tensor {
     const output_shape = ashape.map((size: number, i: number) => {
         if(i == dim) return ashape[dim] + bshape[dim];
         else return size;
-    }).filter((v: number) => v != 1);
+    }).filter((v, i) => { return i < shape_len || v != 1});
+
     return a.runKernel(
         "cat",
         { dtype: a.dtype },
@@ -259,9 +277,22 @@ export function linear(
     weight: Tensor,
     bias?: Tensor,
 ): Tensor {
-    let output = mm(input.unsqueeze(0), weight.t()).squeeze(0);
-    if(bias) return ops.add(output, bias);
-    else return output;
+    const output_shape = Array.from(input.shape);
+    const feature_dim = input.shape.length - 1;
+    if(weight.shape[1] != input.shape[feature_dim]) throw new Error(`Expected last dimention of input and last dimention of weight to match, instead got input.shape = ${input.shape} & weight.shape = ${weight.shape}`);
+    if(bias && bias.shape[0] != weight.shape[0]) throw new Error(`Expected bias to be 1D and match the first dimention of weight, instead got bias.shape = ${bias.shape} and weight.shape = ${weight.shape}`);
+    
+    output_shape[feature_dim] = weight.shape[0];
+    let output = mm(input.view([-1, input.shape[feature_dim]]), weight.t());
+    if(bias) output = ops.add(output, repeat(bias.unsqueeze(0), [output.shape[0], 1]));
+    output = output.view(output_shape)
+    return output;
+}
+
+export function sum(
+    input: Tensor,
+): Tensor {
+    return input.runKernel("sum", { dtype: input.dtype }, { size: input.size }, [[1]])[0];
 }
 
 export function softmax(
@@ -270,10 +301,8 @@ export function softmax(
 ): Tensor {
 
     const exp = input.exp();
-    const sum_exp = exp.sum(dim);
-
+    const sum_exp = exp.sum();
     const params = {
-        stride: shapeSize(input.shape.slice(dim)),
         outputSize: input.size
     };
     return exp.runKernel(
@@ -312,7 +341,18 @@ export function scaled_dot_product_attention(
     if(attn_mask) console.error("attention does not support attention masks");
     if(dropout) console.error("attention does not support dropout");
     if(is_casual) console.error("attention does not support is_causal");
-    return mm(softmax(ops.scalar_div(mm(query, key.t()), Math.sqrt(key.size))), value);
+
+    const output_shape = Array.from(query.shape);
+    output_shape[output_shape.length-1] = value.shape[value.shape.length-1];
+
+    query = query.view([-1, query.shape[query.shape.length-1]]);
+    key = key.view([-1, key.shape[key.shape.length-1]]);
+    value = value.view([-1, value.shape[value.shape.length-1]]);
+
+    let out = ops.scalar_div(mm(query, key.t()), Math.sqrt(key.size));
+    out = softmax(out);
+    out = mm(out, value);
+    return out.view(output_shape);
 }
 
 
@@ -338,6 +378,8 @@ export function multihead_attention(
     q_proj_weight?: Tensor,
     k_proj_weight?: Tensor,
     v_proj_weight?: Tensor,
+    static_k?: Tensor,
+    static_v?: Tensor,
     need_weights=false,
     is_causal=false
 ): { output: Tensor, weights: Tensor | null } {
@@ -353,12 +395,12 @@ export function multihead_attention(
 
     const tgt_len = query.shape[0];
     const bsz = query.shape[1];
-    const embed_dim = query.shape[3];
+    const embed_dim = query.shape[2];
     const src_len = key.shape[0];
 
     
-    if(embed_dim != embed_dim_to_check) throw new Error(`was expeecting embedding dimension of ${embed_dim_to_check}, but got ${embed_dim}`);
-    const head_dim = embed_dim;
+    if(embed_dim != embed_dim_to_check) throw new Error(`was expecting embedding dimension of ${embed_dim_to_check}, but got ${embed_dim}`);
+    const head_dim = Math.floor(embed_dim / num_heads);
 
     let q, k, v;
     if(!use_separate_proj_weight) {
@@ -368,10 +410,12 @@ export function multihead_attention(
         q_proj_weight = unpacked_weights[0];
         k_proj_weight = unpacked_weights[1];
         v_proj_weight = unpacked_weights[2];
+    } else {
+        if(q_proj_weight == null) throw new Error("use_separate_proj_weight is True but q_proj_weight is null");
+        if(k_proj_weight == null) throw new Error("use_separate_proj_weight is True but k_proj_weight is null");
+        if(v_proj_weight == null) throw new Error("use_separate_proj_weight is True but v_proj_weight is null");
     }
-    if(q_proj_weight == null) throw new Error("use_separate_proj_weight is False but q_proj_weight is null");
-    if(k_proj_weight == null) throw new Error("use_separate_proj_weight is False but k_proj_weight is null");
-    if(v_proj_weight == null) throw new Error("use_separate_proj_weight is False but v_proj_weight is null");
+    
     let b_q, b_k, b_v;
     if(in_proj_bias == null) {
         b_q = null;
@@ -388,6 +432,22 @@ export function multihead_attention(
     k = proj.k;
     v = proj.v;
 
+    q = q.view([tgt_len, bsz * num_heads, head_dim]).transpose(0, 1)
+    if (typeof(static_k) == 'undefined') {
+        k = k.view([k.shape[0], bsz * num_heads, head_dim]).transpose(0, 1)
+    } else {
+        if(static_k.shape[0] != bsz*num_heads) throw new Error(`expecting static_k.shape[0] of ${bsz * num_heads}, but got ${static_k.shape[0]}`);
+        if(static_k.shape[2] != head_dim) throw new Error(`expecting static_k.shape[0] of ${head_dim}, but got ${static_k.shape[0]}`);
+        k = static_k;
+    }
+    if (typeof(static_v) == 'undefined') {
+        v = v.view([v.shape[0], bsz * num_heads, head_dim]).transpose(0, 1)
+    } else {
+        if(static_v.shape[0] != bsz*num_heads) throw new Error(`expecting static_k.shape[0] of ${bsz * num_heads}, but got ${static_v.shape[0]}`);
+        if(static_v.shape[2] != head_dim) throw new Error(`expecting static_k.shape[0] of ${head_dim}, but got ${static_v.shape[0]}`);
+        v = static_v;
+    }
+
 
     if (need_weights) {
         console.error("need weights");
@@ -400,9 +460,9 @@ export function multihead_attention(
             }
         }
 
-        q = q.view(bsz, num_heads, tgt_len, head_dim);
-        k = k.view(bsz, num_heads, src_len, head_dim);
-        v = v.view(bsz, num_heads, src_len, head_dim);
+        q = q.view([bsz, num_heads, tgt_len, head_dim]);
+        k = k.view([bsz, num_heads, src_len, head_dim]);
+        v = v.view([bsz, num_heads, src_len, head_dim]);
 
         let attn_output = scaled_dot_product_attention(q, k, v, attn_mask, dropout_p, is_causal);
         attn_output = attn_output.permute([2, 0, 1, 3]).view([bsz * tgt_len, embed_dim]);
@@ -452,22 +512,22 @@ export function chunk(
         if(i == dim) return v / chunks;
         return v;
     })
-    const output_shapes: Array<Shape> = (new Array(chunks)).map(() => output_shape);
 
     const params = {
         chunkSize: output_shape.reduce((acc: number, v: number, i: number) => { return i > dim ? acc * v : acc; }, 1),
         stride: chunks,
         strides: output_shape.reduce((acc: number, v: number, i: number) => { return i < dim ? acc * v : acc; }, 1),
     }
-
-    return (new Array(chunks)).map((_, i: number): Tensor => {
-        return input.runKernel(
+    const arr = [];
+    for(let i = 0; i < chunks; i++) {
+        arr.push(input.runKernel(
             "chunk",
             { dtype: input.dtype },
             {...params, offset: i},
-            output_shapes 
-        )[0]
-    });
+            [output_shape] 
+        )[0]);
+    }
+    return arr;
 }
 
 function _mha_shape_check(query: Tensor, key: Tensor, value: Tensor, num_heads: number, key_padding_mask?: Tensor, attn_mask?: Tensor) {
@@ -550,7 +610,6 @@ export function group_norm(input: Tensor, groups: number, weight?: Tensor, bias?
  * @returns 
  */
 export function conv2d(input: Tensor, weight: Tensor, bias?: Tensor, stride?: number | [number, number], padding?: number | [number, number] | "valid" | "same", dilation?: number | [number, number], groups?: number): Tensor {
-   
     if (shouldCreateGradient(input, weight)) {
         //throw new Error("conv2d gradient not supported yet");
         console.error("conv2d gradient not supported yet");
@@ -565,6 +624,20 @@ export function conv2d(input: Tensor, weight: Tensor, bias?: Tensor, stride?: nu
             `Expected number of channels in input image to match number of channels in kernel, got ${input.shape} and ${weight.shape}`
         );
     }
+    if(typeof(padding) != 'undefined') {
+        if(typeof(padding) == 'number') padding = [padding, padding];
+        if(padding[0] != 0) {
+            let zero_shape = Array.from(input.shape);
+            zero_shape[input.shape.length-1] = padding[0] as any;
+            input = cat(cat(zeros(zero_shape), input, 3), zeros(zero_shape), 3);
+        }
+        if(padding[1] != 0) {
+            let zero_shape = Array.from(input.shape);
+            zero_shape[input.shape.length-2] = padding[1] as any;
+            input = cat(cat(zeros(zero_shape), input, 2), zeros(zero_shape), 2);
+        }
+    }
+    
     const params = {
         batchSize: input.shape[0],
         inputChannels: input.shape[1],
@@ -617,29 +690,32 @@ export function mm(input: Tensor, other: Tensor): Tensor {
 }
 
 export function transpose(input: Tensor, dim0=0, dim1=1): Tensor {
-    if (shouldCreateGradient(input)) {
-        throw new Error("t gradient not supported yet");
-        // return TransposeFunction.apply(input, 0, 1);
-    } else {
-        const newShape = Array.from(input.shape);
-        newShape[dim0] = input.shape[dim1];
-        newShape[dim1] = input.shape[dim0];
-        const params = {
-            dim0: input.shape[dim0],
-            batchSize: shapeSize(Array.from(newShape).splice(dim0)),
-            dim1: input.shape[dim1],
-            elSize: shapeSize(Array.from(newShape).splice(dim1)) / newShape[dim1],
-            stride: dim1-dim0 == 1 ? 1 : shapeSize(Array.from(newShape).splice(dim0+1, dim1-dim0-1)),
-            outputSize: input.size
-        }
-        console.log("running transpose with params: ", params);
-        return input.runKernel(
-            "transpose", 
-            { dtype: input.dtype },
-            params,
-            [newShape]
-        )[0];
+    if(dim1 < dim0) {
+        const temp = dim0;
+        dim0 = dim1;
+        dim1 = temp;
     }
+    if (shouldCreateGradient(input)) {
+        console.error("transpose gradient not supported yet");
+        // return TransposeFunction.apply(input, 0, 1);
+    }
+    const newShape = Array.from(input.shape);
+    newShape[dim0] = input.shape[dim1];
+    newShape[dim1] = input.shape[dim0];
+    const params = {
+        dim0: input.shape[dim0],
+        batchSize: shapeSize(Array.from(newShape).splice(dim0)),
+        dim1: input.shape[dim1],
+        elSize: shapeSize(Array.from(newShape).splice(dim1)) / newShape[dim1],
+        stride: dim1-dim0 == 1 ? 1 : shapeSize(Array.from(newShape).splice(dim0+1, dim1-dim0-1)),
+        outputSize: input.size
+    }
+    return input.runKernel(
+        "transpose", 
+        { dtype: input.dtype },
+        params,
+        [newShape]
+    )[0];
 }
 
 

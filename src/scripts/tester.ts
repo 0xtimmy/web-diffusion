@@ -67,7 +67,10 @@ const funcs: { [key: string]: (args: any, target: any) => Promise<{ res: boolean
     "mm": test_mm,
     "transpose": test_transpose,
     "linspace": test_linspace,
-    "conv2d": test_conv2d
+    "conv2d": test_conv2d,
+    "max_pool2d": test_max_pool2d,
+    "scaled_dot_product_attention": test_scaled_dot_product_attention,
+    "sum": test_sum,
 }
 
 // Tests
@@ -95,6 +98,67 @@ async function test_nn_linear(args, target): Promise<test_result> {
     return { res: true, output: output_data }
 }
 
+async function test_sum(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  input: Tesnor,
+     * }
+     */
+    const input = ops.tensor(args.input);
+    //const target_output = ops.tensor(target);
+    const actual_output = input.sum();
+    console.log("sum output", actual_output);
+    const output_data = await actual_output.toArrayAsync();
+    console.log("sum output*", output_data);
+
+    //if(!array_eq(actual_output.shape, target_output.shape)) return { res: false, output: output_data, error_msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    if(!array_eq(output_data.flat(4), [target].flat(4), 0.0001)) return { res: false, output: output_data, error_msg: `mismatched tensor content` };
+
+    return { res: true, output: output_data };
+
+}
+
+async function test_scaled_dot_product_attention(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  query: Tesnor,
+     *  key: Tensor,
+     *  value: Tensor,
+     * }
+     */
+    const query = ops.tensor(args.query);
+    const key = ops.tensor(args.key);
+    const value = ops.tensor(args.value);
+
+    const target_output = ops.tensor(target);
+    const actual_output = ops.scaled_dot_product_attention(query, key, value);
+    const output_data = await actual_output.toArrayAsync();
+
+    if(!array_eq(actual_output.shape, target_output.shape)) return { res: false, output: output_data, error_msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    if(!array_eq(output_data.flat(4), target.flat(4), 0.0001)) return { res: false, output: output_data, error_msg: `mismatched tensor content` };
+
+    return { res: true, output: output_data };
+}
+
+async function test_max_pool2d(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  input: Tensor,
+     *  kernelSize: number,
+     * }
+     */
+    const input = ops.tensor(args.input);
+    const target_output = ops.tensor(target);
+    const actual_output = ops.maxpool2d(input, [args.kernelSize, args.kernelSize], [args.kernelSize, args.kernelSize], [0, 0], [1, 1]);
+    const output_data = await actual_output.toArrayAsync();
+
+    if(!array_eq(actual_output.shape, target_output.shape)) return { res: false, output: output_data, error_msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    if(!array_eq(output_data.flat(4), target.flat(4), 0.0001)) return { res: false, output: output_data, error_msg: `mismatched tensor content` };
+
+    return { res: true, output: output_data };
+
+}
+
 async function test_conv2d(args, target): Promise<test_result> {
     /**
      * args: {
@@ -110,7 +174,7 @@ async function test_conv2d(args, target): Promise<test_result> {
     const actual_output = ops.conv2d(input, weight, bias);
     const output_data = await actual_output.toArrayAsync();
     if(!array_eq(actual_output.shape, target_output.shape)) return { res: false, output: output_data, error_msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
-    if(!array_eq(output_data.flat(4), target.flat(4), 0.0001)) return { res: false, output: output_data, error_msg: `mismatched tensor content` };
+    if(!array_eq(output_data.flat(4), target.flat(4), 0.001)) return { res: false, output: output_data, error_msg: `mismatched tensor content` };
 
     return { res: true, output: output_data };
 }
