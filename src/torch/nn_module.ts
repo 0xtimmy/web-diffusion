@@ -197,7 +197,6 @@ export class Module {
         name: string,
         param: Parameter,
     ) {
-        console.log(this._parameters);
         if(this._parameters == null) this._parameters = [];
         if(name.includes["."]) throw new Error("parameter cannot be registered with \".\" in the name");
         if(name.length <= 0) throw new Error("parameter name cannot be empty");
@@ -466,7 +465,6 @@ export class Sequential extends Container {
     }
     forward(input: Tensor): Tensor {
         for (const module of this.children) {
-            console.log("forwarding through sequential with input: ", input);
             input = (module as any).forward(input);
         }
         return input;

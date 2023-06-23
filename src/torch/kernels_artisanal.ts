@@ -1,6 +1,76 @@
 import { KernelSpec } from "./kernel";
 
 export const kernels: { [name: string]: KernelSpec } = {
+    index: {
+        name: "sum",
+        config: [
+            {
+                name: "dtype"
+            }
+        ],
+        parameters: [
+            {
+                name: "size",
+                shaderType: "u32"
+            }
+        ],
+        inputs: [
+            {
+                name: "input",
+                shaderType: "array<f32>"
+            },
+            {
+                name: "index",
+                shaderType: "array<u32>"
+            }
+        ],
+        outputs: [
+            {
+                name: "output",
+                shaderType: "array<f32>",
+                size: "size"
+            }
+        ],
+        workgroupSize: [8, 1, 1],
+        workgroupCount: ["size / 8", 1, 1],
+        shader: `
+            if(global_id.x > parameters.size) return;
+            output[global_id.x] = input[index[global_id.x]];
+        `
+    },
+    sum: {
+        name: "sum",
+        config: [
+            {
+                name: "dtype"
+            }
+        ],
+        parameters: [
+            {
+                name: "size",
+                shaderType: "u32"
+            }
+        ],
+        inputs: [
+            {
+                name: "input",
+                shaderType: "array<f32>"
+            }
+        ],
+        outputs: [
+            {
+                name: "output",
+                shaderType: "array<f32>",
+                size: 1
+            }
+        ],
+        workgroupSize: [1, 1, 1],
+        workgroupCount: ["size", 1, 1],
+        shader: `
+            if(global_id.x > parameters.outputSize) return;
+            output[0] = output[0] + input[global_id.x];
+        `
+    },
     group_norm: {
         name: "group_norm",
         config: [
@@ -190,7 +260,7 @@ export const kernels: { [name: string]: KernelSpec } = {
             {
                 name: "output",
                 shaderType: "array<f32>",
-                size: "outputSize * batchSize * elSize"
+                size: "outputSize"
             }
         ],
         workgroupSize: [1, 1, 1],
@@ -220,13 +290,9 @@ export const kernels: { [name: string]: KernelSpec } = {
         ],
         parameters: [
             {
-                name: "stride",
-                shaderType: "u32"
-            },
-            {
                 name: "outputSize",
                 shaderType: "u32"
-            }
+            },
         ],
         inputs: [
             {
@@ -234,7 +300,7 @@ export const kernels: { [name: string]: KernelSpec } = {
                 shaderType: "array<f32>"
             },
             {
-                name: "sums",
+                name: "sum",
                 shaderType: "array<f32>"
             }
         ],
@@ -245,15 +311,13 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        workgroupSize: [4, 4, 1],
-        workgroupCount: ["stride / 4", "outputSize / stride / 4", 1],
+        workgroupSize: [32, 1, 1],
+        workgroupCount: ["outputSize / 32", 1, 1],
         shader: `
-            if(global_id.x > stride || global_id.y > floor(outputSize / stride)) {
+            if(global_id.x > parameters.outputSize) {
                 return;
-            }
-
-            const idx = global_id.x + global_id.y*stride;
-            output[idx] = input[idx] / sum[global_id.y];
+            };
+            output[global_id.x] = input[global_id.x] / sum[0];
         `
     },
     chunk: {

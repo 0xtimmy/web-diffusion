@@ -62,7 +62,6 @@ export class Conv2d extends Module {
     }
 
     forward(input: Tensor): Tensor {
-        console.log("weight shape: ", this.weight.shape);
         return ops.conv2d(input, this.weight, this.bias, this.stride, this.padding, this.dilation, this.groups);
     }
 }
@@ -106,7 +105,6 @@ export class GroupNorm extends Module {
     }
 
     forward(input: Tensor): Tensor {
-        console.log("forwarding group norm with: ", input);
         return ops.group_norm(input, this.numGroups, this.weight, this.bias, this.eps);
     }
 }
@@ -114,16 +112,31 @@ export class GroupNorm extends Module {
 export class Linear extends Module {
     inChannels: number;
     outChannels: number;
-    bias: Tensor;
-    constructor(inChannels: number, outChannels: number) {
+
+    //weight: Parameter;
+    weight: Tensor;
+    bias: Parameter;
+
+    constructor(inChannels: number, outChannels: number, bias=true) {
         super();
         this.inChannels = inChannels;
         this.outChannels = outChannels;
-        this.bias = factories.zeros(outChannels);
+
+        //this.weight = new Parameter(factories.empty([outChannels, inChannels]));
+        this.weight = factories.empty([outChannels, inChannels]);
+        if(bias) this.bias = new Parameter(factories.empty(outChannels));
+        else this.registerParameter("bias", null);
+
+        this.reset_parameters();
+    }
+
+    reset_parameters() {
+        const k = Math.sqrt(1 / this.inChannels);
+        this.weight = factories.uniform([this.outChannels, this.inChannels], -k, k);
+        if(this.bias) this.bias = new Parameter(factories.uniform([this.outChannels], -k, k));
     }
 
     forward(input: Tensor): Tensor {
-        console.error("trying to forward linear");
-        return input;
+        return ops.linear(input, this.weight, this.bias);
     }
 }

@@ -158,6 +158,10 @@ export class Tensor extends TensorBase {
         });
     }
     view(shape: Shape): Tensor {
+        if(shape.indexOf(-1) > -1) {
+            const size = shapeSize(shape);
+            shape[shape.indexOf(-1)] = this.size / size * -1;
+        }
         return this.withShape(shape, defaultStrides(shape));
     }
 
@@ -373,6 +377,12 @@ export class Tensor extends TensorBase {
     }
     chunk(chunks: number, dim?: number): Array<Tensor> {
         return aops.chunk(this, chunks, dim);
+    }
+    index(index: Tensor): Tensor {
+        return aops.index(this, index);
+    }
+    repeat(shape: Shape): Tensor {
+        return aops.repeat(this, shape);
     }
 
     // Codegen marker
@@ -2673,7 +2683,7 @@ export class Tensor extends TensorBase {
     * @returns the output tensor
     */
     sum(dim?: number, keepdim?: boolean): Tensor {
-        return ops.sum(this);
+        return aops.sum(this);
     }
     /**
     * Calculates:
