@@ -1,6 +1,49 @@
 import { KernelSpec } from "./kernel";
 
 export const kernels: { [name: string]: KernelSpec } = {
+    clamp: {
+        name: "clamp",
+        config: [
+            {
+                name: "dtype"
+            }
+        ],
+        parameters: [
+            {
+                name: "low",
+                shaderType: "f32"
+            },
+            {
+                name: "high",
+                shaderType: "f32"
+            },
+            {
+                name: "size",
+                shaderType: "u32"
+            }
+        ],
+        inputs: [
+            {
+                name: "input",
+                shaderType: "array<f32>"
+            }
+        ],
+        outputs: [
+            {
+                name: "output",
+                shaderType: "array<f32>",
+                size: "size"
+            }
+        ],
+        workgroupSize: [32, 1, 1],
+        workgroupCount: ["size", 1, 1],
+        shader: `
+            if(global_id.x > parameters.size) return;
+
+            //output[global_id.x] = min(max(input[global_id.x], parameters.low), parameters.high);
+            output[global_id.x] = 0;
+        `
+    },
     index: {
         name: "sum",
         config: [
@@ -80,12 +123,12 @@ export const kernels: { [name: string]: KernelSpec } = {
         ],
         parameters: [
             {
-                name: "groupSize",
-                shaderType: "u32"
-            },
-            {
                 name: "eps",
                 shaderType: "f32"
+            },
+            {
+                name: "groupSize",
+                shaderType: "u32"
             },
             {
                 name: "outputSize",
@@ -130,7 +173,7 @@ export const kernels: { [name: string]: KernelSpec } = {
             }
 
             mean = mean / parameters.groupSize;
-            const std = sqrt( (mean_sqrd / parameters.groupSize) - (mean * mean) + [parameters.eps]);
+            const std = sqrt( (mean_sqrd / parameters.groupSize) - (mean * mean) + parameters.eps);
 
             output[global_id.x] = (input[global_id.x] - mean) / std * weight[group] + bias[group];
 
@@ -739,14 +782,6 @@ export const kernels: { [name: string]: KernelSpec } = {
                 shaderType: "f32"
             },
             {
-                name: "gamma",
-                shaderType: "f32"
-            },
-            {
-                name: "beta",
-                shaderType: "f32"
-            },
-            {
                 name: "norm_size",
                 shaderType: "u32"
             },
@@ -775,20 +810,18 @@ export const kernels: { [name: string]: KernelSpec } = {
             if (global_id.x >= parameters.outputSize) {
                 return;
             }
-            const norm_shape_idx = floor(global_id.x / parameters.norm_size) * parameters.norm_size
+            const norm_shape_idx = floor(global_id.x / parameters.norm_size) * parameters.norm_size;
             var expectation = 0.0;
             var variance = 0.0;
             for(var i = 0; i < parameters.norm_size; i++) {
-                expectation += input[norm_shape_idx + i];
-                variance += pow(input[norm_shape_idx + i], 2)
+                expectation = expectation + input[norm_shape_idx + i];
+                variance = variance + input[norm_shape_idx + i] * input[norm_shape_idx + i];
             }
             expectation = expectation / parameters.norm_size;
             variance = variance / parameters.norm_size;
             variance = abs(variance - pow(expectation, 2));
 
-            output[global_id.x] = (input[global_id.x] - expectation)
-                / sqrt(variance + parameters.eps)
-                * parameters.gamma + parameters.beta;
+            output[global_id.x] = (input[global_id.x] - expectation) / sqrt(variance + parameters.eps);
         `
     },
     cat: {

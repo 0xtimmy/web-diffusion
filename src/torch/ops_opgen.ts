@@ -28,9 +28,6 @@ export function min(input: Tensor, alpha: number): Tensor {
 export function max(input: Tensor, alpha: number): Tensor {
     return scalar(functions.MaxFunction, input, alpha);
 }
-export function clamp(input: Tensor, low: number, high: number): Tensor {
-    return scalar(functions.ClampFunction, input, low);
-}
 
 // Unary
 export function gelu(input: Tensor): Tensor {

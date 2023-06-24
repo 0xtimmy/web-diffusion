@@ -10,6 +10,19 @@ import * as ops from "./ops_opgen";
 // ------------------------------------
 // Start Custom
 // ------------------------------------
+export function clamp(input: Tensor, low: number, high: number): Tensor {
+    return input.runKernel(
+        "index",
+        { dtype: input.dtype },
+        { 
+            low: low,
+            high: high,
+            size: input.size 
+        },
+        [input.shape],
+    )[0]
+}
+
 export function index(input: Tensor, index: Tensor): Tensor {
     /*
     if(input.shape.map((acc, v, i) => {
@@ -90,22 +103,27 @@ export function repeat(input: Tensor, shape: Shape): Tensor {
     return t3;
 }
 
-export function layernorm(input: Tensor, normalized_shape: Shape, eps=1e-5): Tensor {
+export function layernorm(input: Tensor, normalized_shape: Shape, weight?: Tensor, bias?: Tensor, eps=1e-5): Tensor {
     const params = {
         eps: eps,
-        norm_size: normalized_shape.reduce((acc, v) => {
-            return acc * v;
-        }, 1),
-        gamma: 1,
-        beta: 0,
+        norm_size: shapeSize(normalized_shape),
         outputSize: input.size
-
     };
+
+    if(Array.from(input.shape).splice(1).reduce((acc, v, i) => {
+        return acc || v != normalized_shape[i];
+    }, false)) throw new Error(`Layer norm "normalized_shape" must match the 1-n dimensions of the input, instead got input shape: ${input.shape} and normalized_shape: ${normalized_shape}`);
+
+    if(typeof(weight) == 'undefined') weight = ones(Array.from(input.shape).splice(1));
+    if(typeof(bias) == 'undefined') bias = zeros(Array.from(input.shape).splice(1));
+
     return input.runKernel(
         "layernorm",
         { dtype: input.dtype },
         params,
-        [input.shape]
+        [input.shape],
+        weight,
+        bias
     )[0];
 }
 
@@ -279,6 +297,9 @@ export function linear(
 ): Tensor {
     const output_shape = Array.from(input.shape);
     const feature_dim = input.shape.length - 1;
+
+    if(!bias) bias = zeros(weight[0]);
+
     if(weight.shape[1] != input.shape[feature_dim]) throw new Error(`Expected last dimention of input and last dimention of weight to match, instead got input.shape = ${input.shape} & weight.shape = ${weight.shape}`);
     if(bias && bias.shape[0] != weight.shape[0]) throw new Error(`Expected bias to be 1D and match the first dimention of weight, instead got bias.shape = ${bias.shape} and weight.shape = ${weight.shape}`);
     
@@ -338,6 +359,9 @@ export function scaled_dot_product_attention(
     dropout?: number,
     is_casual?: boolean,
 ): Tensor {
+
+    //(async () => { console.log("running scaled dot product attention with input: ", await query.toArrayAsync(), await key.toArrayAsync(), await value.toArrayAsync()); })();
+    
     if(attn_mask) console.error("attention does not support attention masks");
     if(dropout) console.error("attention does not support dropout");
     if(is_casual) console.error("attention does not support is_causal");
@@ -384,6 +408,8 @@ export function multihead_attention(
     is_causal=false
 ): { output: Tensor, weights: Tensor | null } {
 
+    //(async () => { console.log("running multihead attention with query: ", await query.toArrayAsync()); })();
+
     const is_batched = _mha_shape_check(query, key, value, num_heads, key_padding_mask, attn_mask);
 
     if(!is_batched) {
@@ -404,6 +430,7 @@ export function multihead_attention(
 
     let q, k, v;
     if(!use_separate_proj_weight) {
+        console.log("running multihead attention with packed weights");
         if(in_proj_weight == null) throw new Error("use_separate_proj_weight is False but in_proj_weight is null")
 
         const unpacked_weights = in_proj_weight.chunk(3);
@@ -427,6 +454,9 @@ export function multihead_attention(
         b_k = chunks[1];
         b_v = chunks[2]
     }
+
+    (async () => { console.log("running scaled dot product attention with query: ", await query.toArrayAsync())})();
+        
     const proj = _in_projection(query, key, value, q_proj_weight, k_proj_weight, v_proj_weight, b_q, b_k, b_v)
     q = proj.q;
     k = proj.k;
@@ -464,8 +494,13 @@ export function multihead_attention(
         k = k.view([bsz, num_heads, src_len, head_dim]);
         v = v.view([bsz, num_heads, src_len, head_dim]);
 
+        // q in missing by here
+        (async () => { console.log("running scaled dot product attention with q, k, v, dropout, in_casual: ", await q.toArrayAsync(), await k.toArrayAsync(), await v.toArrayAsync(), dropout_p, is_causal)})();
+        (async () => { console.log("and attn_mask: ", await attn_mask.toArrayAsync())})();
         let attn_output = scaled_dot_product_attention(q, k, v, attn_mask, dropout_p, is_causal);
+        (async () => { console.log("got attn output: ", await attn_output.toArrayAsync())})()
         attn_output = attn_output.permute([2, 0, 1, 3]).view([bsz * tgt_len, embed_dim]);
+        (async () => { console.log("got permuted attn output: ", await attn_output.toArrayAsync())})()
 
         attn_output = linear(attn_output, out_proj_weight, out_proj_bias);
         attn_output = attn_output.view([tgt_len, bsz, attn_output.shape[1]]);
@@ -489,6 +524,10 @@ function _in_projection(
     b_k?: Tensor,
     b_v?: Tensor,
 ): { q: Tensor, k: Tensor, v: Tensor } {
+
+    console.log("project query, weight, and bias shapes", q.shape, w_q.shape, b_q.shape);
+
+    (async () => {console.log("running in projection with query, weight, and bias: ", await q.toArrayAsync(), await w_q.toArrayAsync(), await b_q.toArrayAsync() );})();
 
     const Eq = q.shape[q.dim-1];
     const Ek = k.shape[k.dim-1];
@@ -568,10 +607,9 @@ function _mha_shape_check(query: Tensor, key: Tensor, value: Tensor, num_heads: 
 
 export function group_norm(input: Tensor, groups: number, weight?: Tensor, bias?: Tensor, eps=1e-5): Tensor {
     if(input.dim < 2) throw new Error("group norm expects at least two dimenstions");
-
     const params = {
         eps: eps,
-        groupSize: input.shape[1] / groups,
+        groupSize: shapeSize(input.shape) / groups,
         outputSize: shapeSize(input.shape)
     }
 
@@ -654,7 +692,7 @@ export function conv2d(input: Tensor, weight: Tensor, bias?: Tensor, stride?: nu
         { dtype: input.dtype },
         params,
         [[params.batchSize, params.outputChannels, params.outputHeight, params.outputWidth]],
-        weight
+        weight,
     )[0];
 }
 

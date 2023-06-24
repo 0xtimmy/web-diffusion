@@ -11,6 +11,7 @@ import * as aops from "./ops_artisanal";
 
 export class GeLU extends Module {
     forward(input: Tensor): Tensor {
+        //(async () => { console.log("forwarding GeLU with input: ", await input.toArrayAsync()); })();
         return input.gelu();
     }
 }
@@ -26,10 +27,12 @@ export class LayerNorm extends Module {
         this.normalized_shape = normalized_shape;
         this.eps = eps;
         this.elementwise_affine=elementwise_affine;
+
     }
 
     forward(input: Tensor): Tensor {
-        return input.layernorm(this.normalized_shape, this.eps);
+        //(async () => { console.log("forwarding LayerNorm with input: ", await input.toArrayAsync()); })();
+        return aops.layernorm(input, this.normalized_shape, undefined, undefined, this.eps);
     }
 }
 
@@ -152,19 +155,19 @@ export class MultiheadAttention extends Module {
 
     _reset_parameters() {
         if(this._qkv_same_embed_dim) {
-            xavier_uniform(this.in_proj_weight);
+            this.in_proj_weight = xavier_uniform(this.in_proj_weight);
         } else {
-            xavier_uniform(this.q_proj_weight);
-            xavier_uniform(this.k_proj_weight);
-            xavier_uniform(this.v_proj_weight);
+            this.q_proj_weight = xavier_uniform(this.q_proj_weight);
+            this.k_proj_weight = xavier_uniform(this.k_proj_weight);
+            this.v_proj_weight = xavier_uniform(this.v_proj_weight);
         }
 
         if(this.in_proj_bias != null) {
-            constant(this.in_proj_bias.shape, 0.0);
-            constant(this.out_proj.bias.shape, 0.0);
+            this.in_proj_bias = constant(this.in_proj_bias.shape, 0.0);
+            this.out_proj.bias = constant(this.out_proj.bias.shape, 0.0);
         }
-        if(this.bias_k != null) xavier_normal(this.bias_k);
-        if(this.bias_v != null) xavier_normal(this.bias_v);
+        if(this.bias_k != null) this.bias_k = xavier_normal(this.bias_k);
+        if(this.bias_v != null) this.bias_v = xavier_normal(this.bias_v);
     }
 
     forward(
@@ -178,6 +181,7 @@ export class MultiheadAttention extends Module {
         is_casual=false
     ): { output: Tensor, weights: Tensor } {
 
+        //(async () => { console.log("forwarding multihead attention with input: ", await query.toArrayAsync()); })();
         const is_batched = query.dim == 3;
 
         /*
@@ -224,7 +228,10 @@ export class MultiheadAttention extends Module {
                 this.dropout, this.out_proj.weight, this.out_proj.bias,
                 undefined,
                 undefined,
-                true
+                true,
+                this.q_proj_weight,
+                this.k_proj_weight,
+                this.v_proj_weight
                 /*
                 training=this.training,
                 key_padding_mask=key_padding_mask, need_weights=need_weights,
@@ -242,6 +249,12 @@ export class MultiheadAttention extends Module {
                 this.in_proj_weight, this.in_proj_bias,
                 this.add_zero_attn,
                 this.dropout, this.out_proj.weight, this.out_proj.bias,
+                undefined,
+                undefined,
+                false,
+                this.q_proj_weight,
+                this.k_proj_weight,
+                this.v_proj_weight
                 /*
                 training=self.training,
                 key_padding_mask=key_padding_mask,
@@ -253,8 +266,8 @@ export class MultiheadAttention extends Module {
             )
         }
             
-
-        return { output: res.output, weights: res.weights };
+        throw new Error("finished multihead attention");
+        //return { output: res.output, weights: res.weights };
         //return input.multihead_attention(this.embed_dim, this.num_heads);
     }
 }

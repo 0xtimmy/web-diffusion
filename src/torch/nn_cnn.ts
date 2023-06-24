@@ -48,6 +48,8 @@ export class Conv2d extends Module {
         
         this.weight = new Parameter(factories.empty([outChannels, Math.floor(inChannels / groups), this.kernelSize[0], this.kernelSize[1]]))
         if(bias) this.bias = new Parameter(factories.empty(outChannels));
+
+        this.reset_parameters();
     }
 
     reset_parameters() {
@@ -62,7 +64,9 @@ export class Conv2d extends Module {
     }
 
     forward(input: Tensor): Tensor {
+        (async () => { console.log("forwarding Conv2D with input: ", await input.toArrayAsync()); })();
         return ops.conv2d(input, this.weight, this.bias, this.stride, this.padding, this.dilation, this.groups);
+
     }
 }
 
@@ -105,6 +109,7 @@ export class GroupNorm extends Module {
     }
 
     forward(input: Tensor): Tensor {
+        (async () => { console.log("forwarding GroupNorm with input: ", await input.toArrayAsync()); })();
         return ops.group_norm(input, this.numGroups, this.weight, this.bias, this.eps);
     }
 }
@@ -137,6 +142,7 @@ export class Linear extends Module {
     }
 
     forward(input: Tensor): Tensor {
+        (async () => { console.log("forwarding Linear with input: ", await input.toArrayAsync()); })();
         return ops.linear(input, this.weight, this.bias);
     }
 }

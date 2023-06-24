@@ -71,6 +71,13 @@ const funcs: { [key: string]: (args: any, target: any) => Promise<{ res: boolean
     "max_pool2d": test_max_pool2d,
     "scaled_dot_product_attention": test_scaled_dot_product_attention,
     "sum": test_sum,
+    "scalar_add": test_scalar_add,
+    "scalar_sub": test_scalar_sub,
+    "scalar_mul": test_scalar_mul,
+    "scalar_div": test_scalar_div,
+    "group_norm": test_group_norm,
+    "layer_norm": test_layer_norm,
+    "chunk": test_chunk,
 }
 
 // Tests
@@ -98,6 +105,147 @@ async function test_nn_linear(args, target): Promise<test_result> {
     return { res: true, output: output_data }
 }
 
+async function test_chunk(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  input: Tensor,
+     *  chunks: number,
+     *  dim: number
+     * }
+    **/
+   const input = ops.tensor(args.input);
+   const target_output = target.map((v) => { return ops.tensor(v); });
+   const actual_output = ops.chunk(input, args.chunks, args.dim);
+   const output_data = [];
+   for(let i = 0; i < actual_output.length; i++) {
+    output_data.push(await actual_output[i].toArrayAsync());
+   }
+
+   if(target_output.length != actual_output.length) return { res: false, output: output_data, error_msg: `mismatched number of chunks-- expected ${target_output.length}, got ${actual_output.length}` };
+   for(let i = 0; i < target_output.length; i++) {
+    if(!array_eq(actual_output[i].shape, target_output[i].shape)) return { res: false, output: output_data, error_msg: `mismatched shapes-- expected ${target_output[i].shape}, got ${actual_output[i].shape}` };
+    if(!array_eq(output_data[i].flat(4), target[i].flat(4), 0)) return { res: false, output: output_data, error_msg: `mismatched tensor content` };
+   }
+
+    return { res: true, output: output_data };
+}
+
+async function test_group_norm(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  input: Tesnor,
+     *  groups: number,
+     *  weight: Tensor,
+     *  bias: Tensor
+     * }
+     */
+    const input = ops.tensor(args.input);
+    const weight = ops.tensor(args.weight);
+    const bias = ops.tensor(args.bias);
+    const target_output = ops.tensor(target);
+    const actual_output = ops.group_norm(input, args.groups, weight, bias);
+    const output_data = await actual_output.toArrayAsync();
+
+    if(!array_eq(actual_output.shape, target_output.shape)) return { res: false, output: output_data, error_msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    if(!array_eq(output_data.flat(4), [target].flat(4), 0)) return { res: false, output: output_data, error_msg: `mismatched tensor content` };
+
+    return { res: true, output: output_data };
+}
+
+async function test_layer_norm(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  input: Tesnor,
+     *  norm_shape: number,
+     *  weight: Tensor,
+     *  bias: Tensor
+     * }
+     */
+    const input = ops.tensor(args.input);
+    const weight = ops.tensor(args.weight);
+    const bias = ops.tensor(args.bias);
+    const target_output = ops.tensor(target);
+    const actual_output = ops.layernorm(input, args.norm_shape, weight, bias);
+    const output_data = await actual_output.toArrayAsync();
+
+    if(!array_eq(actual_output.shape, target_output.shape)) return { res: false, output: output_data, error_msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    if(!array_eq(output_data.flat(4), [target].flat(4), 0)) return { res: false, output: output_data, error_msg: `mismatched tensor content` };
+
+    return { res: true, output: output_data };
+}
+
+async function test_scalar_add(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  input: Tesnor,
+     *  alpha: number
+     * }
+     */
+    const input = ops.tensor(args.input);
+    const target_output = ops.tensor(target);
+    const actual_output = ops.scalar_add(input, args.alpha);
+    const output_data = await actual_output.toArrayAsync();
+
+    if(!array_eq(actual_output.shape, target_output.shape)) return { res: false, output: output_data, error_msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    if(!array_eq(output_data.flat(4), [target].flat(4), 0)) return { res: false, output: output_data, error_msg: `mismatched tensor content` };
+
+    return { res: true, output: output_data };
+}
+
+async function test_scalar_sub(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  input: Tesnor,
+     *  alpha: number
+     * }
+     */
+    const input = ops.tensor(args.input);
+    const target_output = ops.tensor(target);
+    const actual_output = ops.scalar_sub(input, args.alpha);
+    const output_data = await actual_output.toArrayAsync();
+
+    if(!array_eq(actual_output.shape, target_output.shape)) return { res: false, output: output_data, error_msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    if(!array_eq(output_data.flat(4), [target].flat(4), 0)) return { res: false, output: output_data, error_msg: `mismatched tensor content` };
+
+    return { res: true, output: output_data };
+}
+
+async function test_scalar_mul(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  input: Tesnor,
+     *  alpha: number
+     * }
+     */
+    const input = ops.tensor(args.input);
+    const target_output = ops.tensor(target);
+    const actual_output = ops.scalar_mul(input, args.alpha);
+    const output_data = await actual_output.toArrayAsync();
+
+    if(!array_eq(actual_output.shape, target_output.shape)) return { res: false, output: output_data, error_msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    if(!array_eq(output_data.flat(4), [target].flat(4), 0)) return { res: false, output: output_data, error_msg: `mismatched tensor content` };
+
+    return { res: true, output: output_data };
+}
+
+async function test_scalar_div(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  input: Tesnor,
+     *  alpha: number
+     * }
+     */
+    const input = ops.tensor(args.input);
+    const target_output = ops.tensor(target);
+    const actual_output = ops.scalar_div(input, args.alpha);
+    const output_data = await actual_output.toArrayAsync();
+
+    if(!array_eq(actual_output.shape, target_output.shape)) return { res: false, output: output_data, error_msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    if(!array_eq(output_data.flat(4), [target].flat(4), 0)) return { res: false, output: output_data, error_msg: `mismatched tensor content` };
+
+    return { res: true, output: output_data };
+}
+
 async function test_sum(args, target): Promise<test_result> {
     /**
      * args: {
@@ -107,9 +255,7 @@ async function test_sum(args, target): Promise<test_result> {
     const input = ops.tensor(args.input);
     //const target_output = ops.tensor(target);
     const actual_output = input.sum();
-    console.log("sum output", actual_output);
     const output_data = await actual_output.toArrayAsync();
-    console.log("sum output*", output_data);
 
     //if(!array_eq(actual_output.shape, target_output.shape)) return { res: false, output: output_data, error_msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
     if(!array_eq(output_data.flat(4), [target].flat(4), 0.0001)) return { res: false, output: output_data, error_msg: `mismatched tensor content` };
