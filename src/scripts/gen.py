@@ -5,7 +5,10 @@ import tests as t;
 # Configure and build the generated test file
 
 tests = [
-    t.gen_chunk("chunk test 1", torch.randint(3, 20, 20), 3, 0),
+    t.gen_chunk("chunk test 1 - dim start", torch.randint(0, 10, [3, 5, 5]), 3, 0),
+    t.gen_chunk("chunk test 1 - dim mid", torch.randint(0, 10, [5, 3, 5]), 3, 1),
+    t.gen_chunk("chunk test 1 - dim end", torch.randint(0, 10, [5, 5, 3]), 3, 2),
+    t.gen_chunk("chunk test 1 - non-one output shape", torch.randint(0, 10, [5, 6, 5]), 2, 1),
     #t.gen_layer_norm("layer_norm basic test", torch.randn(20, 5, 10, 10), [5, 10, 10], torch.ones([5, 10, 10]), torch.zeros([5, 10, 10])),
     #t.gen_group_norm("group_norm basic test", torch.randn(20, 6, 10, 10), 2, torch.ones(6), torch.zeros(6)),
     #t.gen_scalar_add("Scalar add basic test", torch.ones(2, 2), 1),

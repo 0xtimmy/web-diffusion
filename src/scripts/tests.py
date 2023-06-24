@@ -24,7 +24,7 @@ def gen_chunk(message, input, chunks, dim, log="always", log_config="fail"):
             "chunks": chunks,
             "dim": dim,
         },
-        "target": output.numpy().tolist(),
+        "target": [t.numpy().tolist() for t in output],
         "log": log,
         "log_config": log_config
     }

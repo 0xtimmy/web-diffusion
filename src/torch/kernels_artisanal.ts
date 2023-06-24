@@ -376,15 +376,15 @@ export const kernels: { [name: string]: KernelSpec } = {
                 shaderType: "u32"
             },
             {
-                name: "stride",
-                shaderType: "u32"
-            },
-            {
-                name: "strides",
+                name: "numChunks",
                 shaderType: "u32"
             },
             {
                 name: "offset",
+                shaderType: "u32"
+            },
+            {
+                name: "outputSize",
                 shaderType: "u32"
             }
         ],
@@ -398,18 +398,20 @@ export const kernels: { [name: string]: KernelSpec } = {
             {
                 name: "output",
                 shaderType: "array<f32>",
-                size: "chunkSize * strides"
+                size: "outputSize"
             }
         ],
         workgroupSize: [4, 4, 1],
-        workgroupCount: ["chunkSize / 4", "strides / 4", 1],
+        workgroupCount: ["chunkSize / 4", "outputSize / chunkSize / 4", 1],
         shader: `
-            if (global_id.x >= parameters.chunkSize || global_id.y >= parameters.strides) {
+            if (global_id.x >= parameters.chunkSize || global_id.y >= parameters.outputSize / parameters.chunkSize) {
                 return;
             }
 
-            const chunk_idx = global_id.y*parameters.chunkSize;
-            output[global_id.x + chunk_idx] = input[global_id.x + chunk_idx*parameters.stride];
+            const input_chunk_start = global_id.y * parameters.numChunks * parameters.chunkSize;
+            const input_idx = input_chunk_start + parameters.offset * parameters.chunkSize + global_id.x;
+            const output_idx = global_id.y * parameters.chunkSize + global_id.x;
+            output[output_idx] = input[input_idx];
         `
     },
     box_muller: {

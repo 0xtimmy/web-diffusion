@@ -553,10 +553,11 @@ export function chunk(
     })
 
     const params = {
-        chunkSize: output_shape.reduce((acc: number, v: number, i: number) => { return i > dim ? acc * v : acc; }, 1),
-        stride: chunks,
-        strides: output_shape.reduce((acc: number, v: number, i: number) => { return i < dim ? acc * v : acc; }, 1),
+        chunkSize: (dim+1 < output_shape.length ? shapeSize(Array.from(output_shape).splice(dim + 1)) : 1) * output_shape[dim],
+        numChunks: chunks,
+        outputSize: shapeSize(output_shape)
     }
+    console.log("running chunk with params: ", params);
     const arr = [];
     for(let i = 0; i < chunks; i++) {
         arr.push(input.runKernel(
