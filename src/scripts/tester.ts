@@ -12,16 +12,27 @@ interface test {
     "func": string,
     "args": any,
     "target": any,
+    "duration": number,
     "log": logconfig,
     "log_config": logconfig,
 }
 
 interface test_result { res: boolean, output: any, error_msg?: string }
 
+let express_duration: ("compare" | "difference" | "percent") = "difference"
+const express_duration_func = (ts: number, torch: number): string => {
+    if(express_duration == "compare") return `took ${ts}ms (${torch}ms in torch)`;
+    if(express_duration == "difference") return `${ts-torch}ms slower`;
+    if(express_duration == "percent") return `${ts/torch}x time to compute`;
+    return `${ts}ms`
+}  
+
 let test_num;
 
-async function run_test(func: string, args: any, target: any, message?: string, log: logconfig="always", log_args: logconfig="never") {
+async function run_test(func: string, args: any, target: any, control_duration: number, message?: string, log: logconfig="always", log_args: logconfig="never") {
+    const start = Date.now();
     const { res, output, error_msg } = await funcs[func](args, target);
+    const duration = Date.now() - start;
     if(log == "always" || (!res && log == "never")) {
         console.log(`🛠️ Running test #${test_num}: ${message}...`)
         if(log_args == "always" || (!res && log_args == "fail")) {
@@ -29,9 +40,9 @@ async function run_test(func: string, args: any, target: any, message?: string, 
         }
         if(log_args == "always" || (!res && log_args == "fail")) console.warn("Output: ", output, "\nTarget: ", target);
         if(res) {
-            console.log(`✅ Passed!`);
+            console.log(`✅ Passed! `, express_duration_func(duration, control_duration));
         } else {
-            console.warn(`🚩 Failed: ${error_msg}`);
+            console.warn(`🚩 Failed: ${error_msg} `, express_duration_func(duration, control_duration));
         }
     }
     return;
@@ -43,6 +54,7 @@ export async function run_tests(tests: Array<test>) {
             tests[test_num].func,
             tests[test_num].args,
             tests[test_num].target,
+            tests[test_num].duration,
             tests[test_num].message,
             tests[test_num].log,
             tests[test_num].log_config,

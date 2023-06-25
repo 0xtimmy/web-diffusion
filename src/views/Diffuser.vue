@@ -35,15 +35,6 @@ export default defineComponent({
                 console.log("sample result: ");
                 console.log(res_data);
                 const img_data = new Uint8ClampedArray(res_data.flat(3) as any);
-                /*
-                const arr = new Uint8ClampedArray(4 * 200 * 200);
-                for (let i = 0; i < arr.length; i += 4) {
-                    arr[i + 0] = 0; // R value
-                    arr[i + 1] = 0; // G value
-                    arr[i + 2] = 0; // B value
-                    arr[i + 3] = 255; // A value
-                }
-                */
                console.log(img_data);
                 const img = new ImageData(img_data, res.shape[1], res.shape[2]);
                 console.log(img);
