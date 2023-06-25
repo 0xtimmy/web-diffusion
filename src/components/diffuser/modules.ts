@@ -13,9 +13,9 @@ class SelfAttention extends torch.nn.Module {
         this.channels = channels;
         this.size = size;
         this.mha = new torch.nn.MultiheadAttention(channels, 4, );
-        this.ln = new torch.nn.LayerNorm([channels]);
+        this.ln = new torch.nn.LayerNorm([size * size, channels]);
         this.ff_self = new torch.nn.Sequential([
-            new torch.nn.LayerNorm([channels]),
+            new torch.nn.LayerNorm([size * size, channels]),
             new torch.nn.Linear(channels, channels),
             new torch.nn.GeLU(),
             new torch.nn.Linear(channels, channels)
@@ -184,49 +184,99 @@ export class UNet extends torch.nn.Module {
     }
 
     forward(x: torch.Tensor, t: torch.Tensor) {
+        let status = 0;
+        console.log(`forwarding... step: ${status}`);
+        status++;
+        _log_tensor(x, "forwarding x")
+        _log_tensor(t, "with t")
         t = torch.unsqueeze(t, -1);
         t = this.pos_encoding(t, this.time_dim);
-        console.log("finished pos_encoding")
+        console.log(`forwarding... step: ${status}`);
+        status++;
+        _log_tensor(t, "pos_encoding");
 
+        console.log("finsihed pos_encoding starting down");
 
         let x1 = this.inc.forward(x);
-        console.log("inc");
+        _log_tensor(x1, "inc");
+        console.log(`forwarding... step: ${status}`);
+        status++;
+        
         let x2 = this.down1.forward(x1, t);
-        console.log("down1");
-        x2 = this.sa1.forward(x2)
-        console.log("sa1");
+        console.log(`forwarding... step: ${status}`);
+        status++;
+        _log_tensor(x2, "down1");
+        x2 = this.sa1.forward(x2);
+        console.log(`forwarding... step: ${status}`);
+        status++;
+        _log_tensor(x2, "sa1");
         let x3 = this.down2.forward(x2, t);
-        console.log("down2");
+        console.log(`forwarding... step: ${status}`);
+        status++;
+        _log_tensor(x3, "down2");
         x3 = this.sa2.forward(x3);
-        console.log("sa2");
+        console.log(`forwarding... step: ${status}`);
+        status++;
+        _log_tensor(x3, "sa2")
         let x4 = this.down3.forward(x3, t);
-        console.log("down3");
+        console.log(`forwarding... step: ${status}`);
+        status++;
+        _log_tensor(x4, "down3");
         x4 = this.sa3.forward(x4);
-        console.log("sa3");
+        console.log(`forwarding... step: ${status}`);
+        status++;
+        _log_tensor(x4, "sa3");
 
+        console.log("finsihed down starting bot");
         x4 = this.bot1.forward(x4);
-        console.log("bot1");
+        console.log(`forwarding... step: ${status}`);
+        status++;
+        _log_tensor(x4, "bot1");
         x4 = this.bot2.forward(x4);
-        console.log("bot2");
+        console.log(`forwarding... step: ${status}`);
+        status++;
+        _log_tensor(x4, "bot2");
         x4 = this.bot3.forward(x4);
-        console.log("bot3");
+        console.log(`forwarding... step: ${status}`);
+        status++;
+        _log_tensor(x4, "bot3");
 
+        console.log("finsihed bot starting up");
         x = this.up1.forward(x4, x3, t);
-        console.log("up1");
+        console.log(`forwarding... step: ${status}`);
+        status++;
+        _log_tensor(x, "up1");
         x = this.sa4.forward(x);
-        console.log("sa4");
+        console.log(`forwarding... step: ${status}`);
+        status++;
+        _log_tensor(x, "sa4");
         x = this.up2.forward(x, x2, t);
-        console.log("up2");
+        console.log(`forwarding... step: ${status}`);
+        status++;
+        _log_tensor(x, "up2");
         x = this.sa5.forward(x);
-        console.log("sa5");
+        console.log(`forwarding... step: ${status}`);
+        status++;
+        _log_tensor(x, "sa5")
         x = this.up3.forward(x, x1, t);
-        console.log("up3");
+        console.log(`forwarding... step: ${status}`);
+        status++;
+        _log_tensor(x, "up3");
         x = this.sa6.forward(x);
-        console.log("sa6");
+        console.log(`forwarding... step: ${status}`);
+        status++;
+        _log_tensor(x, "sa6")
 
-        const output = this.outc.forward(x)
-        console.log("finished UNet forward");
+        const output = this.outc.forward(x);
+        console.log(`forwarding... step: ${status}`);
+        status++;
+        _log_tensor(output, "finished UNet")
         return output
 
     }
+}
+
+async function _log_tensor(x: torch.Tensor, message?: string) {
+    //const data = await x.toArrayAsync();
+    //console.log(message ? message : "", data);
 }

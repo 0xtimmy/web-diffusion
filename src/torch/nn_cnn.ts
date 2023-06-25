@@ -48,6 +48,8 @@ export class Conv2d extends Module {
         
         this.weight = new Parameter(factories.empty([outChannels, Math.floor(inChannels / groups), this.kernelSize[0], this.kernelSize[1]]))
         if(bias) this.bias = new Parameter(factories.empty(outChannels));
+
+        this.reset_parameters();
     }
 
     reset_parameters() {
@@ -62,7 +64,9 @@ export class Conv2d extends Module {
     }
 
     forward(input: Tensor): Tensor {
+        //(async () => { console.log("forwarding Conv2D with input: ", await input.toArrayAsync()); })();
         return ops.conv2d(input, this.weight, this.bias, this.stride, this.padding, this.dilation, this.groups);
+
     }
 }
 
@@ -105,6 +109,7 @@ export class GroupNorm extends Module {
     }
 
     forward(input: Tensor): Tensor {
+        //(async () => { console.log("forwarding GroupNorm with input: ", await input.toArrayAsync()); })();
         return ops.group_norm(input, this.numGroups, this.weight, this.bias, this.eps);
     }
 }
@@ -113,8 +118,7 @@ export class Linear extends Module {
     inChannels: number;
     outChannels: number;
 
-    //weight: Parameter;
-    weight: Tensor;
+    weight: Parameter;
     bias: Parameter;
 
     constructor(inChannels: number, outChannels: number, bias=true) {
@@ -122,8 +126,7 @@ export class Linear extends Module {
         this.inChannels = inChannels;
         this.outChannels = outChannels;
 
-        //this.weight = new Parameter(factories.empty([outChannels, inChannels]));
-        this.weight = factories.empty([outChannels, inChannels]);
+        this.weight = new Parameter(factories.empty([outChannels, inChannels]));
         if(bias) this.bias = new Parameter(factories.empty(outChannels));
         else this.registerParameter("bias", null);
 
@@ -132,11 +135,12 @@ export class Linear extends Module {
 
     reset_parameters() {
         const k = Math.sqrt(1 / this.inChannels);
-        this.weight = factories.uniform([this.outChannels, this.inChannels], -k, k);
+        this.weight = new Parameter(factories.uniform([this.outChannels, this.inChannels], -k, k));
         if(this.bias) this.bias = new Parameter(factories.uniform([this.outChannels], -k, k));
     }
 
     forward(input: Tensor): Tensor {
+        //(async () => { console.log("forwarding Linear with input: ", await input.toArrayAsync()); })();
         return ops.linear(input, this.weight, this.bias);
     }
 }

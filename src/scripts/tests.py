@@ -14,6 +14,110 @@ import numpy
 #    "log_config"?: logconfig,  // whether to log the test arguements and output
 #}
 
+def gen_chunk(message, input, chunks, dim, log="always", log_config="fail"):
+    output = torch.chunk(input, chunks, dim)
+    return {
+        "message": message,
+        "func": "chunk",
+        "args": {
+            "input": input.numpy().tolist(),
+            "chunks": chunks,
+            "dim": dim,
+        },
+        "target": [t.numpy().tolist() for t in output],
+        "log": log,
+        "log_config": log_config
+    }
+
+def gen_layer_norm(message, input, norm_shape, weight, bias, log="always", log_config="fail"):
+    output = torch.layer_norm(input, norm_shape, weight, bias)
+    return {
+        "message": message,
+        "func": "layer_norm",
+        "args": {
+            "input": input.numpy().tolist(),
+            "norm_shape": norm_shape,
+            "weight": weight.numpy().tolist(),
+            "bias": weight.numpy().tolist()
+        },
+        "target": output.numpy().tolist(),
+        "log": log,
+        "log_config": log_config
+    }
+
+def gen_group_norm(message, input, groups, weight, bias, log="always", log_config="fail"):
+    output = torch.group_norm(input, groups, weight, bias)
+    return {
+        "message": message,
+        "func": "group_norm",
+        "args": {
+            "input": input.numpy().tolist(),
+            "groups": groups,
+            "weight": weight.numpy().tolist(),
+            "bias": weight.numpy().tolist()
+        },
+        "target": output.numpy().tolist(),
+        "log": log,
+        "log_config": log_config
+    }
+
+
+def gen_scalar_add(message, input, alpha, log="always", log_config="fail"):
+    output = input + alpha
+    return {
+        "message": message,
+        "func": "scalar_add",
+        "args": {
+            "input": input.numpy().tolist(),
+            "alpha": alpha,
+        },
+        "target": output.numpy().tolist(),
+        "log": log,
+        "log_config": log_config
+    }
+
+def gen_scalar_sub(message, input, alpha, log="always", log_config="fail"):
+    output = input - alpha
+    return {
+        "message": message,
+        "func": "scalar_sub",
+        "args": {
+            "input": input.numpy().tolist(),
+            "alpha": alpha,
+        },
+        "target": output.numpy().tolist(),
+        "log": log,
+        "log_config": log_config
+    }
+
+def gen_scalar_mul(message, input, alpha, log="always", log_config="fail"):
+    output = input * alpha
+    return {
+        "message": message,
+        "func": "scalar_mul",
+        "args": {
+            "input": input.numpy().tolist(),
+            "alpha": alpha,
+        },
+        "target": output.numpy().tolist(),
+        "log": log,
+        "log_config": log_config
+    }
+
+def gen_scalar_div(message, input, alpha, log="always", log_config="fail"):
+    output = input / alpha
+    return {
+        "message": message,
+        "func": "scalar_div",
+        "args": {
+            "input": input.numpy().tolist(),
+            "alpha": alpha,
+        },
+        "target": output.numpy().tolist(),
+        "log": log,
+        "log_config": log_config
+    }
+
 def gen_sum(message, input, log="always", log_config="fail"):
     output = input.sum()
     return {
@@ -84,37 +188,6 @@ def gen_conv2d(message, input, weight, bias, log="always", log_config="fail"):
             "log": log,
             "log_config": log_config
         }
-
-def gen_layer_norm(message, input, weight, bias, log="always", log_config="fail"):
-    output = torch.layer_norm(input)
-    return {
-        "message": message,
-        "func": "layer_norm",
-        "args": {
-            "input": input.numpy().tolist(),
-            "weight": weight.numpy().tolist(),
-            "bias": bias.numpy().tolist(),
-        },
-        "target": output.numpy().tolist(),
-        "log": log,
-        "log_config": log_config
-    }
-
-def gen_group_norm(message, input, groups, weight, bias, log="always", log_config="fail"):
-    output = torch.layer_norm(input)
-    return {
-        "message": message,
-        "func": "group_norm",
-        "args": {
-            "input": input.numpy().tolist(),
-            "groups": groups,
-            "weight": weight.numpy().tolist(),
-            "bias": bias.numpy().tolist(),
-        },
-        "target": output.numpy().tolist(),
-        "log": log,
-        "log_config": log_config
-    }
 
 def gen_linspace(message, start, end, steps, log="always", log_config="fail"):
     output = torch.linspace(start, end, steps)

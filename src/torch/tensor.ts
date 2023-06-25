@@ -384,6 +384,9 @@ export class Tensor extends TensorBase {
     repeat(shape: Shape): Tensor {
         return aops.repeat(this, shape);
     }
+    cat(t: Tensor, dim: 0 | 1 | 2 | 3 = 0): Tensor {
+        return aops.cat(this, t, dim);
+    }
 
     // Codegen marker
     /**
@@ -1869,8 +1872,8 @@ export class Tensor extends TensorBase {
         return ops.gelu(this);
     }
 
-    layernorm(normalized_shape: Shape, eps: number): Tensor {
-        return aops.layernorm(this, normalized_shape, eps);
+    layernorm(normalized_shape: Shape, weight?: Tensor, bias?: Tensor, eps=1e-5): Tensor {
+        return aops.layernorm(this, normalized_shape, weight, bias, eps);
     }
 
     box_muller(mean: number, std: number): Tensor {
