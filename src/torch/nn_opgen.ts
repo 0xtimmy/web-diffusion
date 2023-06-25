@@ -266,9 +266,7 @@ export class MultiheadAttention extends Module {
             )
         }
             
-        throw new Error("finished multihead attention");
-        //return { output: res.output, weights: res.weights };
-        //return input.multihead_attention(this.embed_dim, this.num_heads);
+        return { output: res.output, weights: res.weights };
     }
 }
 

@@ -25,7 +25,7 @@ export default defineComponent({
             const diffuser = new Diffusion({ noise_steps: 1, img_size: 64 });
             const model = new UNet();
             let res = diffuser.sample(model);
-            res = res.cat(torch.zeros([1, 1, ...Array.from(res.shape).splice(2)]), 1);
+            res = res.cat(torch.ones([1, 1, ...Array.from(res.shape).splice(2)]), 1);
             console.log("res shape: ", res.shape);
             res = res.transpose(1, 2).transpose(2, 3);
             console.log("res shape: ", res.shape);
@@ -44,7 +44,9 @@ export default defineComponent({
                     arr[i + 3] = 255; // A value
                 }
                 */
+               console.log(img_data);
                 const img = new ImageData(img_data, res.shape[1], res.shape[2]);
+                console.log(img);
                 const context = this.$refs["canvas"].getContext("2d");
                 context.putImageData(img, 16, 16);
             })()

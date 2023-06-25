@@ -277,6 +277,6 @@ export class UNet extends torch.nn.Module {
 }
 
 async function _log_tensor(x: torch.Tensor, message?: string) {
-    const data = await x.toArrayAsync();
-    console.log(message ? message : "", data);
+    //const data = await x.toArrayAsync();
+    //console.log(message ? message : "", data);
 }

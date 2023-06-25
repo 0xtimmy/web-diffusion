@@ -12,7 +12,7 @@ import * as ops from "./ops_opgen";
 // ------------------------------------
 export function clamp(input: Tensor, low: number, high: number): Tensor {
     return input.runKernel(
-        "index",
+        "clamp",
         { dtype: input.dtype },
         { 
             low: low,
@@ -430,7 +430,6 @@ export function multihead_attention(
 
     let q, k, v;
     if(!use_separate_proj_weight) {
-        console.log("running multihead attention with packed weights");
         if(in_proj_weight == null) throw new Error("use_separate_proj_weight is False but in_proj_weight is null")
 
         const unpacked_weights = in_proj_weight.chunk(3);
@@ -455,7 +454,7 @@ export function multihead_attention(
         b_v = chunks[2]
     }
 
-    (async () => { console.log("running scaled dot product attention with query: ", await query.toArrayAsync())})();
+    //(async () => { console.log("running scaled dot product attention with query: ", await query.toArrayAsync())})();
         
     const proj = _in_projection(query, key, value, q_proj_weight, k_proj_weight, v_proj_weight, b_q, b_k, b_v)
     q = proj.q;
@@ -495,12 +494,12 @@ export function multihead_attention(
         v = v.view([bsz, num_heads, src_len, head_dim]);
 
         // q in missing by here
-        (async () => { console.log("running scaled dot product attention with q, k, v, dropout, in_casual: ", await q.toArrayAsync(), await k.toArrayAsync(), await v.toArrayAsync(), dropout_p, is_causal)})();
-        (async () => { console.log("and attn_mask: ", await attn_mask.toArrayAsync())})();
+        //(async () => { console.log("running scaled dot product attention with q, k, v, dropout, in_casual: ", await q.toArrayAsync(), await k.toArrayAsync(), await v.toArrayAsync(), dropout_p, is_causal)})();
+        //(async () => { console.log("and attn_mask: ", await attn_mask.toArrayAsync())})();
         let attn_output = scaled_dot_product_attention(q, k, v, attn_mask, dropout_p, is_causal);
-        (async () => { console.log("got attn output: ", await attn_output.toArrayAsync())})()
+        //(async () => { console.log("got attn output: ", await attn_output.toArrayAsync())})()
         attn_output = attn_output.permute([2, 0, 1, 3]).view([bsz * tgt_len, embed_dim]);
-        (async () => { console.log("got permuted attn output: ", await attn_output.toArrayAsync())})()
+        //(async () => { console.log("got permuted attn output: ", await attn_output.toArrayAsync())})()
 
         attn_output = linear(attn_output, out_proj_weight, out_proj_bias);
         attn_output = attn_output.view([tgt_len, bsz, attn_output.shape[1]]);
@@ -525,9 +524,7 @@ function _in_projection(
     b_v?: Tensor,
 ): { q: Tensor, k: Tensor, v: Tensor } {
 
-    console.log("project query, weight, and bias shapes", q.shape, w_q.shape, b_q.shape);
-
-    (async () => {console.log("running in projection with query, weight, and bias: ", await q.toArrayAsync(), await w_q.toArrayAsync(), await b_q.toArrayAsync() );})();
+    //(async () => {console.log("running in projection with query, weight, and bias: ", await q.toArrayAsync(), await w_q.toArrayAsync(), await b_q.toArrayAsync() );})();
 
     const Eq = q.shape[q.dim-1];
     const Ek = k.shape[k.dim-1];
@@ -557,7 +554,6 @@ export function chunk(
         numChunks: chunks,
         outputSize: shapeSize(output_shape)
     }
-    console.log("running chunk with params: ", params);
     const arr = [];
     for(let i = 0; i < chunks; i++) {
         arr.push(input.runKernel(
