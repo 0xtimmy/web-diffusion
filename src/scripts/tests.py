@@ -1,5 +1,0 @@
-import arithmetic_tests
-import functional_tests
-import module_tests
-import reshape_tests
-import factory_tests

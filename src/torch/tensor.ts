@@ -2686,7 +2686,7 @@ export class Tensor extends TensorBase {
     * @returns the output tensor
     */
     sum(dim?: number, keepdim?: boolean): Tensor {
-        return aops.sum(this);
+        return aops.sum(this, dim);
     }
     /**
     * Calculates:

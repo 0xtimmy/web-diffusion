@@ -38,14 +38,15 @@ export const kernels: { [name: string]: KernelSpec } = {
         workgroupSize: [32, 1, 1],
         workgroupCount: ["size", 1, 1],
         shader: `
-            if(global_id.x > parameters.size) return;
+            if(global_id.x > parameters.size) {
+                return;
+            }
 
-            //output[global_id.x] = min(max(input[global_id.x], parameters.low), parameters.high);
-            output[global_id.x] = 0;
+            output[global_id.x] = min(max(input[global_id.x], parameters.low), parameters.high);
         `
     },
     index: {
-        name: "sum",
+        name: "index",
         config: [
             {
                 name: "dtype"
@@ -77,7 +78,9 @@ export const kernels: { [name: string]: KernelSpec } = {
         workgroupSize: [8, 1, 1],
         workgroupCount: ["size / 8", 1, 1],
         shader: `
-            if(global_id.x > parameters.size) return;
+            if(global_id.x > parameters.size) {
+                return;
+            }
             output[global_id.x] = input[index[global_id.x]];
         `
     },
@@ -90,9 +93,13 @@ export const kernels: { [name: string]: KernelSpec } = {
         ],
         parameters: [
             {
-                name: "size",
+                name: "batches",
                 shaderType: "u32"
-            }
+            },
+            {
+                name: "batch_size",
+                shaderType: "u32"
+            },
         ],
         inputs: [
             {
@@ -104,14 +111,20 @@ export const kernels: { [name: string]: KernelSpec } = {
             {
                 name: "output",
                 shaderType: "array<f32>",
-                size: 1
+                size:"batches"
             }
         ],
-        workgroupSize: [1, 1, 1],
-        workgroupCount: ["size", 1, 1],
+        workgroupSize: [8, 1, 1],
+        workgroupCount: ["batches / 8 ", 1, 1],
         shader: `
-            if(global_id.x > parameters.outputSize) return;
-            output[0] = output[0] + input[global_id.x];
+            var batch_start: u32 = global_id.x * parameters.batch_size;
+
+            var sum: f32 = 0;
+            for(var i: u32 = 0; i < parameters.batch_size; i++) {
+                sum += input[batch_start + i];
+            }
+
+            output[global_id.x] = sum;
         `
     },
     group_norm: {
@@ -127,7 +140,19 @@ export const kernels: { [name: string]: KernelSpec } = {
                 shaderType: "f32"
             },
             {
+                name: "groups",
+                shaderType: "u32"
+            },
+            {
                 name: "groupSize",
+                shaderType: "u32"
+            },
+            {
+                name: "channels",
+                shaderType: "u32"
+            },
+            {
+                name: "batches",
                 shaderType: "u32"
             },
             {
@@ -156,26 +181,28 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        workgroupSize: [1, 1, 1],
-        workgroupCount: ["outputSize", 1, 1],
+        workgroupSize: [2, 2, 8],
+        workgroupCount: ["batches / 2", "groups / 2", "groupSize / 8"],
         shader: `
-            if(global_id.x > parameters.outputSize) return;
-
-            const group = floor(global_id.x / parameters.groupSize);
-            const group_start = group * parameters.groupSize;
-
-            var mean = 0;
-            var mean_sqrd = 0;
-
-            for(let i = group * parameters.groupSize; i < (group + 1) * parameters.groupSize; i++) {
-                mean = mean + input[i];
-                mean_sqrd = mean_sqrd + input[i] * input[i];
+            if(global_id.x >= parameters.batches || global_id.y >= parameters.groups || global_id.z >= parameters.groupSize) {
+                return;
             }
 
-            mean = mean / parameters.groupSize;
-            const std = sqrt( (mean_sqrd / parameters.groupSize) - (mean * mean) + parameters.eps);
+            var group_start = (global_id.x * parameters.groups + global_id.y) * parameters.groupSize;
 
-            output[global_id.x] = (input[global_id.x] - mean) / std * weight[group] + bias[group];
+            var mean: f32 = 0;
+            var mean_sqrd: f32 = 0;
+
+            for(var i: u32 = 0; i < parameters.groupSize; i++) {
+                mean = mean + input[group_start + i];
+                mean_sqrd = mean_sqrd + input[group_start + i] * input[group_start + i];
+            }
+
+            mean = mean / f32(parameters.groupSize);
+            var variance = (mean_sqrd / f32(parameters.groupSize)) - (mean * mean) + parameters.eps;
+            
+            var channel = (global_id.x * parameters.groups + global_id.y / (parameters.groupSize / parameters.groups)) % parameters.channels;
+            output[group_start + global_id.z] = ((input[group_start + global_id.z] - mean) / sqrt(variance)) * weight[channel] + bias[channel];
 
         `
     },
@@ -216,9 +243,11 @@ export const kernels: { [name: string]: KernelSpec } = {
         workgroupSize: [8, 1, 1],
         workgroupCount: ["outputSize / 8", 1, 1],
         shader: `
-            if(global_id.x >= parameters.outputSize) return;
+            if(global_id.x >= parameters.outputSize) {
+                return;
+            }
 
-            output[global_id.x] = parameters.step * global_id.x + parameters.start;
+            output[global_id.x] = parameters.step * f32(global_id.x) + parameters.start;
         `  
     },
     linspace: {
@@ -258,10 +287,12 @@ export const kernels: { [name: string]: KernelSpec } = {
         workgroupSize: [8, 1, 1],
         workgroupCount: ["outputSize / 8", 1, 1],
         shader: `
-            if(global_id.x >= parameters.outputSize) return;
+            if(global_id.x >= parameters.outputSize) {
+                return;
+            }
 
-            const diff = parameters.end - parameters.start;
-            output[global_id.x] = diff * global_id.x / (parameters.outputSize - 1) + parameters.start;
+            var diff = parameters.end - parameters.start;
+            output[global_id.x] = diff * f32(global_id.x) / f32(parameters.outputSize - 1) + parameters.start;
         `  
     },
     transpose: {
@@ -289,6 +320,10 @@ export const kernels: { [name: string]: KernelSpec } = {
                 shaderType: "u32"
             },
             {
+                name: "stride",
+                shaderType: "u32"
+            },
+            {
                 name: "outputSize",
                 shaderType: "u32"
             }
@@ -313,14 +348,14 @@ export const kernels: { [name: string]: KernelSpec } = {
                 return;
             }
 
-            const i = floor(global_id.x / parameters.stride / parameters.dim1);
-            const j = global_id.x % parameters.dim1;
-            const k = floor(global_id.x / parameters.dim1) % parameters.stride;
+            var i: u32 = global_id.x / parameters.stride / parameters.dim1;
+            var j: u32 = global_id.x % parameters.dim1;
+            var k: u32 = global_id.x / parameters.dim1 % parameters.stride;
 
-            const win_idx = j * parameters.dim0 * parameters.stride + k * parameters.dim0 + i;
+            var win_idx: u32 = j * parameters.dim0 * parameters.stride + k * parameters.dim0 + i;
 
-            const output_idx = global_id.y * parameters.batchSize + win_idx * parameters.elSize + global_id.z;
-            const input_idx = global_id.y * parameters.batchSize + global_id.x * parameters.elSize + global_id.z
+            var output_idx: u32 = global_id.y * parameters.batchSize + win_idx * parameters.elSize + global_id.z;
+            var input_idx: u32 = global_id.y * parameters.batchSize + global_id.x * parameters.elSize + global_id.z;
             output[output_idx] = input[input_idx];
         `
     },
@@ -333,34 +368,41 @@ export const kernels: { [name: string]: KernelSpec } = {
         ],
         parameters: [
             {
-                name: "outputSize",
+                name: "batches",
                 shaderType: "u32"
             },
+            {
+                name: "batch_size",
+                shaderType: "u32"
+            }
         ],
         inputs: [
             {
                 name: "input",
                 shaderType: "array<f32>"
             },
-            {
-                name: "sum",
-                shaderType: "array<f32>"
-            }
         ],
         outputs: [
             {
                 name: "output",
                 shaderType: "array<f32>",
-                size: "outputSize"
+                size: "batches * batch_size"
             }
         ],
-        workgroupSize: [32, 1, 1],
-        workgroupCount: ["outputSize / 32", 1, 1],
+        workgroupSize: [16, 16, 1],
+        workgroupCount: ["batches / 16", "batch_size / 16", 1],
         shader: `
-            if(global_id.x > parameters.outputSize) {
+            if(global_id.x >= parameters.batches || global_id.y >= parameters.batch_size) {
                 return;
-            };
-            output[global_id.x] = input[global_id.x] / sum[0];
+            }
+
+            var sum: f32 = 0;
+            for(var i: u32 = 0; i < parameters.batch_size; i++) {
+                sum += exp(input[i * parameters.batches + global_id.x]);
+            } 
+
+            var idx: u32 = global_id.y * parameters.batches + global_id.x;
+            output[idx] = exp(input[idx]) / sum;
         `
     },
     chunk: {
@@ -408,9 +450,9 @@ export const kernels: { [name: string]: KernelSpec } = {
                 return;
             }
 
-            const input_chunk_start = global_id.y * parameters.numChunks * parameters.chunkSize;
-            const input_idx = input_chunk_start + parameters.offset * parameters.chunkSize + global_id.x;
-            const output_idx = global_id.y * parameters.chunkSize + global_id.x;
+            var input_chunk_start: u32 = global_id.y * parameters.numChunks * parameters.chunkSize;
+            var input_idx: u32 = input_chunk_start + parameters.offset * parameters.chunkSize + global_id.x;
+            var output_idx: u32 = global_id.y * parameters.chunkSize + global_id.x;
             output[output_idx] = input[input_idx];
         `
     },
@@ -427,7 +469,7 @@ export const kernels: { [name: string]: KernelSpec } = {
                 shaderType: "f32"
             },
             {
-                name: "std",
+                name: "sdev",
                 shaderType: "f32"
             },
             {
@@ -455,10 +497,10 @@ export const kernels: { [name: string]: KernelSpec } = {
                 return;
             }
 
-            const pi = 3.1415
-            let u1;
-            let u2;
-            let idx;
+            const pi = 3.1415;
+            var u1: f32;
+            var u2: f32;
+            var idx: u32;
             if(global_id.y == 0) {
                 u1 = input[global_id.x];
                 u2 = input[global_id.x + (parameters.outputSize / 2)];
@@ -468,7 +510,7 @@ export const kernels: { [name: string]: KernelSpec } = {
                 u2 = input[global_id.x];
                 idx = global_id.x + (parameters.outputSize / 2);
             }
-            output[idx] = sqrt(-2 * log(u1)) * cos(2 * pi * u2) * parameters.std + parameters.mean;
+            output[idx] = sqrt(-2 * log(u1)) * cos(2 * pi * u2) * parameters.sdev + parameters.mean;
         `
     },
     upsample: {
@@ -530,25 +572,25 @@ export const kernels: { [name: string]: KernelSpec } = {
         shader: `
             //inputIdx = x*parameters.h_in*parameters.d_in + y*parameters.d_in + z;
 
-            const output_idx = global_id.x * parameters.h_out * parameters.d_out + global_id.y * parameters.d_out + global_id.z;
+            var output_idx = global_id.x * parameters.h_out * parameters.d_out + global_id.y * parameters.d_out + global_id.z;
             if (output_idx >= parameters.outputSize) {
                 return;
             }
 
             switch (parameters.mode) {
                 case 0: { // nearest
-                    const x_map = floor(global_id.x * parameters.w_in / parameters.w_out);
-                    const y_map = floor(global_id.y * parameters.h_in / parameters.h_out);
-                    const d_map = floor(global_id.z * parameters.d_in / parameters.d_out);
-                    const idx_map = x_map * parameters.h_in * parameters.d_in + y_map * parameters.d_in + d_map;
+                    var x_map = floor(global_id.x * parameters.w_in / parameters.w_out);
+                    var y_map = floor(global_id.y * parameters.h_in / parameters.h_out);
+                    var d_map = floor(global_id.z * parameters.d_in / parameters.d_out);
+                    var idx_map: u32 = x_map * parameters.h_in * parameters.d_in + y_map * parameters.d_in + d_map;
                     output[output_idx] = input[idx_map]; 
                     break;
                 }
                 case 1: { // linear
-                    const scale_factor = parameters.w_out / parameters.w_in;
-                    const offset = (scale_factor - 1) / 2;
-                    const x_l = floor((global_id.x - offset) / scale_factor);
-                    const x_r = x_l + 1
+                    var scale_factor = parameters.w_out / parameters.w_in;
+                    var offset = (scale_factor - 1) / 2;
+                    var x_l = floor((global_id.x - offset) / scale_factor);
+                    var x_r = x_l + 1
                     if(x_r % parameters.w_in < abs(x_l) % parameters.w_in) {
                         if(global_id.x % parameters.w_out < scale_factor) {
                             output[output_idx] = input[x_r];
@@ -558,20 +600,20 @@ export const kernels: { [name: string]: KernelSpec } = {
                         return;
                     }
                     
-                    const diff = (input[x_r] - input[x_l]) / scale_factor;
+                    var diff = (input[x_r] - input[x_l]) / scale_factor;
                     output[output_idx] = input[x_l] + diff * ((2*(global_id.x - offset)) % (2*scale_factor))/2;
                     break;
                 }
                 case 2: { // bilinear
-                    const xscale_factor = parameters.w_out / parameters.w_in;
-                    const xoffset = (xscale_factor - 1) / 2;
-                    const yscale_factor = parameters.h_out / parameters.h_in;
-                    const yoffset = (yscale_factor - 1) / 2;
+                    var xscale_factor = parameters.w_out / parameters.w_in;
+                    var xoffset = (xscale_factor - 1) / 2;
+                    var yscale_factor = parameters.h_out / parameters.h_in;
+                    var yoffset = (yscale_factor - 1) / 2;
 
-                    const x1_map = floor((global_id.x - xoffset) / xscale_factor);
-                    const x2_map = floor(x1_map + 1);
-                    const y1_map = floor((global_id.y - yoffset) / yscale_factor);
-                    const y2_map = floor(y1_map + 1);
+                    var x1_map = floor((global_id.x - xoffset) / xscale_factor);
+                    var x2_map = floor(x1_map + 1);
+                    var y1_map = floor((global_id.y - yoffset) / yscale_factor);
+                    var y2_map = floor(y1_map + 1);
 
                     /*
                     if(x_r % parameters.w_in < abs(x_l) % parameters.w_in) {
@@ -584,30 +626,30 @@ export const kernels: { [name: string]: KernelSpec } = {
                     }
                     */
 
-                    const x_oob = x2_map % parameters.w_in < abs(x1_map) % parameters.w_in;
-                    const y_oob = y2_map % parameters.w_in < abs(y1_map);
+                    var x_oob = x2_map % parameters.w_in < abs(x1_map) % parameters.w_in;
+                    var y_oob = y2_map % parameters.w_in < abs(y1_map);
                     if(x_oob && y_oob) {
                         if(global_id.x % parameters.w_out < xscale_factor) {
                             if(global_id.y < yscale_factor) {
-                                const idx = x2_map*parameters.h_in + y2_map;
+                                var idx: u32 = x2_map*parameters.h_in + y2_map;
                                 output[output_idx] = input[idx];
                             } else {
-                                const idx = x2_map*parameters.h_in + y1_map;
+                                var idx: u32 = x2_map*parameters.h_in + y1_map;
                                 output[output_idx] = input[idx];
                             }
                         } else {
                             if(global_id.y < yscale_factor) {
-                                const idx = x1_map*parameters.h_in + y2_map;
+                                var idx: u32 = x1_map*parameters.h_in + y2_map;
                                 output[output_idx] = input[idx];
                             } else {
-                                const idx = x1_map*parameters.h_in + y1_map;
+                                var idx: u32 = x1_map*parameters.h_in + y1_map;
                                 output[output_idx] = input[idx];
                             }
                         }
                         return;
                     } else if(x_oob && !y_oob) {
-                        let p1Idx;
-                        let p2Idx;
+                        let p1Idx: u32;
+                        let p2Idx: u32;
                         if(global_id.x % parameters.w_out < xscale_factor) {
                             p1Idx = x2_map*parameters.h_in + y1_map;
                             p2Idx = x2_map*parameters.h_in + y2_map;
@@ -615,7 +657,7 @@ export const kernels: { [name: string]: KernelSpec } = {
                             p1Idx = x1_map*parameters.h_in + y1_map;
                             p2Idx = x1_map*parameters.h_in + y2_map;
                         }
-                        const diff = (input[p2Idx] - input[p1Idx]) / yscale_factor;
+                        var diff = (input[p2Idx] - input[p1Idx]) / yscale_factor;
                         output[output_idx] = input[p1Idx] + diff * ((2*(global_id.y - yoffset)) % (2*yscale_factor))/2;
                         return;
                     } else if(!x_oob && y_oob) {
@@ -628,7 +670,7 @@ export const kernels: { [name: string]: KernelSpec } = {
                             p1Idx = x1_map*parameters.h_in + y1_map;
                             p2Idx = x2_map*parameters.h_in + y1_map;
                         }
-                        const diff = (input[p2Idx] - input[p1Idx]) / xscale_factor;
+                        var diff = (input[p2Idx] - input[p1Idx]) / xscale_factor;
                         output[output_idx] = input[p1Idx] + diff * ((2*(global_id.x - xoffset)) % (2*xscale_factor))/2;
                         return;
                     }
@@ -637,15 +679,15 @@ export const kernels: { [name: string]: KernelSpec } = {
                     // [ ...        ...        ... ]
                     // [ ... p3, x, ..., x, p4 ... ]
 
-                    const p1Idx = x1_map*parameters.h_in*parameters.d_in + y1_map*parameters.d_in;
-                    const p2Idx = x1_map*parameters.h_in*parameters.d_in + y2_map*parameters.d_in;
-                    const p3Idx = x2_map*parameters.h_in*parameters.d_in + y1_map*parameters.d_in;
-                    const p4Idx = x2_map*parameters.h_in*parameters.d_in + y2_map*parameters.d_in;
-                    const diff1 = (input[p2Idx] - input[p1Idx]) / yscale_factor;
-                    const diff2 = (input[p4Idx] - input[p3Idx]) / yscale_factor;
-                    const p5    = input[p1Idx] + diff1 * ((2*(global_id.y - yoffset)) % (2*yscale_factor))/2;
-                    const p6    = input[p3Idx] + diff2 * ((2*(global_id.y - yoffset)) % (2*yscale_factor))/2;
-                    const diff = (p6 - p5) / xscale_factor;
+                    var p1Idx = x1_map*parameters.h_in*parameters.d_in + y1_map*parameters.d_in;
+                    var p2Idx = x1_map*parameters.h_in*parameters.d_in + y2_map*parameters.d_in;
+                    var p3Idx = x2_map*parameters.h_in*parameters.d_in + y1_map*parameters.d_in;
+                    var p4Idx = x2_map*parameters.h_in*parameters.d_in + y2_map*parameters.d_in;
+                    var diff1 = (input[p2Idx] - input[p1Idx]) / yscale_factor;
+                    var diff2 = (input[p4Idx] - input[p3Idx]) / yscale_factor;
+                    var p5    = input[p1Idx] + diff1 * ((2*(global_id.y - yoffset)) % (2*yscale_factor))/2;
+                    var p6    = input[p3Idx] + diff2 * ((2*(global_id.y - yoffset)) % (2*yscale_factor))/2;
+                    var diff = (p6 - p5) / xscale_factor;
                     
                     output[output_idx] = p5 + diff * ((2*(global_id.x - xoffset)) % (2*xscale_factor))/2;
                     break;
@@ -753,15 +795,15 @@ export const kernels: { [name: string]: KernelSpec } = {
             var channel_offset = parameters.channel_size * (global_id.y + global_id.z * parameters.channel_width);
 
             var pool_size = parameters.kernel_size_x * parameters.kernel_size_y;
-            var row = floor(global_id.x / parameters.row_len);
+            var row = global_id.x / parameters.row_len;
             var col = global_id.x % parameters.row_len;
             var row_start = parameters.stride_x * parameters.width_y * row;
             var pool_start = row_start + parameters.stride_y * col  + channel_offset;
 
             var walker = input[pool_start];
-            for(var i = 0; i < parameters.kernel_size_x*parameters.dilation_x; i += parameters.dilation_x) {
-                for(var j = 0; j < parameters.kernel_size_y*parameters.dilation_y; j += parameters.dilation_y) {
-                    const idx = pool_start + j + parameters.width_y * i;
+            for(var i: u32 = 0; i < parameters.kernel_size_x*parameters.dilation_x; i += parameters.dilation_x) {
+                for(var j: u32 = 0; j < parameters.kernel_size_y*parameters.dilation_y; j += parameters.dilation_y) {
+                    var idx: u32 = pool_start + j + parameters.width_y * i;
                     walker = max(walker, input[idx]);
                     //walker = pool_start;
                 }
@@ -812,15 +854,15 @@ export const kernels: { [name: string]: KernelSpec } = {
             if (global_id.x >= parameters.outputSize) {
                 return;
             }
-            const norm_shape_idx = floor(global_id.x / parameters.norm_size) * parameters.norm_size;
+            var norm_shape_idx = (global_id.x / parameters.norm_size) * parameters.norm_size;
             var expectation = 0.0;
             var variance = 0.0;
-            for(var i = 0; i < parameters.norm_size; i++) {
+            for(var i: u32 = 0; i < parameters.norm_size; i++) {
                 expectation = expectation + input[norm_shape_idx + i];
                 variance = variance + input[norm_shape_idx + i] * input[norm_shape_idx + i];
             }
-            expectation = expectation / parameters.norm_size;
-            variance = variance / parameters.norm_size;
+            expectation = expectation / f32(parameters.norm_size);
+            variance = variance / f32(parameters.norm_size);
             variance = abs(variance - pow(expectation, 2));
 
             output[global_id.x] = (input[global_id.x] - expectation) / sqrt(variance + parameters.eps);
@@ -876,12 +918,12 @@ export const kernels: { [name: string]: KernelSpec } = {
                 return;
             }
             if(global_id.x % parameters.stride < parameters.part) { 
-                const idx = (floor(global_id.x / parameters.stride) * parameters.part) + (global_id.x % parameters.stride)
-                output[global_id.x] = a[idx] 
+                var idx = ((global_id.x / parameters.stride) * parameters.part) + (global_id.x % parameters.stride);
+                output[global_id.x] = a[idx];
             }
             else { 
-                const idx = (floor(global_id.x / parameters.stride) * (parameters.stride - parameters.part)) + (global_id.x % parameters.stride) - parameters.part
-                output[global_id.x] = b[idx] 
+                var idx = ((global_id.x / parameters.stride) * (parameters.stride - parameters.part)) + (global_id.x % parameters.stride) - parameters.part;
+                output[global_id.x] = b[idx];
             }
         `
     },
@@ -1012,6 +1054,10 @@ export const kernels: { [name: string]: KernelSpec } = {
                 name: "alpha",
                 shaderType: "f32",
             },
+            {
+                name: "batches",
+                shaderType: "u32"
+            }
         ],
         inputs: [
             {
@@ -1027,23 +1073,24 @@ export const kernels: { [name: string]: KernelSpec } = {
             {
                 name: "resultMatrix",
                 shaderType: "array<f32>",
-                size: "resultRows * resultCols",
+                size: "resultRows * resultCols * batches",
             },
         ],
         workgroupSize: [8, 8, 1],
-        workgroupCount: ["resultRows/8", "resultCols/8", 1],
+        workgroupCount: ["resultRows/8", "resultCols/8", "batches"],
         shader: `
-    if (global_id.x >= parameters.resultRows || global_id.y >= parameters.resultCols) {
-        return;
-    }
-    var result = 0.0;
-    for (var i = 0u; i < parameters.innerDim; i = i + 1u) {
-        let a = global_id.x * parameters.innerDim + i;
-        let b = i * parameters.resultCols + global_id.y;
-        result = result + firstMatrix[a] * secondMatrix[b];
-    }
-    let index = global_id.y + global_id.x * parameters.resultCols;
-    resultMatrix[index] = result;
+            if (global_id.x >= parameters.resultRows || global_id.y >= parameters.resultCols) {
+                return;
+            }
+
+            var result = 0.0;
+            for (var i = 0u; i < parameters.innerDim; i = i + 1u) {
+                let a = global_id.x * parameters.innerDim + i               + parameters.resultRows * parameters.innerDim * global_id.z;
+                let b = i * parameters.resultCols + global_id.y             + parameters.resultCols * parameters.innerDim * global_id.z;
+                result = result + firstMatrix[a] * secondMatrix[b];
+            }
+            let index = global_id.y + global_id.x * parameters.resultCols   + parameters.resultRows * parameters.resultCols * global_id.z;
+            resultMatrix[index] = result;
 `
     },
     sumDim: {

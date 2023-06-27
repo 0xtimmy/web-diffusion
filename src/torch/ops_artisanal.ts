@@ -253,7 +253,7 @@ export function box_muller(
     const output_shape = input.shape;
     const params = {
         mean: mean,
-        std: std,
+        sdev: std,
         outputSize: input.size
     }
     return input.runKernel(
@@ -298,7 +298,7 @@ export function linear(
     const output_shape = Array.from(input.shape);
     const feature_dim = input.shape.length - 1;
 
-    if(!bias) bias = zeros(weight[0]);
+    if(!bias) bias = zeros(weight.shape[0]);
 
     if(weight.shape[1] != input.shape[feature_dim]) throw new Error(`Expected last dimention of input and last dimention of weight to match, instead got input.shape = ${input.shape} & weight.shape = ${weight.shape}`);
     if(bias && bias.shape[0] != weight.shape[0]) throw new Error(`Expected bias to be 1D and match the first dimention of weight, instead got bias.shape = ${bias.shape} and weight.shape = ${weight.shape}`);
@@ -312,26 +312,46 @@ export function linear(
 
 export function sum(
     input: Tensor,
+    dim=0
 ): Tensor {
-    return input.runKernel("sum", { dtype: input.dtype }, { size: input.size }, [[1]])[0];
+    if(dim < 0 || dim >= input.shape.length) throw new Error(`Expected dim that's within the tensor but input has shape: ${input.shape} and got dim ${dim}`);
+    const output_shape = dim == 0 ? [1] : Array.from(input.shape).splice(0, dim);
+    const batches = shapeSize(output_shape);
+    const batch_size = shapeSize(Array.from(input.shape).splice(dim));
+
+    return input.runKernel(
+        "sum", 
+        { dtype: input.dtype }, 
+        { 
+            batches: batches,
+            batch_size: batch_size,
+            size: input.size 
+        }, 
+        [output_shape]
+    )[0];
 }
 
 export function softmax(
     input: Tensor,
-    dim?: number,
+    dim=0
 ): Tensor {
+    if(dim < 0 || dim >= input.shape.length) throw new Error(`Expected dim that's within the tensor but input has shape: ${input.shape} and got dim ${dim}`);
 
-    const exp = input.exp();
-    const sum_exp = exp.sum();
+    const batches = input.shape.length == 1 ? 1 : shapeSize(Array.from(input.shape).splice(dim+1));
+    const batch_size = dim == 0 ? input.shape[0] : shapeSize(Array.from(input.shape).splice(1, dim));
+
     const params = {
-        outputSize: input.size
+        batches: batches,
+        batch_size: batch_size,
     };
-    return exp.runKernel(
+
+    console.log("running softmax with params: ", params);
+
+    return input.runKernel(
         "softmax",
         { dtype: input.dtype },
         params,
         [input.shape],
-        sum_exp
     )[0]
 }
 
@@ -369,12 +389,14 @@ export function scaled_dot_product_attention(
     const output_shape = Array.from(query.shape);
     output_shape[output_shape.length-1] = value.shape[value.shape.length-1];
 
-    query = query.view([-1, query.shape[query.shape.length-1]]);
-    key = key.view([-1, key.shape[key.shape.length-1]]);
-    value = value.view([-1, value.shape[value.shape.length-1]]);
+    const dk = shapeSize(Array.from(key.shape).splice(key.shape.length - 2));
 
-    let out = ops.scalar_div(mm(query, key.t()), Math.sqrt(key.size));
-    out = softmax(out);
+    query = query.view([-1, query.shape[query.shape.length-2], query.shape[query.shape.length-1]]);
+    key = key.view([-1, key.shape[key.shape.length-2], key.shape[key.shape.length-1]]);
+    value = value.view([-1, value.shape[value.shape.length-2], value.shape[value.shape.length-1]]);
+
+    let out = ops.scalar_div(mm(query, key.transpose(1,2)), Math.sqrt(dk));
+    out = softmax(out, 1);
     out = mm(out, value);
     return out.view(output_shape);
 }
@@ -604,14 +626,23 @@ function _mha_shape_check(query: Tensor, key: Tensor, value: Tensor, num_heads: 
 
 export function group_norm(input: Tensor, groups: number, weight?: Tensor, bias?: Tensor, eps=1e-5): Tensor {
     if(input.dim < 2) throw new Error("group norm expects at least two dimenstions");
+    if(input.shape[1] % groups != 0) throw new Error(`group norm expects group num to evenly divide channels but got input shape: ${input.shape} and group num: ${groups} (${input.shape[1] / groups})`);
+
+    if(weight.shape[0] != input.shape[1] || weight.dim > 1) throw new Error(`in group_norm, weights should be the same size as input channels, instead got input shape: ${input.shape} and weight shape: ${weight.shape}`);
+    if(bias.shape[0] != input.shape[1] || bias.dim > 1) throw new Error(`in group_norm, bias should be the same size as input channels, instead got input shape: ${input.shape} and bias shape: ${weight.shape}`);
+    
+
     const params = {
         eps: eps,
-        groupSize: shapeSize(input.shape) / groups,
+        batches: input.shape[0],
+        channels: input.shape[1],
+        groups: groups,
+        groupSize: shapeSize(Array.from(input.shape).splice(1)) / groups,
         outputSize: shapeSize(input.shape)
     }
 
-    if(!weight) weight = ones([input.shape[0], groups]);
-    if(!bias) bias = zeros([input.shape[0], groups]);
+    if(!weight) weight = ones([input.shape[1]]);
+    if(!bias) bias = zeros([input.shape[1]]);
 
     return input.runKernel(
         "group_norm",
@@ -697,28 +728,33 @@ export function mm(input: Tensor, other: Tensor): Tensor {
     if (shouldCreateGradient(input, other)) {
         throw new Error("mm gradient not supported yet");
     } else {
-        if (input.shape.length !== 2 || other.shape.length !== 2) {
-            throw new Error(
-                `Expected 2D tensors, got ${input.shape} and ${other.shape}`
-            );
-        }
-        if (input.shape[1] !== other.shape[0]) {
+        let is_batched;
+        if(input.shape.length == 2) is_batched = false;
+        else if(input.shape.length == 3) is_batched = true;
+        else throw new Error(`Expected 2D tensors or 3D tensors (batched) got ${input.shape} and ${other.shape}`)
+
+        if(input.shape.length != other.shape.length) throw new Error(`Expected tensors to be of the same dimension, instead got got ${input.shape} and ${other.shape}`);
+        if(is_batched && input.shape[0] != other.shape[0]) throw new Error(`Expected tensors to have the same number of batches, instead got got ${input.shape} and ${other.shape}`);
+        if ((!is_batched && (input.shape[1] !== other.shape[0])) || (is_batched && (input.shape[2] !== other.shape[1]))) {
             throw new Error(
                 `Expected tensors inner dimensions to be compatible, got ${input.shape} and ${other.shape}`
             );
         }
+        
         const params = {
-            resultRows: input.shape[0],
-            resultCols: other.shape[1],
-            innerDim: input.shape[1],
+            batches: is_batched ? input.shape[0] : 1,
+            resultRows: is_batched ? input.shape[1] : input.shape[0],
+            resultCols: is_batched ? other.shape[2] : other.shape[1],
+            innerDim: is_batched ? input.shape[2] : input.shape[1],
             alpha: 1.0,
         };
 
+        console.log("running mm with params: ", params);
         return input.runKernel(
             "mm",
             { resultDtype: input.dtype },
             params,
-            [[params.resultRows, params.resultCols]],
+            [[...(is_batched ? [params.batches] : []), params.resultRows, params.resultCols]],
             other
         )[0];
     }

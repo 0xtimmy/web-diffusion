@@ -1,10 +1,81 @@
 import torch
 import torch.nn.functional as F
 import numpy
+import time
+import math
+
+def gen_softmax(message, input, dim, log="always", log_config="fail"):
+    start = time.time()
+    output = torch.softmax(input, dim)
+    duration = time.time() - start
+    return {
+        "message": message,
+        "func": "softmax",
+        "args": {
+            "input": input.numpy().tolist(),
+            "dim": dim
+        },
+        "target": output.numpy().tolist(),
+        "duration": duration * 1000,
+        "log": log,
+        "log_config": log_config
+    }
+
+def gen_silu(message, input, log="always", log_config="fail"):
+    start = time.time()
+    output = F.silu(input)
+    duration = time.time() - start
+    return {
+        "message": message,
+        "func": "silu",
+        "args": {
+            "input": input.numpy().tolist(),
+        },
+        "target": output.numpy().tolist(),
+        "duration": duration * 1000,
+        "log": log,
+        "log_config": log_config
+    }
+
+def gen_gelu(message, input, log="always", log_config="fail"):
+    start = time.time()
+    output = F.gelu(input)
+    duration = time.time() - start
+    return {
+        "message": message,
+        "func": "gelu",
+        "args": {
+            "input": input.numpy().tolist(),
+        },
+        "target": output.numpy().tolist(),
+        "duration": duration * 1000,
+        "log": log,
+        "log_config": log_config
+    }
+
+def gen_clamp(message, input, low, high, log="always", log_config="fail"):
+    start = time.time()
+    output = torch.clamp(input, low, high)
+    duration = time.time() - start
+    return {
+        "message": message,
+        "func": "clamp",
+        "args": {
+            "input": input.numpy().tolist(),
+            "low": low,
+            "high": high,
+        },
+        "target": output.numpy().tolist(),
+        "duration": duration * 1000,
+        "log": log,
+        "log_config": log_config
+    }
+
 
 def gen_layer_norm(message, input, norm_shape, weight, bias, log="always", log_config="fail"):
     start = time.time()
     output = torch.layer_norm(input, norm_shape, weight, bias)
+    duration = time.time() - start
     return {
         "message": message,
         "func": "layer_norm",
@@ -23,6 +94,7 @@ def gen_layer_norm(message, input, norm_shape, weight, bias, log="always", log_c
 def gen_group_norm(message, input, groups, weight, bias, log="always", log_config="fail"):
     start = time.time()
     output = torch.group_norm(input, groups, weight, bias)
+    duration = time.time() - start
     return {
         "message": message,
         "func": "group_norm",
@@ -30,13 +102,14 @@ def gen_group_norm(message, input, groups, weight, bias, log="always", log_confi
             "input": input.numpy().tolist(),
             "groups": groups,
             "weight": weight.numpy().tolist(),
-            "bias": weight.numpy().tolist()
+            "bias": bias.numpy().tolist()
         },
         "target": output.numpy().tolist(),
         "duration": duration * 1000,
         "log": log,
         "log_config": log_config
     }
+
 
 def gen_scaled_dot_product_attention(message, query, key, value, log="always", log_config="fail"):
     start = time.time()

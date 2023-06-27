@@ -1,6 +1,10 @@
 import torch;
 import json;
-import tests as t;
+import arithmetic_tests as at;
+import functional_tests as ft;
+import module_tests as mt
+import reshape_tests as rt
+import factory_tests as fact
 
 # Configure and build the generated test file
 
@@ -26,29 +30,41 @@ tests = [
     # Functional Tests --------------------------------------------------------
 
 
-    #t.gen_linear("Linear test 1 - small no bias", torch.randint(1, 5, [3]), torch.randint(1, 5, [2, 3])),
-    #t.gen_linear("Linear test 2 - small with bias", torch.randint(1, 5, [3]), torch.randint(1, 5, [2, 3]), torch.randint(0, 1, [2])),
-    #t.gen_linear("Linear test 3 - default", torch.randint(1, 5, [20]), torch.randint(1, 5, [50, 20]), torch.randint(1, 5, [50])),
-    #t.gen_linear("Linear test 4 - no bias", torch.randint(1, 5, [20]), torch.randint(1, 5, [50, 20])),
-    #t.gen_linear("Linear test 5 - special zeros", torch.tensor([1, 1]), torch.tensor([[0, 0], [1, 1]])),
+    ft.gen_softmax("Softmax basic test", torch.randn(10) * 10, 0),
+    ft.gen_softmax("Softmax basic test", torch.randn([2, 5]) * 10, 0),
+    ft.gen_softmax("Softmax basic test", torch.randn([2, 3, 3,]) * 10, 0),
+    ft.gen_softmax("Softmax basic test", torch.randn([2, 2, 3, 3,]) * 10, 0),
 
-    #t.gen_layer_norm("layer_norm basic test", torch.randn(20, 5, 10, 10), [5, 10, 10], torch.ones([5, 10, 10]), torch.zeros([5, 10, 10])),
+    #ft.gen_scaled_dot_product_attention("Scaled dot product attention test 1", torch.rand(1, 8, 128, 64), torch.rand(1, 8, 128, 64), torch.rand(1, 8, 128, 64)),
+    ft.gen_scaled_dot_product_attention("Scaled dot product attention test 2 - 1 batch", torch.rand(1, 1, 64, 64), torch.rand(1, 1, 64, 64), torch.rand(1, 1, 64, 64)),
 
-    #t.gen_group_norm("group_norm basic test", torch.randn(20, 6, 10, 10), 2, torch.ones(6), torch.zeros(6)),
+    ft.gen_linear("Linear test 1 - small no bias", torch.randint(1, 5, [3]), torch.randint(1, 5, [2, 3])),
+    ft.gen_linear("Linear test 2 - small with bias", torch.randint(1, 5, [3]), torch.randint(1, 5, [2, 3]), torch.randint(0, 1, [2])),
+    ft.gen_linear("Linear test 3 - default", torch.randint(1, 5, [20]), torch.randint(1, 5, [50, 20]), torch.randint(1, 5, [50])),
+    ft.gen_linear("Linear test 4 - no bias", torch.randint(1, 5, [20]), torch.randint(1, 5, [50, 20])),
+    ft.gen_linear("Linear test 5 - special zeros", torch.tensor([1, 1]), torch.tensor([[0, 0], [1, 1]])),
 
-    #t.gen_scaled_dot_product_attention("Scaled dot product attention test 1", torch.rand(32, 8, 128, 64), torch.rand(32, 8, 128, 64), torch.rand(32, 8, 128, 64)),
+    ft.gen_layer_norm("layer_norm basic test", torch.randn(20, 5, 10, 10), [5, 10, 10], torch.ones([5, 10, 10]), torch.zeros([5, 10, 10])),
 
-    #t.gen_conv2d("Conv2d test 1", torch.randn(1, 4, 5, 5), torch.randn(8, 4, 5, 5), None),
-    #t.gen_conv2d("Conv2d test 2", torch.randn(1, 4, 5, 5), torch.randn(8, 4, 5, 5), None),
-    #t.gen_conv2d("Conv2d test 3 - image dimensions", torch.randn(1, 3, 64, 64), torch.randn(3, 3, 64, 64), None),
+    ft.gen_group_norm("group_norm basic test", torch.randn(20, 6, 10, 10), 2, torch.ones(6), torch.zeros(6)),
 
-    #t.gen_max_pool2d("MaxPool2D test 1", torch.randn(4, 16, 16), 2),
+    ft.gen_conv2d("Conv2d test 1", torch.randn(1, 4, 5, 5), torch.randn(8, 4, 5, 5), None),
+    ft.gen_conv2d("Conv2d test 2", torch.randn(1, 4, 5, 5), torch.randn(8, 4, 5, 5), None),
+    ft.gen_conv2d("Conv2d test 3 - image dimensions", torch.randn(1, 3, 64, 64), torch.randn(3, 3, 64, 64), None),
+
+    ft.gen_max_pool2d("MaxPool2D test 1", torch.randn(4, 16, 16), 2),
+
+    ft.gen_clamp("Clamp basic test", torch.randn(10) * 2, -1, 1),
+
+    ft.gen_silu("SiLU basic test", torch.randn(1000)),
+    ft.gen_gelu("GeLU basic test", torch.randn(1000)),
 
 
     # Module Tests ------------------------------------------------------------
 
 
     # Reshape Tests -----------------------------------------------------------
+
 
     #t.gen_chunk("chunk test 1 - dim start", torch.randint(0, 10, [3, 5, 5]), 3, 0),
     #t.gen_chunk("chunk test 1 - dim mid", torch.randint(0, 10, [5, 3, 5]), 3, 1),
