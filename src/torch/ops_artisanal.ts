@@ -10,6 +10,17 @@ import * as ops from "./ops_opgen";
 // ------------------------------------
 // Start Custom
 // ------------------------------------
+export function find_index(input: Tensor): Tensor {
+    return input.runKernel(
+        "find_index",
+        { dtype: input.dtype },
+        {
+            outputSize: input.size
+        },
+        [input.shape]
+    )[0]
+}
+
 export function clamp(input: Tensor, low: number, high: number): Tensor {
     return input.runKernel(
         "clamp",
@@ -344,8 +355,6 @@ export function softmax(
         batches: batches,
         batch_size: batch_size,
     };
-
-    console.log("running softmax with params: ", params);
 
     return input.runKernel(
         "softmax",
@@ -749,7 +758,6 @@ export function mm(input: Tensor, other: Tensor): Tensor {
             alpha: 1.0,
         };
 
-        console.log("running mm with params: ", params);
         return input.runKernel(
             "mm",
             { resultDtype: input.dtype },
@@ -767,7 +775,7 @@ export function transpose(input: Tensor, dim0=0, dim1=1): Tensor {
         dim1 = temp;
     }
     if (shouldCreateGradient(input)) {
-        console.error("transpose gradient not supported yet");
+        //console.error("transpose gradient not supported yet");
         // return TransposeFunction.apply(input, 0, 1);
     }
     const newShape = Array.from(input.shape);
@@ -781,6 +789,7 @@ export function transpose(input: Tensor, dim0=0, dim1=1): Tensor {
         stride: dim1-dim0 == 1 ? 1 : shapeSize(Array.from(newShape).splice(dim0+1, dim1-dim0-1)),
         outputSize: input.size
     }
+
     return input.runKernel(
         "transpose", 
         { dtype: input.dtype },

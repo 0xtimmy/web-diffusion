@@ -31,7 +31,8 @@ let test_num;
 
 async function run_test(func: string, args: any, target: any, control_duration: number, message?: string, log: logconfig="always", log_args: logconfig="never") {
     const start = Date.now();
-    const { res, output, msg } = await funcs[func](args, target);
+    let { res, output, msg } = await funcs[func](args, target);
+    if(typeof(msg) == 'undefined') msg = "";
     const duration = Date.now() - start;
     if(log == "always" || (!res && log == "never")) {
         console.log(`🛠️ Running test #${test_num}: ${message}...`)
@@ -49,6 +50,10 @@ async function run_test(func: string, args: any, target: any, control_duration: 
 }
 
 export async function run_tests(tests: Array<test>) {
+
+    const indecies = ops.find_index(factories.ones([10, 10]));
+    console.log("indecies: ", await indecies.toArrayAsync());
+
     for(test_num = 0; test_num < tests.length; test_num++) {
         await run_test(
             tests[test_num].func,

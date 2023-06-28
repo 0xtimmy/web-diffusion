@@ -95,7 +95,7 @@ export abstract class Kernel {
         outputs?: (GPUBuffer | ATypedArray)[]
     ): (GPUBuffer | ATypedArray)[];
 
-    protected getRunEnv(parameters: KernelParamsInput): EvalEnv {
+    getRunEnv(parameters: KernelParamsInput): EvalEnv {
         const env: EvalEnv = {};
         for (let i = 0; i < this._spec.config.length; i++) {
             const configSpec = this._spec.config[i];
@@ -230,6 +230,9 @@ export function getKernelShaderCode(
         let parameter = spec.parameters[i];
         shaderCodeParts.push(`    ${parameter.name}: ${parameter.shaderType},`);
     }
+    shaderCodeParts.push(`    _x_part_offset: u32,`);
+    shaderCodeParts.push(`    _y_part_offset: u32,`);
+    shaderCodeParts.push(`    _z_part_offset: u32,`);
     shaderCodeParts.push(`}`);
     let bindingIndex = 0;
     for (let i = 0; i < spec.inputs.length; i++, bindingIndex++) {
@@ -270,8 +273,10 @@ export function getKernelShaderCode(
     shaderCodeParts.push(`    ) {`);
     shaderCodeParts.push("    " + configdShader);
     shaderCodeParts.push("}");
-    const shaderCode = shaderCodeParts.join("\n");
-    // console.log(shaderCode);
+    let shaderCode = shaderCodeParts.join("\n");
+    shaderCode = shaderCode.replaceAll("global_id.x", "(global_id.x + parameters._x_part_offset)");
+    shaderCode = shaderCode.replaceAll("global_id.y", "(global_id.y + parameters._y_part_offset)");
+    shaderCode = shaderCode.replaceAll("global_id.z", "(global_id.z + parameters._z_part_offset)");
     return shaderCode;
 }
 

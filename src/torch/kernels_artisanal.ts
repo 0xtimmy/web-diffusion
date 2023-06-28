@@ -1,6 +1,38 @@
 import { KernelSpec } from "./kernel";
 
 export const kernels: { [name: string]: KernelSpec } = {
+    find_index: {
+        name: "find_index",
+        config: [
+            {
+                name: "dtype"
+            }
+        ],
+        parameters: [
+            {
+                name: "outputSize",
+                shaderType: "u32"
+            }
+        ],
+        inputs: [
+            {
+                name: "input",
+                shaderType: "array<f32>"
+            }
+        ],
+        outputs: [
+            {
+                name: "output",
+                shaderType: "array<f32>",
+                size: "outputSize"
+            }
+        ],
+        workgroupSize: [1, 1, 1],
+        workgroupCount: ["outputSize", 1, 1],
+        shader: `
+            output[global_id.x] = f32(global_id.x);
+        `
+    },
     clamp: {
         name: "clamp",
         config: [
@@ -181,10 +213,10 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        workgroupSize: [2, 2, 8],
-        workgroupCount: ["batches / 2", "groups / 2", "groupSize / 8"],
+        workgroupSize: [2, 2, 1],
+        workgroupCount: ["batches / 2", "groups / 2", 1],
         shader: `
-            if(global_id.x >= parameters.batches || global_id.y >= parameters.groups || global_id.z >= parameters.groupSize) {
+            if(global_id.x >= parameters.batches || global_id.y >= parameters.groups) {
                 return;
             }
 
@@ -202,7 +234,10 @@ export const kernels: { [name: string]: KernelSpec } = {
             var variance = (mean_sqrd / f32(parameters.groupSize)) - (mean * mean) + parameters.eps;
             
             var channel = (global_id.x * parameters.groups + global_id.y / (parameters.groupSize / parameters.groups)) % parameters.channels;
-            output[group_start + global_id.z] = ((input[group_start + global_id.z] - mean) / sqrt(variance)) * weight[channel] + bias[channel];
+            for(var i: u32 = 0; i < parameters.groupSize; i++) {
+                output[group_start + i] = ((input[group_start + i] - mean) / sqrt(variance)) * weight[channel] + bias[channel];
+            }
+            
 
         `
     },
@@ -357,6 +392,7 @@ export const kernels: { [name: string]: KernelSpec } = {
             var output_idx: u32 = global_id.y * parameters.batchSize + win_idx * parameters.elSize + global_id.z;
             var input_idx: u32 = global_id.y * parameters.batchSize + global_id.x * parameters.elSize + global_id.z;
             output[output_idx] = input[input_idx];
+            
         `
     },
     softmax: {
@@ -590,7 +626,7 @@ export const kernels: { [name: string]: KernelSpec } = {
                     var scale_factor = parameters.w_out / parameters.w_in;
                     var offset = (scale_factor - 1) / 2;
                     var x_l = floor((global_id.x - offset) / scale_factor);
-                    var x_r = x_l + 1
+                    var x_r = x_l + 1;
                     if(x_r % parameters.w_in < abs(x_l) % parameters.w_in) {
                         if(global_id.x % parameters.w_out < scale_factor) {
                             output[output_idx] = input[x_r];
@@ -847,14 +883,14 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        workgroupSize: [8, 1, 1],
-        workgroupCount: ["outputSize / 8", 1, 1],
+        workgroupSize: [1, 4, 1],
+        workgroupCount: ["outputSize / norm_size", "norm_size/4", 1],
         // y = (x - E[x]) / sqrt(Var[x] + eps) * y + B
         shader: `
             if (global_id.x >= parameters.outputSize) {
                 return;
             }
-            var norm_shape_idx = (global_id.x / parameters.norm_size) * parameters.norm_size;
+            var norm_shape_idx = global_id.x * parameters.norm_size;
             var expectation = 0.0;
             var variance = 0.0;
             for(var i: u32 = 0; i < parameters.norm_size; i++) {
@@ -865,7 +901,7 @@ export const kernels: { [name: string]: KernelSpec } = {
             variance = variance / f32(parameters.norm_size);
             variance = abs(variance - pow(expectation, 2));
 
-            output[global_id.x] = (input[global_id.x] - expectation) / sqrt(variance + parameters.eps);
+            output[norm_shape_idx + global_id.y] = (input[norm_shape_idx + global_id.y] - expectation) / sqrt(variance + parameters.eps);
         `
     },
     cat: {

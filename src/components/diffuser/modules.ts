@@ -24,13 +24,14 @@ class SelfAttention extends torch.nn.Module {
     }
 
     forward(x: torch.Tensor): torch.Tensor {
+        console.log(x.shape);
         x = x.view([-1, this.channels, this.size * this.size]).transpose(1, 2);
+        console.log(x.shape);
         let x_ln = this.ln.forward(x);
         let attention_value = this.mha.forward(x_ln, x_ln, x_ln).output;
         attention_value = torch.add(attention_value, x);
         attention_value = torch.add(this.ff_self.forward(attention_value), attention_value);
         return attention_value.transpose(2, 1).view([-1, this.channels, this.size, this.size]);
-
     }
 }
 
@@ -195,8 +196,8 @@ export class UNet extends torch.nn.Module {
         status++;
         _log_tensor(t, "pos_encoding");
 
+    
         console.log("finsihed pos_encoding starting down");
-
         let x1 = this.inc.forward(x);
         _log_tensor(x1, "inc");
         console.log(`forwarding... step: ${status}`);
@@ -272,7 +273,6 @@ export class UNet extends torch.nn.Module {
         status++;
         _log_tensor(output, "finished UNet")
         return output
-
     }
 }
 

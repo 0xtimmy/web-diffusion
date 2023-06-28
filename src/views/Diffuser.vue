@@ -1,8 +1,8 @@
 <template>
     <div>
         <h2>Diffuser</h2>
-        <button @click="generate">go !!</button>
-        <canvas ref="canvas">
+        <button @click="generate">go !!</button> <br />
+        <canvas ref="canvas" width="64" height="64">
 
         </canvas>
     </div>
@@ -21,26 +21,21 @@ export default defineComponent({
         await init_device();
     },
     methods: {
-        generate: function() {
+        generate: async function() {
             const diffuser = new Diffusion({ noise_steps: 1, img_size: 64 });
             const model = new UNet();
             let res = diffuser.sample(model);
-            res = res.cat(torch.ones([1, 1, ...Array.from(res.shape).splice(2)]), 1);
-            console.log("res shape: ", res.shape);
+            res = res.cat(torch.constant([1, 1, ...Array.from(res.shape).splice(2)], 255), 1);
             res = res.transpose(1, 2).transpose(2, 3);
             console.log("res shape: ", res.shape);
-            (async () => {
-
-                const res_data = await res.toArrayAsync();
-                console.log("sample result: ");
-                console.log(res_data);
-                const img_data = new Uint8ClampedArray(res_data.flat(3) as any);
-               console.log(img_data);
-                const img = new ImageData(img_data, res.shape[1], res.shape[2]);
-                console.log(img);
-                const context = this.$refs["canvas"].getContext("2d");
-                context.putImageData(img, 16, 16);
-            })()
+            const res_data = await res.toArrayAsync();
+            console.log("sample result: ");
+            console.log(res_data);
+            const img_data = new Uint8ClampedArray(res_data.flat(3) as any);
+            const context = this.$refs["canvas"].getContext("2d");
+            context.putImageData(
+                new ImageData(img_data, 64, 64), 
+                0, 0);
         }
     }
 })

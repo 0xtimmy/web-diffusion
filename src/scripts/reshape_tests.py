@@ -1,6 +1,7 @@
 import torch
 import torch.nn.functional as F
 import numpy
+import time
 
 # Each gen function should return a json object of the below form
 # These will be passed to tester.ts and run against our ts-torch
@@ -15,7 +16,9 @@ import numpy
 #}
 
 def gen_chunk(message, input, chunks, dim, log="always", log_config="fail"):
+    start = time.time()
     output = torch.chunk(input, chunks, dim)
+    duration = time.time() - start
     return {
         "message": message,
         "func": "chunk",
@@ -25,13 +28,16 @@ def gen_chunk(message, input, chunks, dim, log="always", log_config="fail"):
             "dim": dim,
         },
         "target": [t.numpy().tolist() for t in output],
+        "duration": duration * 1000,
         "log": log,
         "log_config": log_config
     }
 
 
 def gen_transpose(message, input, dim0=0, dim1=1, log="always", log_config="fail"):
+    start = time.time()
     output = input.transpose(dim0, dim1)
+    duration = time.time() - start
     return {
         "message": message,
         "func": "transpose",
@@ -41,34 +47,41 @@ def gen_transpose(message, input, dim0=0, dim1=1, log="always", log_config="fail
             "dim1": dim1,
         },
         "target": output.numpy().tolist(),
+        "duration": duration * 1000,
         "log": log,
         "log_config": log_config
     }
     
 
 def gen_unsqueeze(message, shape, dim, log="always", log_config="fail"):
+    start = time.time()
     input = torch.randint(0, 9, shape)
     output = input.unsqueeze(dim)
+    duration = time.time() - start
     return {
         "message": message,
         "func": "unsqueeze",
         "args": { "input": input.numpy().tolist(), "dim": dim },
         "target": output.numpy().tolist(),
+        "duration": duration * 1000,
         "log": log,
         "log_config": log_config
     }
 
 def gen_squeeze(message, shape, dim=None, log="always", log_config="fail"):
+    start = time.time()
     input = torch.randint(0, 9, shape)
     if dim : 
         output = input.squeeze(dim)
     else :
         output = input.squeeze()
+    duration = time.time() - start
     return {
         "message": message,
         "func": "squeeze",
         "args": { "input": input.numpy().tolist(), "dim": dim },
         "target": output.numpy().tolist(),
+        "duration": duration * 1000,
         "log": log,
         "log_config": log_config
     }

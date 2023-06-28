@@ -73,15 +73,17 @@ export class KernelWebGPU extends Kernel {
         parameters: KernelParamsInput,
         outputs?: GPUBuffer[]
     ): GPUBuffer[] {
-        console.log("run gpu kernel", this.key);
+        //console.log("run gpu kernel", this.key);
 
         // Build the parameter environment
         const env: EvalEnv = this.getRunEnv(parameters);
-        let paramsBufferSize = 0;
-        for (let i = 0; i < this.spec.parameters.length; i++) {
-            const param = this.spec.parameters[i];
-            paramsBufferSize += getShaderTypeElementByteSize(param.shaderType);
-        }
+        // Get the workgroup counts
+        const [workgroupCountX, workgroupCountY, workgroupCountZ] =
+            this.getWorkgroupCounts(env);
+
+        const totalWorkgroups = workgroupCountX*workgroupCountY*workgroupCountZ;
+        //let neededParts = Math.ceil(Math.log2(totalWorkgroups / 65535));
+        //if(neededParts > 1) console.error(`Exceeded max workgroups with ${totalWorkgroups} total workgroup count; run must be split into ${neededParts} parts`);
 
         // Get input buffers with storage usage
         const storageInputs = this.spec.inputs.map((input, i) =>
@@ -102,55 +104,74 @@ export class KernelWebGPU extends Kernel {
                 env
             )
         );
+        
+        for(let i = 0; i < workgroupCountX; i += 256) {
+            for(let j = 0; j < workgroupCountY; j += 256) {
+                for(let k = 0; k <workgroupCountZ; k += 64) {
+                    parameters = {
+                        _x_part_offset: i,
+                        _y_part_offset: j,
+                        _k_part_offset: k,
+                        ...parameters,
+                    }
 
-        // Build the params buffer
-        const paramsBuffer = this._gpuDevice.createBuffer({
-            mappedAtCreation: true,
-            size: paramsBufferSize,
-            usage: GPUBufferUsage.STORAGE,
-        });
-        const paramsArrayBuffer = paramsBuffer.getMappedRange();
-        for (let paramDtype of ["u32", "f32"]) {
-            let paramsArray = new (
-                paramDtype === "u32" ? Uint32Array : Float32Array
-            )(paramsArrayBuffer);
-            for (let i = 0; i < this.spec.parameters.length; i++) {
-                const param = this.spec.parameters[i];
-                if (param.shaderType === paramDtype) {
-                    paramsArray[i] = +env[param.name];
+                    let paramsBufferSize = 12;
+                    for (let i = 0; i < this.spec.parameters.length; i++) {
+                        const param = this.spec.parameters[i];
+                        paramsBufferSize += getShaderTypeElementByteSize(param.shaderType);
+                    }
+
+                    // Build the params buffer
+                    const paramsBuffer = this._gpuDevice.createBuffer({
+                        mappedAtCreation: true,
+                        size: paramsBufferSize,
+                        usage: GPUBufferUsage.STORAGE,
+                    });
+                    const paramsArrayBuffer = paramsBuffer.getMappedRange();
+                    for (let paramDtype of ["u32", "f32"]) {
+                        let paramsArray = new (
+                            paramDtype === "u32" ? Uint32Array : Float32Array
+                        )(paramsArrayBuffer);
+                        paramsArray[0] = i;
+                        paramsArray[1] = j;
+                        paramsArray[2] = k;
+                        for (let i = 0; i < this.spec.parameters.length; i++) {
+                            const param = this.spec.parameters[i];
+                            if (param.shaderType === paramDtype) {
+                                paramsArray[i+3] = +env[param.name];
+                            }
+                        }
+                    }
+                    paramsBuffer.unmap();
+
+                    // Bind the buffers
+                    const bindGroup = this.createBindGroup(
+                        storageInputs,
+                        paramsBuffer,
+                        storageOutputs
+                    );
+
+                    // Start a new command encoder
+                    const commandEncoder = this._gpuDevice.createCommandEncoder();
+
+                    // Encode the kernel using pass encoder
+                    const passEncoder = commandEncoder.beginComputePass();
+                    passEncoder.setPipeline(this._computePipeline);
+                    passEncoder.setBindGroup(0, bindGroup);
+                    passEncoder.dispatchWorkgroups(
+                        Math.min(workgroupCountX - i, 256),
+                        Math.min(workgroupCountY - j, 256),
+                        Math.min(workgroupCountZ - k, 64)
+                    );
+                    passEncoder.end();
+
+                    // Submit GPU commands
+                    const gpuCommands = commandEncoder.finish();
+                    this._gpuDevice.queue.submit([gpuCommands]);
+                    
                 }
             }
         }
-        paramsBuffer.unmap();
-
-        // Bind the buffers
-        const bindGroup = this.createBindGroup(
-            storageInputs,
-            paramsBuffer,
-            storageOutputs
-        );
-
-        // Get the workgroup counts
-        const [workgroupCountX, workgroupCountY, workgroupCountZ] =
-            this.getWorkgroupCounts(env);
-
-        // Start a new command encoder
-        const commandEncoder = this._gpuDevice.createCommandEncoder();
-
-        // Encode the kernel using pass encoder
-        const passEncoder = commandEncoder.beginComputePass();
-        passEncoder.setPipeline(this._computePipeline);
-        passEncoder.setBindGroup(0, bindGroup);
-        passEncoder.dispatchWorkgroups(
-            workgroupCountX,
-            workgroupCountY,
-            workgroupCountZ
-        );
-        passEncoder.end();
-
-        // Submit GPU commands
-        const gpuCommands = commandEncoder.finish();
-        this._gpuDevice.queue.submit([gpuCommands]);
 
         // Return the storage output buffers
         return storageOutputs;

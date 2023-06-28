@@ -5,7 +5,7 @@ import time
 def gen_scalar_add(message, input, alpha, log="always", log_config="fail"):
     start = time.time()
     output = input + alpha
-    duration = time.time() - duration
+    duration = time.time() - start
     return {
         "message": message,
         "func": "scalar_add",
@@ -22,7 +22,7 @@ def gen_scalar_add(message, input, alpha, log="always", log_config="fail"):
 def gen_scalar_sub(message, input, alpha, log="always", log_config="fail"):
     start = time.time()
     output = input - alpha
-    duration = time.time() - duration
+    duration = time.time() - start
     return {
         "message": message,
         "func": "scalar_sub",
@@ -39,7 +39,7 @@ def gen_scalar_sub(message, input, alpha, log="always", log_config="fail"):
 def gen_scalar_mul(message, input, alpha, log="always", log_config="fail"):
     start = time.time()
     output = input * alpha
-    duration = time.time() - duration
+    duration = time.time() - start
     return {
         "message": message,
         "func": "scalar_mul",
@@ -56,7 +56,7 @@ def gen_scalar_mul(message, input, alpha, log="always", log_config="fail"):
 def gen_scalar_div(message, input, alpha, log="always", log_config="fail"):
     start = time.time()
     output = input / alpha
-    duration = time.time() - duration
+    duration = time.time() - start
     return {
         "message": message,
         "func": "scalar_div",
