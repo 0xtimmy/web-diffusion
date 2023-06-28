@@ -104,7 +104,7 @@ export class GroupNorm extends Module {
     reset_parameters() {
         if(this.affine) {
             this.weight = new Parameter(factories.ones(this.numChannels));
-            this.bias = new Parameter(factories.ones(this.numChannels));
+            this.bias = new Parameter(factories.zeros(this.numChannels));
         }
     }
 

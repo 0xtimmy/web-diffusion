@@ -185,6 +185,7 @@ export class Tensor extends TensorBase {
         }
         const index: number[] = [];
         return readArray(index);
+        
         function readArray(index: number[]): TensorArrayData {
             const dim = index.length;
             // console.log("Read array: ", index, "dim=", dim);
@@ -246,10 +247,12 @@ export class Tensor extends TensorBase {
                 d.getBufferForKernel(t.storage, t.dtype)
             ),
         ];
+        
         const outputBuffers = kernel.run(inputBuffers, params) as (
             | GPUBuffer
             | ATypedArray
         )[];
+        
         
         if (outputBuffers.length !== outputShapes.length) {
             throw new Error(
@@ -2686,7 +2689,7 @@ export class Tensor extends TensorBase {
     * @returns the output tensor
     */
     sum(dim?: number, keepdim?: boolean): Tensor {
-        return aops.sum(this);
+        return aops.sum(this, dim);
     }
     /**
     * Calculates:

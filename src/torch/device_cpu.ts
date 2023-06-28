@@ -23,9 +23,6 @@ export class DeviceCPU extends Device {
         ) {
             return new ArrayBufferStorage(storage.buffer);
         }
-        throw new Error(
-            `Cannot wrap buffer of type ${storage.constructor.name} to get CPU storage`
-        );
     }
     getBufferForKernel(
         storage: UntypedStorage,

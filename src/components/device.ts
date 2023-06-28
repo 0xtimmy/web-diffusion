@@ -1,4 +1,4 @@
-import * as torch from "webgpu-torch";
+import * as torch from "@/torch";
 
 export async function init_device() {
     if (!await torch.initWebGPUAsync()) {
