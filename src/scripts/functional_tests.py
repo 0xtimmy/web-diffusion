@@ -4,6 +4,25 @@ import numpy
 import time
 import math
 
+def gen_upsample(message, input, scale_factor=None, size=None, mode="nearest", log="always", log_config="fail"):
+    start = time.time()
+    output = F.interpolate(input, scale_factor=scale_factor, size=size, mode=mode)
+    duration = time.time() - start
+    return {
+        "message": message,
+        "func": "upsample",
+        "args": {
+            "input": input.numpy().tolist(),
+            "scale_factor": scale_factor,
+            "size": size,
+            "mode": mode
+        },
+        "target": output.numpy().tolist(),
+        "duration": duration * 1000,
+        "log": log,
+        "log_config": log_config
+    }
+
 def gen_softmax(message, input, dim, log="always", log_config="fail"):
     start = time.time()
     output = torch.softmax(input, dim)

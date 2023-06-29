@@ -3,7 +3,6 @@ import { Conv2d, GroupNorm, Linear } from "./nn_cnn";
 import { Module, ModuleList, Sequential } from "./nn_module";
 import { SiLU } from "./nn_opgen";
 import { cat } from "./ops_artisanal";
-import { cos, div, exp, mul, sin } from "./ops_opgen";
 import type { Tensor } from ".";
 
 export interface UNetModelConfig {

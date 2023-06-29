@@ -52,7 +52,7 @@ class Diffusion {
             
             //let predicted_noise = torch.normal([1, 3, 64, 64]);
             // makes it out of the unet
-            (async () => { console.log("predicted noise init: ", await predicted_noise.toArrayAsync()) })();
+            //(async () => { console.log("predicted noise init: ", await predicted_noise.toArrayAsync()) })();
             
             const alpha = this.alpha.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
             const alpha_hat = this.alpha_hat.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
@@ -65,10 +65,14 @@ class Diffusion {
             }
             console.log("shapes: x, alpha, alpha_hat, beta", x.shape, alpha.shape, alpha_hat.shape, beta.shape);
 
+            //(async () => { console.log("alpha: ", await alpha.toArrayAsync()) })();
+            //(async () => { console.log("alpha_hat: ", await alpha_hat.toArrayAsync()) })();
+            //(async () => { console.log("beta: ", await beta.toArrayAsync()) })();
             let one_div_sqrt_alpha = torch.div(torch.ones(alpha.shape), torch.sqrt(alpha));
             //(async () => { console.log("one_div_sqrt_alpha: ", await one_div_sqrt_alpha.toArrayAsync()) })();
-            let sqrt_one_minus_alpha_hat = torch.sqrt(torch.scalar_add(torch.scalar_mul(alpha_hat, -1), 1));
-            //(async () => { console.log("sqrt_one_minus_alpha_hat: ", await sqrt_one_minus_alpha_hat.toArrayAsync()) })();
+            //let sqrt_one_minus_alpha_hat = torch.sqrt(torch.scalar_add(torch.scalar_mul(alpha_hat, -1), 1));
+            let sqrt_one_minus_alpha_hat = torch.sqrt(alpha_hat);
+            //(async () => { console.log("sqrt_one_minus_alpha_hat: ", await torch.scalar_add(torch.scalar_mul(alpha_hat, -1), 1).toArrayAsync()) })();
             let one_minus_alpha = torch.scalar_add(torch.scalar_mul(alpha_hat, -1), 1);
             //(async () => { console.log("one_minus_alpha: ", await one_minus_alpha.toArrayAsync()) })();
             predicted_noise = torch.mul(predicted_noise, torch.div(one_minus_alpha, sqrt_one_minus_alpha_hat));
@@ -84,7 +88,7 @@ class Diffusion {
             //(async () => { console.log("final x for noise pass : ", 1, await x.toArrayAsync()) })();
         }
         
-        model.train();
+        //model.train();
         x = torch.scalar_div(torch.scalar_add(torch.clamp(x, -1, 1), 1), 2);
         //(async () => { console.log("x / 2 : ", 1, await x.toArrayAsync()) })();
         x = torch.scalar_mul(x, 255)

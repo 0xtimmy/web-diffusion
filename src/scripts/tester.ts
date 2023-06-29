@@ -100,7 +100,9 @@ const funcs: { [key: string]: (args: any, target: any) => Promise<test_result>} 
     "clamp": test_clamp,
     "silu": test_silu,
     "gelu": test_gelu,
-    "softmax": test_softmax
+    "softmax": test_softmax,
+    "upsample": test_upsample,
+    "cat": test_cat
 }
 
 // Tests
@@ -126,6 +128,48 @@ async function test_nn_linear(args, target): Promise<test_result> {
     if(!array_eq(output_data.flat(4), target.flat(4))) return { res: false, output: output_data, msg: `mismatched tensor content` };
 
     return { res: true, output: output_data }
+}
+
+async function test_cat(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  a: Tensor,
+     *  b: Tensor,
+     *  dim: number
+     * }
+     */
+    const a = ops.tensor(args.a);
+    const b = ops.tensor(args.b);
+    const target_output = ops.tensor(target);
+    const actual_output = ops.cat(a, b, args.dim);
+    const output_data = await actual_output.toArrayAsync()
+
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    const diff = array_eq(output_data.flat(4), [target].flat(4))
+    if(diff > 0.00001) return { res: false, output: output_data, msg: `mismatched tensor content, average diff: ${diff}` };
+
+    return { res: true, output: output_data, msg: `average diff: ${diff}` };
+}
+
+async function test_upsample(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  input: Tensor,
+     *  scale_factor: Shape,
+     *  size: Shape,
+     *  mode: string
+     * }
+     */
+    const input = ops.tensor(args.input);
+    const target_output = ops.tensor(target);
+    const actual_output = ops.upsample(input, args.size, args.scale_factor, args.mode);
+    const output_data = await actual_output.toArrayAsync()
+
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    const diff = array_eq(output_data.flat(4), [target].flat(4))
+    if(diff > 0.00001) return { res: false, output: output_data, msg: `mismatched tensor content, average diff: ${diff}` };
+
+    return { res: true, output: output_data, msg: `average diff: ${diff}` };
 }
 
 async function test_softmax(args, target): Promise<test_result> {
@@ -347,7 +391,7 @@ async function test_scalar_div(args, target): Promise<test_result> {
     const actual_output = ops.scalar_div(input, args.alpha);
     const output_data = await actual_output.toArrayAsync();
 
-    if(!array_eq(actual_output.shape, target_output.shape)) return { res: false, output: output_data, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
     const diff = array_eq(output_data.flat(4), [target].flat(4));
     if(diff > 0.00001) return { res: false, output: output_data, msg: `mismatched tensor content` };
 
@@ -503,6 +547,7 @@ async function test_linear(args, target): Promise<test_result> {
     const target_output = ops.tensor(target);
     const actual_output = ops.linear(input, weight, bias);
     const output_data = await actual_output.toArrayAsync();
+    
     if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
     const diff = array_eq(output_data.flat(4), [target].flat(4));
     if(array_eq(output_data.flat(4), target.flat(4)) > 0.00001) return { res: false, output: output_data, msg: `mismatched tensor content` };

@@ -239,6 +239,7 @@ export class Tensor extends TensorBase {
         outputShapes: Shape[],
         ...additionalInputs: Tensor[]
     ): Tensor[] {
+        //console.log("running kernel: ", name);
         const d = this.device;
         const kernel = d.getKernel(name, config);
         const inputBuffers = [
@@ -585,7 +586,7 @@ export class Tensor extends TensorBase {
     * @returns the output tensor
     */
     add(other: Tensor, alpha?: number): Tensor {
-        return ops.add(this, other, alpha);
+        return aops.add(this, other);
     }
     /**
     * Calculates:
@@ -1051,7 +1052,7 @@ export class Tensor extends TensorBase {
     * @returns the output tensor
     */
     div(other: Tensor, alpha?: number): Tensor {
-        return ops.div(this, other, alpha);
+        return aops.div(this, other);
     }
     /**
     * Alias for `div`.
@@ -1071,7 +1072,7 @@ export class Tensor extends TensorBase {
     * @returns the output tensor
     */
     divide(other: Tensor, alpha?: number): Tensor {
-        return ops.div(this, other, alpha);
+        return aops.div(this, other);
     }
     /**
     * Calculates:
@@ -1610,7 +1611,7 @@ export class Tensor extends TensorBase {
     * @returns the output tensor
     */
     mul(other: Tensor, alpha?: number): Tensor {
-        return ops.mul(this, other, alpha);
+        return aops.mul(this, other);
     }
     /**
     * Alias for `mul`.
@@ -1630,7 +1631,7 @@ export class Tensor extends TensorBase {
     * @returns the output tensor
     */
     multiply(other: Tensor, alpha?: number): Tensor {
-        return ops.mul(this, other, alpha);
+        return aops.mul(this, other);
     }
     /**
     * Calculates:
@@ -2131,7 +2132,7 @@ export class Tensor extends TensorBase {
     * @returns the output tensor
     */
     silu(): Tensor {
-        return ops.silu(this);
+        return aops.silu(this);
     }
     /**
     * ![Plot of silu and its gradient](/plots/silu.svg)
@@ -2287,7 +2288,7 @@ export class Tensor extends TensorBase {
     * @returns the output tensor
     */
     sqrt(): Tensor {
-        return ops.sqrt(this);
+        return aops.sqrt(this);
     }
     /**
     * ![Plot of sqrt and its gradient](/plots/sqrt.svg)
@@ -2365,7 +2366,7 @@ export class Tensor extends TensorBase {
     * @returns the output tensor
     */
     sub(other: Tensor, alpha?: number): Tensor {
-        return ops.sub(this, other, alpha);
+        return aops.sub(this, other);
     }
     /**
     * Alias for `sub`.
@@ -2385,7 +2386,7 @@ export class Tensor extends TensorBase {
     * @returns the output tensor
     */
     subtract(other: Tensor, alpha?: number): Tensor {
-        return ops.sub(this, other, alpha);
+        return aops.sub(this, other);
     }
     /**
     * Calculates:

@@ -96,6 +96,7 @@ export const registry: AnOpSpec[] = [
         forward: "output = acosh(input)",
         backward: "inputGrad = outputGrad / sqrt(input * input - 1)",
     },
+    /*
     {
         name: "add",
         type: "binary",
@@ -103,6 +104,7 @@ export const registry: AnOpSpec[] = [
         forward: "output = input + other",
         backward: "inputGrad = outputGrad; otherGrad = outputGrad",
     },
+    */
     // addcdiv: trinary
     // addcmul: trinary
     // angle: complex
@@ -173,6 +175,7 @@ export const registry: AnOpSpec[] = [
         forward: "output = input * 0.017453292519943295",
         backward: "inputGrad = outputGrad * 0.017453292519943295",
     },
+    /*
     {
         name: "div",
         aliases: ["divide"],
@@ -181,6 +184,7 @@ export const registry: AnOpSpec[] = [
         forward: "output = input / other",
         backward: "inputGrad = outputGrad / other; otherGrad = -outputGrad * input / (other * other)",
     },
+    */
     // digamma: special
     // erf: special
     // erfc: special
@@ -281,6 +285,7 @@ export const registry: AnOpSpec[] = [
     // logical_or: boolean
     // logical_xor: boolean
     // logit: yikes
+    /*
     {
         name: "mul",
         aliases: ["multiply"],
@@ -289,6 +294,7 @@ export const registry: AnOpSpec[] = [
         forward: "output = input * other",
         backward: "inputGrad = outputGrad * other; otherGrad = outputGrad * input",
     },
+    */
     // mvlgamma: special
     // nan_to_num: special
     {
@@ -362,6 +368,7 @@ export const registry: AnOpSpec[] = [
         forward: "output = sign(input)",
         backward: "inputGrad = 0",
     },
+    /*
     {
         name: "silu",
         nnName: "SiLU",
@@ -371,6 +378,7 @@ export const registry: AnOpSpec[] = [
         forward: "output = input / (1.0 + exp(-input))",
         backward: "var out = 1.0 / (1.0 + exp(-input)); inputGrad = outputGrad * (out + input * out * (1.0 - out))",
     },
+    */
     // signbit: integer
     {
         name: "sin",
@@ -403,6 +411,7 @@ export const registry: AnOpSpec[] = [
         forward: "output = input * input",
         backward: "inputGrad = outputGrad * 2.0 * input",
     },
+    /*
     {
         name: "sub",
         aliases: ["subtract"],
@@ -411,6 +420,7 @@ export const registry: AnOpSpec[] = [
         forward: "output = input - other",
         backward: "inputGrad = outputGrad; otherGrad = -outputGrad",
     },
+    */
     {
         name: "tan",
         type: "unary",
