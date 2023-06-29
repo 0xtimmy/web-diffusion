@@ -174,13 +174,9 @@ export class UNet extends torch.nn.Module {
 
     pos_encoding(t: torch.Tensor, channels: number) {
         const range = torch.scalar_div(torch.arange(0, channels, 2), channels);
-        console.log("scalar dived");
         const inv_freq = torch.div(torch.ones(range.shape), torch.pow(torch.constant(range.shape, 10000), range)).unsqueeze(0);
-        console.log("inv freq")
         const pos_enc_a = torch.sin(torch.mul(torch.repeat(t, [1, Math.floor(channels / 2)]), inv_freq));
-        console.log("pos_enc_a");
         const pos_enc_b = torch.cos(torch.mul(torch.repeat(t, [1, Math.floor(channels / 2)]), inv_freq));
-        console.log("pos_enc_b");
         const pos_enc = torch.cat(pos_enc_a, pos_enc_b, 1);
         return pos_enc;
     }

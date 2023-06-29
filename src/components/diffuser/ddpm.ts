@@ -42,16 +42,15 @@ class Diffusion {
         return torch.randint(1, this.noise_steps, [n]);
     }
 
-    sample(model, n=1): torch.Tensor {
+    sample(model, handleStep?: (img: torch.Tensor) => void, n=1): torch.Tensor {
         console.log(`Sampling ${n} new images...`);
         const sampleStart = Date.now();
         model.eval();
         let x = torch.normal([n, 3, this.img_size, this.img_size]);
         for(let i = this.noise_steps -1; i >= 0; i--) {
-            console.log(`sampling... ${(this.noise_steps-i)/ this.noise_steps}% complete - ${Date.now() - sampleStart}ms`)
+            console.log(`sampling... ${100*(this.noise_steps-i)/this.noise_steps}% complete - ${Date.now() - sampleStart}ms`)
             const t = torch.scalar_mul(torch.ones(n), i);
             let predicted_noise = model.forward(x, t);
-            
             
             const alpha = this.alpha.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
             const alpha_hat = this.alpha_hat.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
@@ -80,8 +79,13 @@ class Diffusion {
             //(async () => { console.log("beta_noise: ", await beta_noise.toArrayAsync()) })();
             x = torch.add(x, beta_noise);
             //(async () => { console.log("final x for noise pass : ", 1, await x.toArrayAsync()) })();
+
+            if(typeof(handleStep) != 'undefined') {
+                let step = torch.scalar_div(torch.scalar_add(torch.clamp(x, -1, 1), 1), 2);
+                step = torch.scalar_mul(step, 255)
+                handleStep(step);
+            }   
         }
-        
         //model.train();
         x = torch.scalar_div(torch.scalar_add(torch.clamp(x, -1, 1), 1), 2);
         x = torch.scalar_mul(x, 255)
