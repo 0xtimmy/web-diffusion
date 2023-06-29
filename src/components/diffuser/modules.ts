@@ -274,12 +274,12 @@ export class UNet extends torch.nn.Module {
         console.log(`forwarding... step: ${status}`);
         status++;
         _log_tensor(output, "finished UNet");
-        return x
+        return output;
     }
 }
 
 async function _log_tensor(x: torch.Tensor, message?: string) {
     //const data = await x.toArrayAsync();
     //console.log(message ? message : "", data);
-    console.log(message, x.shape);
+    //console.log(message, x.shape);
 }

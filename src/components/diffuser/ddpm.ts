@@ -44,6 +44,7 @@ class Diffusion {
 
     sample(model, n=1): torch.Tensor {
         console.log(`Sampling ${n} new images...`);
+        const sampleStart = Date.now();
         model.eval();
         let x = torch.normal([n, 3, this.img_size, this.img_size]);
         for(let i = this.noise_steps -1; i >= 0; i--) {
@@ -92,6 +93,7 @@ class Diffusion {
         x = torch.scalar_div(torch.scalar_add(torch.clamp(x, -1, 1), 1), 2);
         //(async () => { console.log("x / 2 : ", 1, await x.toArrayAsync()) })();
         x = torch.scalar_mul(x, 255)
+        console.log(`sample took ${Date.now() - sampleStart} ms`);
         return x;
     }
 
