@@ -81,10 +81,6 @@ export class KernelWebGPU extends Kernel {
         const [workgroupCountX, workgroupCountY, workgroupCountZ] =
             this.getWorkgroupCounts(env);
 
-        const totalWorkgroups = workgroupCountX*workgroupCountY*workgroupCountZ;
-        //let neededParts = Math.ceil(Math.log2(totalWorkgroups / 65535));
-        //if(neededParts > 1) console.error(`Exceeded max workgroups with ${totalWorkgroups} total workgroup count; run must be split into ${neededParts} parts`);
-
         // Get input buffers with storage usage
         const storageInputs = this.spec.inputs.map((input, i) =>
             this.getStorageInputBuffer(
@@ -108,14 +104,8 @@ export class KernelWebGPU extends Kernel {
         for(let i = 0; i < workgroupCountX; i += 256) {
             for(let j = 0; j < workgroupCountY; j += 256) {
                 for(let k = 0; k <workgroupCountZ; k += 64) {
-                    parameters = {
-                        _x_part_offset: i,
-                        _y_part_offset: j,
-                        _k_part_offset: k,
-                        ...parameters,
-                    }
 
-                    let paramsBufferSize = 12;
+                    let paramsBufferSize = 3*getShaderTypeElementByteSize("u32");
                     for (let i = 0; i < this.spec.parameters.length; i++) {
                         const param = this.spec.parameters[i];
                         paramsBufferSize += getShaderTypeElementByteSize(param.shaderType);
@@ -128,13 +118,15 @@ export class KernelWebGPU extends Kernel {
                         usage: GPUBufferUsage.STORAGE,
                     });
                     const paramsArrayBuffer = paramsBuffer.getMappedRange();
+                    let offsetsArray = new Uint32Array(paramsArrayBuffer);
+                    offsetsArray[0] = i;
+                    offsetsArray[1] = j;
+                    offsetsArray[2] = k;
+
                     for (let paramDtype of ["u32", "f32"]) {
                         let paramsArray = new (
                             paramDtype === "u32" ? Uint32Array : Float32Array
                         )(paramsArrayBuffer);
-                        paramsArray[0] = i;
-                        paramsArray[1] = j;
-                        paramsArray[2] = k;
                         for (let i = 0; i < this.spec.parameters.length; i++) {
                             const param = this.spec.parameters[i];
                             if (param.shaderType === paramDtype) {
@@ -153,6 +145,17 @@ export class KernelWebGPU extends Kernel {
 
                     // Start a new command encoder
                     const commandEncoder = this._gpuDevice.createCommandEncoder();
+
+                    /*
+                    console.log(
+                        "running workgroups:",
+                        Math.min(workgroupCountX - i, 256),
+                        Math.min(workgroupCountY - j, 256),
+                        Math.min(workgroupCountZ - k, 64)
+                    );
+                    if(Math.min(workgroupCountX - i, 256)*Math.min(workgroupCountY - j, 256)*Math.min(workgroupCountZ - k, 64) > 256) console.warn("running over 256 workgroups");
+                    if(Math.min(workgroupCountX - i, 256)*Math.min(workgroupCountY - j, 256)*Math.min(workgroupCountZ - k, 64) > 65535) console.error("running over 65535 workgroups");
+                    */
 
                     // Encode the kernel using pass encoder
                     const passEncoder = commandEncoder.beginComputePass();

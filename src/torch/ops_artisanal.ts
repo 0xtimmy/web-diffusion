@@ -10,6 +10,17 @@ import * as ops from "./ops_opgen";
 // ------------------------------------
 // Start Custom
 // ------------------------------------
+export function silu(input: Tensor): Tensor {
+    return input.runKernel(
+        "silu",
+        { dtype: input.dtype },
+        {
+            outputSize: input.size
+        },
+        [input.shape]
+    )[0]
+}
+
 export function find_index(input: Tensor): Tensor {
     return input.runKernel(
         "find_index",
@@ -28,7 +39,7 @@ export function clamp(input: Tensor, low: number, high: number): Tensor {
         { 
             low: low,
             high: high,
-            size: input.size 
+            outputSize: shapeSize(input.shape) 
         },
         [input.shape],
     )[0]
@@ -47,6 +58,51 @@ export function index(input: Tensor, index: Tensor): Tensor {
         { size: index.size },
         [index.shape],
         index
+    )[0]
+}
+
+export function add(a: Tensor, b: Tensor): Tensor {
+    return a.runKernel(
+        "add",
+        { dtype: a.dtype },
+        { outputSize: shapeSize(a.shape) },
+        [a.shape],
+        b
+    )[0]
+}
+export function sub(a: Tensor, b: Tensor): Tensor {
+    return a.runKernel(
+        "sub",
+        { dtype: a.dtype },
+        { outputSize: shapeSize(a.shape) },
+        [a.shape],
+        b
+    )[0]
+}
+export function mul(a: Tensor, b: Tensor): Tensor {
+    return a.runKernel(
+        "mul",
+        { dtype: a.dtype },
+        { outputSize: shapeSize(a.shape) },
+        [a.shape],
+        b
+    )[0]
+}
+export function div(a: Tensor, b: Tensor): Tensor {
+    return a.runKernel(
+        "div",
+        { dtype: a.dtype },
+        { outputSize: shapeSize(a.shape) },
+        [a.shape],
+        b
+    )[0]
+}
+export function sqrt(input: Tensor): Tensor {
+    return input.runKernel(
+        "sqrt",
+        { dtype: input.dtype },
+        { outputSize: shapeSize(input.shape) },
+        [input.shape],
     )[0]
 }
 
@@ -187,17 +243,18 @@ export function maxpool2d(input: Tensor, kernel_size: [number, number], stride: 
 
 export function upsample(
     input: Tensor, 
-    size: number | [number, number] | [number, number, number] | null,
-    scale_factor: number | [number, number] | [number, number, number] | null ,
-    mode: "nearest" | "linear" | "bilinear" | "bicubic" | "trilinear",
-    align_corners: boolean,
-    recompute_scale_factor: boolean
+    size: number | [number, number] | [number, number, number] | null = null,
+    scale_factor: number | [number, number] | [number, number, number] | null = null,
+    mode: "nearest" | "linear" | "bilinear" | "bicubic" | "trilinear" = "nearest",
+    align_corners=false,
+    recompute_scale_factor=false,
 ) {
     if(align_corners) throw new Error("align_corners not implemented!");
     if(recompute_scale_factor) throw new Error("recompute_scale_factor not implemented!");
     if(mode == "trilinear") throw new Error("trilinear not implemented!");
     let output_shape;
     if(size == null) {
+        console.log("using scale factor");
         if(scale_factor == null) throw new Error("both size and scale factor cannot be undefined at once");
         if(typeof(scale_factor) == 'number') scale_factor = (new Array(input.shape.length - 2)).fill(scale_factor) as any
         else if(scale_factor.length != input.shape.length - 2) throw new Error(`Expects a ${input.shape.length - 2}D scale factor for a ${input.shape.length}D input`);
@@ -206,6 +263,7 @@ export function upsample(
             return Math.floor(v * scale_factor[i-2]);
         })
     } else {
+        console.log("using size");
         if(scale_factor != null) throw new Error("both size and scale factor cannot be defined at once");
         if(typeof(size) == 'number') size = (new Array(input.shape.length - 2)).fill(size) as any
         else if(size.length != input.shape.length - 2) throw new Error(`Expects a ${input.shape.length - 2}D scale factor for a ${input.shape.length}D input`);
@@ -316,7 +374,7 @@ export function linear(
     
     output_shape[feature_dim] = weight.shape[0];
     let output = mm(input.view([-1, input.shape[feature_dim]]), weight.t());
-    if(bias) output = ops.add(output, repeat(bias.unsqueeze(0), [output.shape[0], 1]));
+    //if(bias) output = ops.add(output, repeat(bias.unsqueeze(0), [output.shape[0], 1]));
     output = output.view(output_shape)
     return output;
 }
@@ -439,8 +497,6 @@ export function multihead_attention(
     is_causal=false
 ): { output: Tensor, weights: Tensor | null } {
 
-    //(async () => { console.log("running multihead attention with query: ", await query.toArrayAsync()); })();
-
     const is_batched = _mha_shape_check(query, key, value, num_heads, key_padding_mask, attn_mask);
 
     if(!is_batched) {
@@ -482,7 +538,7 @@ export function multihead_attention(
         const chunks = in_proj_bias.chunk(3);
         b_q = chunks[0];
         b_k = chunks[1];
-        b_v = chunks[2]
+        b_v = chunks[2];
     }
 
     //(async () => { console.log("running scaled dot product attention with query: ", await query.toArrayAsync())})();
@@ -507,7 +563,6 @@ export function multihead_attention(
         if(static_v.shape[2] != head_dim) throw new Error(`expecting static_k.shape[0] of ${head_dim}, but got ${static_v.shape[0]}`);
         v = static_v;
     }
-
 
     if (need_weights) {
         console.error("need weights");
@@ -729,7 +784,7 @@ export function conv2d(input: Tensor, weight: Tensor, bias?: Tensor, stride?: nu
         { dtype: input.dtype },
         params,
         [[params.batchSize, params.outputChannels, params.outputHeight, params.outputWidth]],
-        weight,
+        //weight,
     )[0];
 }
 

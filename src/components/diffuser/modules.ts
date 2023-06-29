@@ -12,7 +12,7 @@ class SelfAttention extends torch.nn.Module {
         super();
         this.channels = channels;
         this.size = size;
-        this.mha = new torch.nn.MultiheadAttention(channels, 4, );
+        this.mha = new torch.nn.MultiheadAttention(channels, 4);
         this.ln = new torch.nn.LayerNorm([size * size, channels]);
         this.ff_self = new torch.nn.Sequential([
             new torch.nn.LayerNorm([size * size, channels]),
@@ -24,9 +24,7 @@ class SelfAttention extends torch.nn.Module {
     }
 
     forward(x: torch.Tensor): torch.Tensor {
-        console.log(x.shape);
         x = x.view([-1, this.channels, this.size * this.size]).transpose(1, 2);
-        console.log(x.shape);
         let x_ln = this.ln.forward(x);
         let attention_value = this.mha.forward(x_ln, x_ln, x_ln).output;
         attention_value = torch.add(attention_value, x);
@@ -46,6 +44,7 @@ class DoubleConv extends torch.nn.Module {
         if (isNaN(mid_channels)) {
             mid_channels = out_channels;
         }
+        console.log("double conv with channels: ", in_channels, mid_channels, out_channels);
         this.double_conv = new torch.nn.Sequential([
             new torch.nn.Conv2d(in_channels, mid_channels, 3, 1, 1, 1, 1, false),
             new torch.nn.GroupNorm(1, mid_channels),
@@ -88,9 +87,7 @@ class Down extends torch.nn.Module {
 
     forward(x: torch.Tensor, t: torch.Tensor): torch.Tensor {
         x = this.maxpool_conv.forward(x);
-        //x shape: torch.Size([{batch_size}, 128, 32, 32])
         t = this.emb_layer.forward(t);
-        //t shape: torch.Size([{batch_size}, 128, 32, 32])
         const emb = torch.repeat(t, [1, 1, x.shape[x.shape.length-2], x.shape[x.shape.length-1]]);
         return torch.add(x, emb);
     }
@@ -124,6 +121,7 @@ class Up extends torch.nn.Module {
         t = this.emb_layer.forward(t);
         let emb = torch.repeat(t, [1, 1, x.shape[x.shape.length-2], x.shape[x.shape.length-1]]);
         return torch.add(x, emb);
+        //return x;
     }
 }
 
@@ -195,7 +193,6 @@ export class UNet extends torch.nn.Module {
         console.log(`forwarding... step: ${status}`);
         status++;
         _log_tensor(t, "pos_encoding");
-
     
         console.log("finsihed pos_encoding starting down");
         let x1 = this.inc.forward(x);
@@ -247,6 +244,8 @@ export class UNet extends torch.nn.Module {
         console.log(`forwarding... step: ${status}`);
         status++;
         _log_tensor(x, "up1");
+        /*
+
         x = this.sa4.forward(x);
         console.log(`forwarding... step: ${status}`);
         status++;
@@ -267,16 +266,18 @@ export class UNet extends torch.nn.Module {
         console.log(`forwarding... step: ${status}`);
         status++;
         _log_tensor(x, "sa6")
-
+        
         const output = this.outc.forward(x);
         console.log(`forwarding... step: ${status}`);
         status++;
-        _log_tensor(output, "finished UNet")
-        return output
+        _log_tensor(output, "finished UNet");
+        */
+        return x
     }
 }
 
 async function _log_tensor(x: torch.Tensor, message?: string) {
     //const data = await x.toArrayAsync();
     //console.log(message ? message : "", data);
+    console.log(message, x.shape);
 }

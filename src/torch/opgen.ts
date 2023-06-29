@@ -183,8 +183,8 @@ function getScalarKernelSpec(op: ScalarOpSpec): KernelSpec {
                 size: "size",
             },
         ],
-        workgroupSize: [64, 1, 1],
-        workgroupCount: ["size/8", 1, 1],
+        workgroupSize: [1, 1, 1],
+        workgroupCount: ["size", 1, 1],
         shader: shader,
     };
 }
@@ -392,8 +392,8 @@ function getBinaryInplaceKernelSpec(op: BinaryOpSpec): KernelSpec {
                 size: "size",
             },
         ],
-        workgroupSize: [64, 1, 1],
-        workgroupCount: ["size/8", 1, 1],
+        workgroupSize: [1, 1, 1],
+        workgroupCount: ["size", 1, 1],
         shader: shader,
     };
 }
@@ -458,8 +458,8 @@ function getBinaryGradKernelSpec(
                 size: "size",
             },
         ],
-        workgroupSize: [64, 1, 1],
-        workgroupCount: ["size/8", 1, 1],
+        workgroupSize: [1, 1, 1],
+        workgroupCount: ["size", 1, 1],
         shader: shader,
     };
 }
@@ -504,8 +504,8 @@ function getUnaryKernelSpec(op: UnaryOpSpec): KernelSpec {
                 size: "size",
             },
         ],
-        workgroupSize: [64, 1, 1],
-        workgroupCount: ["size/8", 1, 1],
+        workgroupSize: [1, 1, 1],
+        workgroupCount: ["size", 1, 1],
         shader: shader,
     };
 }
@@ -600,8 +600,8 @@ function getUnaryGradKernelSpec(
                 size: "size",
             },
         ],
-        workgroupSize: [64, 1, 1],
-        workgroupCount: ["size/8", 1, 1],
+        workgroupSize: [1, 1, 1],
+        workgroupCount: ["size", 1, 1],
         shader: shader,
     };
 }

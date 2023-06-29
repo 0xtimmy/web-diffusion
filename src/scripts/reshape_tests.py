@@ -15,6 +15,24 @@ import time
 #    "log_config"?: logconfig,  // whether to log the test arguements and output
 #}
 
+def gen_cat(message, a, b, dim, log="always", log_config="fail"):
+    start = time.time()
+    output = torch.cat([a, b], dim)
+    duration = time.time() - start
+    return {
+        "message": message,
+        "func": "cat",
+        "args": {
+            "a": a.numpy().tolist(),
+            "b": b.numpy().tolist(),
+            "dim": dim,
+        },
+        "target": [t.numpy().tolist() for t in output],
+        "duration": duration * 1000,
+        "log": log,
+        "log_config": log_config
+    }
+
 def gen_chunk(message, input, chunks, dim, log="always", log_config="fail"):
     start = time.time()
     output = torch.chunk(input, chunks, dim)

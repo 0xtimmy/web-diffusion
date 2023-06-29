@@ -226,13 +226,13 @@ export function getKernelShaderCode(
 
     let shaderCodeParts: string[] = ["// " + spec.name + " kernel"];
     shaderCodeParts.push(`struct ${spec.name}Parameters {`);
+    shaderCodeParts.push(`    _x_part_offset: u32,`);
+    shaderCodeParts.push(`    _y_part_offset: u32,`);
+    shaderCodeParts.push(`    _z_part_offset: u32,`);
     for (let i = 0; i < spec.parameters.length; i++) {
         let parameter = spec.parameters[i];
         shaderCodeParts.push(`    ${parameter.name}: ${parameter.shaderType},`);
     }
-    shaderCodeParts.push(`    _x_part_offset: u32,`);
-    shaderCodeParts.push(`    _y_part_offset: u32,`);
-    shaderCodeParts.push(`    _z_part_offset: u32,`);
     shaderCodeParts.push(`}`);
     let bindingIndex = 0;
     for (let i = 0; i < spec.inputs.length; i++, bindingIndex++) {

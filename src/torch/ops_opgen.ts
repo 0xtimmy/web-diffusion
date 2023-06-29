@@ -174,9 +174,11 @@ export function arccosh(input: Tensor): Tensor {
 * @param alpha the alpha value to multiply `other` with
 * @returns the output tensor
 */
+/*
 export function add(input: Tensor, other: Tensor, alpha?: number): Tensor {
     return binaryWithAlpha(functions.AddFunction, input, other, alpha);
 }
+*/
 /**
 * ![Plot of asin and its gradient](/plots/asin.svg)
 *
@@ -454,9 +456,11 @@ export function deg2rad(input: Tensor): Tensor {
 * @param alpha the alpha value to multiply `other` with
 * @returns the output tensor
 */
+/*
 export function div(input: Tensor, other: Tensor, alpha?: number): Tensor {
     return binaryWithAlpha(functions.DivFunction, input, other, alpha);
 }
+*/
 /**
 * Alias for `div`.
 *
@@ -475,9 +479,11 @@ export function div(input: Tensor, other: Tensor, alpha?: number): Tensor {
 * @param alpha the alpha value to multiply `other` with
 * @returns the output tensor
 */
+/*
 export function divide(input: Tensor, other: Tensor, alpha?: number): Tensor {
     return div(input, other, alpha);
 }
+*/
 /**
 * ![Plot of exp and its gradient](/plots/exp.svg)
 *
@@ -737,9 +743,11 @@ export function logaddexp2(input: Tensor, other: Tensor): Tensor {
 * @param alpha the alpha value to multiply `other` with
 * @returns the output tensor
 */
+/*
 export function mul(input: Tensor, other: Tensor, alpha?: number): Tensor {
     return binaryWithAlpha(functions.MulFunction, input, other, alpha);
 }
+*/
 /**
 * Alias for `mul`.
 *
@@ -758,9 +766,11 @@ export function mul(input: Tensor, other: Tensor, alpha?: number): Tensor {
 * @param alpha the alpha value to multiply `other` with
 * @returns the output tensor
 */
+/*
 export function multiply(input: Tensor, other: Tensor, alpha?: number): Tensor {
     return mul(input, other, alpha);
 }
+*/
 /**
 * ![Plot of neg and its gradient](/plots/neg.svg)
 *
@@ -987,9 +997,11 @@ export function sign(input: Tensor): Tensor {
 * @param input the input tensor of any shape
 * @returns the output tensor
 */
+/*
 export function silu(input: Tensor): Tensor {
     return unary(functions.SiluFunction, input);
 }
+*/
 /**
 * ![Plot of sin and its gradient](/plots/sin.svg)
 *
@@ -1063,9 +1075,11 @@ export function sinh(input: Tensor): Tensor {
 * @param input the input tensor of any shape
 * @returns the output tensor
 */
+/*
 export function sqrt(input: Tensor): Tensor {
     return unary(functions.SqrtFunction, input);
 }
+*/
 /**
 * ![Plot of square and its gradient](/plots/square.svg)
 *
@@ -1101,9 +1115,11 @@ export function square(input: Tensor): Tensor {
 * @param alpha the alpha value to multiply `other` with
 * @returns the output tensor
 */
+/*
 export function sub(input: Tensor, other: Tensor, alpha?: number): Tensor {
     return binaryWithAlpha(functions.SubFunction, input, other, alpha);
 }
+*/
 /**
 * Alias for `sub`.
 *
@@ -1122,9 +1138,11 @@ export function sub(input: Tensor, other: Tensor, alpha?: number): Tensor {
 * @param alpha the alpha value to multiply `other` with
 * @returns the output tensor
 */
+/*
 export function subtract(input: Tensor, other: Tensor, alpha?: number): Tensor {
     return sub(input, other, alpha);
 }
+*/
 /**
 * ![Plot of tan and its gradient](/plots/tan.svg)
 *

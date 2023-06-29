@@ -53,7 +53,9 @@ export class Conv2d extends Module {
     }
 
     reset_parameters() {
-        this.weight = kaiming_uniform(this.weight, Math.sqrt(5));
+        //this.weight = kaiming_uniform(this.weight, Math.sqrt(5));
+        this.weight = new Parameter(factories.ones([this.outChannels, Math.floor(this.inChannels / this.groups), this.kernelSize[0], this.kernelSize[1]]))
+        this.bias = new Parameter(factories.zeros(this.outChannels));
         if(this.bias) {
             const { fan_in, fan_out } = _calculate_fan_in_fan_out(this.weight);
             if(fan_in != 0) {
@@ -64,7 +66,7 @@ export class Conv2d extends Module {
     }
 
     forward(input: Tensor): Tensor {
-        //(async () => { console.log("forwarding Conv2D with input: ", await input.toArrayAsync()); })();
+        console.log("running conv2d with shapes: ", input.shape, this.weight.shape, this.bias.shape)
         return ops.conv2d(input, this.weight, this.bias, this.stride, this.padding, this.dilation, this.groups);
 
     }
