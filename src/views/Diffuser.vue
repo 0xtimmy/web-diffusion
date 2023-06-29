@@ -30,7 +30,7 @@ export default defineComponent({
         generate: function() {
             if(!this.active) {
                 this.active = true;
-                const diffuser = new Diffusion({ noise_steps: 1, img_size: 64 });
+                const diffuser = new Diffusion({ noise_steps: 100, img_size: 64 });
                 const model = new UNet();
                 let res = diffuser.sample(model);
                 res = res.cat(torch.constant([1, 1, ...Array.from(res.shape).splice(2)], 255), 1);
