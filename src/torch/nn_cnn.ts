@@ -66,7 +66,6 @@ export class Conv2d extends Module {
     }
 
     forward(input: Tensor): Tensor {
-        console.log("running conv2d with shapes: ", input.shape, this.weight.shape, this.bias.shape)
         return ops.conv2d(input, this.weight, this.bias, this.stride, this.padding, this.dilation, this.groups);
 
     }

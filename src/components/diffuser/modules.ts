@@ -44,7 +44,6 @@ class DoubleConv extends torch.nn.Module {
         if (isNaN(mid_channels)) {
             mid_channels = out_channels;
         }
-        console.log("double conv with channels: ", in_channels, mid_channels, out_channels);
         this.double_conv = new torch.nn.Sequential([
             new torch.nn.Conv2d(in_channels, mid_channels, 3, 1, 1, 1, 1, false),
             new torch.nn.GroupNorm(1, mid_channels),
@@ -175,9 +174,13 @@ export class UNet extends torch.nn.Module {
 
     pos_encoding(t: torch.Tensor, channels: number) {
         const range = torch.scalar_div(torch.arange(0, channels, 2), channels);
+        console.log("scalar dived");
         const inv_freq = torch.div(torch.ones(range.shape), torch.pow(torch.constant(range.shape, 10000), range)).unsqueeze(0);
+        console.log("inv freq")
         const pos_enc_a = torch.sin(torch.mul(torch.repeat(t, [1, Math.floor(channels / 2)]), inv_freq));
+        console.log("pos_enc_a");
         const pos_enc_b = torch.cos(torch.mul(torch.repeat(t, [1, Math.floor(channels / 2)]), inv_freq));
+        console.log("pos_enc_b");
         const pos_enc = torch.cat(pos_enc_a, pos_enc_b, 1);
         return pos_enc;
     }
@@ -189,6 +192,7 @@ export class UNet extends torch.nn.Module {
         _log_tensor(x, "forwarding x")
         _log_tensor(t, "with t")
         t = torch.unsqueeze(t, -1);
+        console.log(`forwarding... step: ${status}`);
         t = this.pos_encoding(t, this.time_dim);
         console.log(`forwarding... step: ${status}`);
         status++;
@@ -244,7 +248,6 @@ export class UNet extends torch.nn.Module {
         console.log(`forwarding... step: ${status}`);
         status++;
         _log_tensor(x, "up1");
-        /*
 
         x = this.sa4.forward(x);
         console.log(`forwarding... step: ${status}`);
@@ -271,7 +274,6 @@ export class UNet extends torch.nn.Module {
         console.log(`forwarding... step: ${status}`);
         status++;
         _log_tensor(output, "finished UNet");
-        */
         return x
     }
 }

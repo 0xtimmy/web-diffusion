@@ -241,7 +241,7 @@ export class Tensor extends TensorBase {
     ): Tensor[] {
         //console.log("running kernel: ", name);
         const d = this.device;
-        const kernel = d.getKernel(name, config);
+        const kernel = d.getKernel(name, config, params);
         const inputBuffers = [
             d.getBufferForKernel(this.storage, this.dtype),
             ...additionalInputs.map((t) =>
@@ -935,7 +935,7 @@ export class Tensor extends TensorBase {
     * @returns the output tensor
     */
     cos(): Tensor {
-        return ops.cos(this);
+        return aops.cos(this);
     }
     /**
     * ![Plot of cos and its gradient](/plots/cos.svg)
@@ -1873,7 +1873,7 @@ export class Tensor extends TensorBase {
     // ------------------------------------
 
     gelu(): Tensor {
-        return ops.gelu(this);
+        return aops.gelu(this);
     }
 
     layernorm(normalized_shape: Shape, weight?: Tensor, bias?: Tensor, eps=1e-5): Tensor {
@@ -2171,7 +2171,7 @@ export class Tensor extends TensorBase {
     * @returns the output tensor
     */
     sin(): Tensor {
-        return ops.sin(this);
+        return aops.sin(this);
     }
     /**
     * ![Plot of sin and its gradient](/plots/sin.svg)

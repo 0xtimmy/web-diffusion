@@ -12,6 +12,7 @@ export class DeviceWebGPU extends Device {
     constructor(id: string, adapter: GPUAdapter, device: GPUDevice) {
         super(id, "webgpu");
         this._device = device;
+
     }
     alloc(byteSize: number): GPUBufferStorage {
         return new GPUBufferStorage(
@@ -20,8 +21,8 @@ export class DeviceWebGPU extends Device {
             GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
         );
     }
-    createKernel(spec: KernelSpec, config: KernelConfig): Kernel {
-        return new KernelWebGPU(spec, config, this);
+    createKernel(spec: KernelSpec, config: KernelConfig, params=null): Kernel {
+        return new KernelWebGPU(spec, config, this, params);
     }
     getStorageFromKernel(storage: ATypedArray | GPUBuffer): UntypedStorage {
         if (storage instanceof GPUBuffer) {

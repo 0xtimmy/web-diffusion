@@ -8,6 +8,7 @@ import { unary, unaryWithAlpha, scalar, binary, binaryWithAlpha } from "./ops_hi
 export function double(input: Tensor): Tensor {
     return unary(functions.DoubleFunction, input);
 }
+/*
 // scalar arithmetic
 export function scalar_mul(input: Tensor, alpha: number): Tensor {
     return scalar(functions.ScalarMulFunction, input, alpha);
@@ -33,6 +34,7 @@ export function max(input: Tensor, alpha: number): Tensor {
 export function gelu(input: Tensor): Tensor {
     return unary(functions.GeluFunction, input);
 }
+*/
 // ------------------------------------
 // End Custom
 // ------------------------------------
@@ -390,9 +392,11 @@ export function copysign(input: Tensor, other: Tensor): Tensor {
 * @param input the input tensor of any shape
 * @returns the output tensor
 */
+/*
 export function cos(input: Tensor): Tensor {
     return unary(functions.CosFunction, input);
 }
+*/
 /**
 * ![Plot of cosh and its gradient](/plots/cosh.svg)
 *
@@ -418,9 +422,11 @@ export function cosh(input: Tensor): Tensor {
 * @param input the input tensor of any shape
 * @returns the output tensor
 */
+/*
 export function cumprod(input: Tensor): Tensor {
     return unary(functions.CumprodFunction, input);
 }
+*/
 /**
 * ![Plot of deg2rad and its gradient](/plots/deg2rad.svg)
 *
@@ -1018,9 +1024,11 @@ export function silu(input: Tensor): Tensor {
 * @param input the input tensor of any shape
 * @returns the output tensor
 */
+/*
 export function sin(input: Tensor): Tensor {
     return unary(functions.SinFunction, input);
 }
+*/
 /**
 * ![Plot of sinc and its gradient](/plots/sinc.svg)
 *

@@ -19,7 +19,7 @@ export type ShaderType =
 export interface KernelSpec {
     name: string;
     config: KernelConfigSpec[];
-    workgroupSize: [ExprCode, ExprCode, ExprCode];
+    //workgroupSize: [ExprCode, ExprCode, ExprCode];
     parameters: KernelParamSpec[];
     workgroupCount: [ExprCode, ExprCode, ExprCode];
     inputs: KernelInputSpec[];
@@ -78,9 +78,10 @@ export abstract class Kernel {
         this._device = device;
         this._spec = spec;
         this._config = config;
-        this._workgroupCountXFunc = compileCode(spec.workgroupCount[0]);
-        this._workgroupCountYFunc = compileCode(spec.workgroupCount[1]);
-        this._workgroupCountZFunc = compileCode(spec.workgroupCount[2]);
+        // at some point modify ExprCode so it's just strings
+        this._workgroupCountXFunc = compileCode(`${spec.workgroupCount[0]}`.replaceAll("parameters.", ""));
+        this._workgroupCountYFunc = compileCode(`${spec.workgroupCount[1]}`.replaceAll("parameters.", ""));
+        this._workgroupCountZFunc = compileCode(`${spec.workgroupCount[2]}`.replaceAll("parameters.", ""));
         this._outputSizeFuncs = [];
         for (let i = 0; i < this._spec.outputs.length; i++) {
             const outputSpec = this._spec.outputs[i];
@@ -220,8 +221,10 @@ function configShader(
 
 export function getKernelShaderCode(
     spec: KernelSpec,
-    config: KernelConfig
-): string {
+    config: KernelConfig,
+    workgroupCounts: [number, number, number],
+    device: GPUDevice
+): { code: string, workgroupSizes: { x: number, y: number, z: number }} {
     const [configdShader, env] = configShader(spec, config);
 
     let shaderCodeParts: string[] = ["// " + spec.name + " kernel"];
@@ -250,11 +253,17 @@ export function getKernelShaderCode(
     shaderCodeParts.push(
         `@group(0) @binding(${bindingIndex}) var<storage, read> parameters: ${spec.name}Parameters;`
     );
-    const workgroupSizeX = Math.ceil(evalCode(spec.workgroupSize[0], env));
-    const workgroupSizeY = Math.ceil(evalCode(spec.workgroupSize[1], env));
-    const workgroupSizeZ = Math.ceil(evalCode(spec.workgroupSize[2], env));
+            
+    const workgroupSizes = _getOptimWorkgroupSize(
+        workgroupCounts,
+        device.limits
+    );
+
+    // workgroup count?
+    // Get the device limits
+
     shaderCodeParts.push(
-        `@compute @workgroup_size(${workgroupSizeX}, ${workgroupSizeY}, ${workgroupSizeZ})`
+        `@compute @workgroup_size(${workgroupSizes.x}, ${workgroupSizes.y}, ${workgroupSizes.z})`
     );
     shaderCodeParts.push(`fn main(`);
     let head = "";
@@ -271,13 +280,47 @@ export function getKernelShaderCode(
         head = ", ";
     }
     shaderCodeParts.push(`    ) {`);
+    shaderCodeParts.push("    " + `if(global_id.x >= ${spec.workgroupCount[0]} || global_id.y >= ${spec.workgroupCount[1]} || global_id.z >= ${spec.workgroupCount[2]}) { return; }`)
     shaderCodeParts.push("    " + configdShader);
     shaderCodeParts.push("}");
     let shaderCode = shaderCodeParts.join("\n");
+    //console.log("shader code: ", shaderCode);
     shaderCode = shaderCode.replaceAll("global_id.x", "(global_id.x + parameters._x_part_offset)");
     shaderCode = shaderCode.replaceAll("global_id.y", "(global_id.y + parameters._y_part_offset)");
     shaderCode = shaderCode.replaceAll("global_id.z", "(global_id.z + parameters._z_part_offset)");
-    return shaderCode;
+    return { code: shaderCode, workgroupSizes: workgroupSizes };
+}
+
+
+// maxComputeWorkgroupSize{dim}         : the maximum value for `workgroupSize` for a dimention
+// maxComputeInvocationsPerWorkgroup    : the maximum value for the product of a kernel's `workgroupSize`
+// maxComputeWorkgroupsPerDimension     : the maximum number of workgroups dispatchable from `dispatchWorkgroups(xWorkgroups, yWorkgroups, zWorkgroups)`
+function _getOptimWorkgroupSize(workgroupCounts: [number, number, number], limits: GPUSupportedLimits): {
+    x: number,
+    y: number,
+    z: number,
+} {
+
+    //console.log("getting optimal workgroup sizes...");
+    //console.log("counts: ", workgroupCounts);
+
+    let x = 1;
+    let xOptim = x;
+    let y = 1;
+    let yOptim = y;
+    let z = 1;
+    let zOptim = z;
+    const xcap = Math.min(workgroupCounts[0], limits.maxComputeWorkgroupSizeX);
+    const ycap = Math.min(workgroupCounts[1], limits.maxComputeWorkgroupSizeY);
+    const zcap = Math.min(workgroupCounts[2], limits.maxComputeWorkgroupSizeZ);
+    //console.log("caps: ", [xcap, ycap, zcap]);
+    //console.log("max invocations: ", limits.maxComputeInvocationsPerWorkgroup);
+
+    for(; (x < xcap) && (xcap % x) / (xcap / x) < 0.25 && xOptim*yOptim*zOptim < limits.maxComputeInvocationsPerWorkgroup; x *= 2) { xOptim = x; }
+    for(; (y < ycap) && (ycap % y) / (ycap / y) < 0.25 && xOptim*yOptim*zOptim < limits.maxComputeInvocationsPerWorkgroup; y *= 2) { yOptim = y; }
+    for(; (z < zcap) && (zcap % z) / (zcap / z) < 0.25 && xOptim*yOptim*zOptim < limits.maxComputeInvocationsPerWorkgroup; z *= 2) { zOptim = z; }
+
+    return { x: xOptim, y: yOptim, z: zOptim };
 }
 
 const javaScriptSubstitutions: [RegExp, string][] = [
@@ -351,9 +394,9 @@ export function getKernelJavaScriptCode(
     params.push("workgroupCountX");
     params.push("workgroupCountY");
     params.push("workgroupCountZ");
-    const workgroupSizeX = Math.ceil(evalCode(spec.workgroupSize[0], env));
-    const workgroupSizeY = Math.ceil(evalCode(spec.workgroupSize[1], env));
-    const workgroupSizeZ = Math.ceil(evalCode(spec.workgroupSize[2], env));
+    const workgroupSizeX = 1
+    const workgroupSizeY = 1
+    const workgroupSizeZ = 1
     w.writeLine(`((${params.join(", ")}) => {`);
     w.indent();
 

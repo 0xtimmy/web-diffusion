@@ -10,6 +10,7 @@ export const registry: AnOpSpec[] = [
         forward: "output = input * 2",
         backward: "inputGrad = 0",
     },
+    /*
     {
         name: "gelu",
         nnName: "GeLU",
@@ -18,14 +19,18 @@ export const registry: AnOpSpec[] = [
         forward: "output = 0.5 * input * (1 + tanh(sqrt(2 / 3.14159265359) * (input + 0.044715 * input*input*input)))",
         backward: "inputGrad = input > 0.0 ? outputGrad : 0.0",
     },
+    */
     // Cat
+    /*
     {
         name: "cat",
         type: "binary",
         forward: "output = input * 2",
         backward: "inputGrad = 0",
     },
+    */
     // Scalar
+    /*
     {
         name: "smul",
         type: "scalar",
@@ -50,7 +55,9 @@ export const registry: AnOpSpec[] = [
         forward: "output = input - alpha",
         backward: "inputGrad = outputGrad; alphaGrad = -outputGrad",
     },
+    */
     // Min/Max
+    /*
     {
         name: "min",
         type: "scalar",
@@ -69,6 +76,7 @@ export const registry: AnOpSpec[] = [
         forward: "output = min(max(input, low), high)",
         backward: "inputGrad = 0",
     },
+    */
     // ------------------------------------
     // End Custom
     // ------------------------------------
@@ -157,6 +165,7 @@ export const registry: AnOpSpec[] = [
         forward: "output = other >= 0 ? abs(input) : -abs(input)",
         backward: "var dir = other >= 0 ? (input >= 0 ? 1.0 : -1.0) : (input >= 0 ? -1.0 : 1.0); inputGrad = input == 0.0 ? 0.0 : outputGrad * dir; otherGrad = 0",
     },
+    /*
     {
         name: "cos",
         type: "unary",
@@ -169,6 +178,7 @@ export const registry: AnOpSpec[] = [
         forward: "output = cosh(input)",
         backward: "inputGrad = outputGrad * sinh(input)",
     },
+    */
     {
         name: "deg2rad",
         type: "unary",
@@ -380,12 +390,14 @@ export const registry: AnOpSpec[] = [
     },
     */
     // signbit: integer
+    /*
     {
         name: "sin",
         type: "unary",
         forward: "output = sin(input)",
         backward: "inputGrad = outputGrad * cos(input)",
     },
+    */
     {
         name: "sinc",
         type: "unary",
@@ -399,12 +411,14 @@ export const registry: AnOpSpec[] = [
         backward: "inputGrad = outputGrad * cosh(input)",
     },
     // softmax: artisanal
+    /*
     {
         name: "sqrt",
         type: "unary",
         forward: "output = sqrt(input)",
         backward: "inputGrad = outputGrad / (2.0 * sqrt(input))",
     },
+    */
     {
         name: "square",
         type: "unary",
