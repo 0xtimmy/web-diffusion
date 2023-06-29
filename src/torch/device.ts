@@ -37,21 +37,28 @@ export abstract class Device {
         const byteSize = shapeSize(shape) * elementByteSize;
         return this.alloc(byteSize);
     }
-    getKernel(name: string, config: KernelConfigInput): Kernel {
+    getKernel(name: string, config: KernelConfigInput, params=null): Kernel {
         const spec = kernelRegistry[name];
         if (spec === undefined) {
             throw new Error(`Kernel "${name}" not found`);
         }
         const kconfig = getKernelConfig(spec, config);
+        // Time to create kernel seemed negligible;
+        /*
         const key = getKernelKey(spec, kconfig);
         let kernel = this._kernels[key];
         if (kernel === undefined) {
+            //const startCreateKernel = Date.now();
             kernel = this.createKernel(spec, kconfig);
+            //const doneCreatingKernel = Date.now();
+            //console.log("time to create kernel: ", startCreateKernel - doneCreatingKernel, "ms");
             this._kernels[key] = kernel;
         }
+        */
+        const kernel = this.createKernel(spec, kconfig, params);
         return kernel;
     }
-    abstract createKernel(spec: KernelSpec, config: KernelConfig): Kernel;
+    abstract createKernel(spec: KernelSpec, config: KernelConfig, params?: null | any): Kernel;
     abstract getBufferForKernel(
         storage: UntypedStorage,
         dtype: Dtype

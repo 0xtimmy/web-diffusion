@@ -31,3 +31,10 @@ export function defaultStrides(shape: Shape): Strides {
     }
     return strides;
 }
+
+export function shapesEq(a: Shape, b: Shape): boolean {
+    if(a.length != b.length) return false;
+    return a.reduce((acc, v, i) => {
+        return acc && v == b[i];
+    }, true);
+}

@@ -42,17 +42,15 @@ class Diffusion {
         return torch.randint(1, this.noise_steps, [n]);
     }
 
-    sample(model, n=1): torch.Tensor {
+    sample(model, handleStep?: (img: torch.Tensor) => void, n=1): torch.Tensor {
         console.log(`Sampling ${n} new images...`);
+        const sampleStart = Date.now();
         model.eval();
         let x = torch.normal([n, 3, this.img_size, this.img_size]);
         for(let i = this.noise_steps -1; i >= 0; i--) {
+            console.log(`sampling... ${100*(this.noise_steps-i)/this.noise_steps}% complete - ${Date.now() - sampleStart}ms`)
             const t = torch.scalar_mul(torch.ones(n), i);
             let predicted_noise = model.forward(x, t);
-            
-            //let predicted_noise = torch.normal([1, 3, 64, 64]);
-            // makes it out of the unet
-            //(async () => { console.log("predicted noise init: ", await predicted_noise.toArrayAsync()) })();
             
             const alpha = this.alpha.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
             const alpha_hat = this.alpha_hat.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
@@ -63,11 +61,6 @@ class Diffusion {
             } else {
                 noise = torch.zeros(x.shape);
             }
-            console.log("shapes: x, alpha, alpha_hat, beta", x.shape, alpha.shape, alpha_hat.shape, beta.shape);
-
-            //(async () => { console.log("alpha: ", await alpha.toArrayAsync()) })();
-            //(async () => { console.log("alpha_hat: ", await alpha_hat.toArrayAsync()) })();
-            //(async () => { console.log("beta: ", await beta.toArrayAsync()) })();
             let one_div_sqrt_alpha = torch.div(torch.ones(alpha.shape), torch.sqrt(alpha));
             //(async () => { console.log("one_div_sqrt_alpha: ", await one_div_sqrt_alpha.toArrayAsync()) })();
             //let sqrt_one_minus_alpha_hat = torch.sqrt(torch.scalar_add(torch.scalar_mul(alpha_hat, -1), 1));
@@ -86,11 +79,15 @@ class Diffusion {
             //(async () => { console.log("beta_noise: ", await beta_noise.toArrayAsync()) })();
             x = torch.add(x, beta_noise);
             //(async () => { console.log("final x for noise pass : ", 1, await x.toArrayAsync()) })();
+
+            if(typeof(handleStep) != 'undefined') {
+                let step = torch.scalar_div(torch.scalar_add(torch.clamp(x, -1, 1), 1), 2);
+                step = torch.scalar_mul(step, 255)
+                handleStep(step);
+            }   
         }
-        
         //model.train();
         x = torch.scalar_div(torch.scalar_add(torch.clamp(x, -1, 1), 1), 2);
-        //(async () => { console.log("x / 2 : ", 1, await x.toArrayAsync()) })();
         x = torch.scalar_mul(x, 255)
         return x;
     }

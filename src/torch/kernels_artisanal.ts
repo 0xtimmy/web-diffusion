@@ -1,41 +1,147 @@
-import { KernelSpec } from "./kernel";
+import { KernelSpec, KernelConfigSpec, KernelParamSpec, KernelInputSpec, KernelOutputSpec } from "./kernel";
+import { ExprCode } from "./expr";
+
+function _defaultKernel({
+    name,
+    config =  [{ name: "dtype" }],
+    parameters = [{ name: "outputSize", shaderType: "u32" }],
+    inputs = [{ name: "input", shaderType: "array<f32>"}],
+    outputs = [{ name: "output", shaderType: "array<f32>", size: "outputSize" }],
+    workgroupCount = ["parameters.outputSize", 1, 1],
+    shader
+}: {
+    name: string,
+    config?: Array<KernelConfigSpec>,
+    parameters?: Array<KernelParamSpec>,
+    inputs?: Array<KernelInputSpec>,
+    outputs?: Array<KernelOutputSpec>,
+    workgroupCount?: [ExprCode, ExprCode, ExprCode]
+    shader: string,
+}): KernelSpec {
+    return {
+        name: name,
+        config: config,
+        parameters: parameters,
+        inputs: inputs,
+        outputs: outputs,
+        workgroupCount: workgroupCount,
+        shader: shader,
+    }
+}
 
 export const kernels: { [name: string]: KernelSpec } = {
-    silu: {
-        name: "silu",
-        config: [
-            {
-                name: "dtype"
-            }
+    pow: _defaultKernel({
+        name: "pow",
+        inputs: [
+            { name: "a", shaderType: "array<f32>" },
+            { name: "b", shaderType: "array<f32>" }
         ],
+        shader: `output[global_id.x] = pow(a[global_id.x], b[global_id.y]);`
+    }),
+    cosh: _defaultKernel({
+        name: "cosh",
+        shader: `output[global_id.x] = cosh(input[global_id.x]);`
+    }),
+    cos: _defaultKernel({
+        name: "sin", 
+        shader: `output[global_id.x] = cos(input[global_id.x]);`
+    }),
+    sin: _defaultKernel({
+        name: "sin", 
+        shader: `output[global_id.x] = sin(input[global_id.x]);`
+    }),
+    sadd: _defaultKernel({
+        name: "sadd",
         parameters: [
             {
                 name: "outputSize",
                 shaderType: "u32"
-            }
-        ],
-        inputs: [
+            },
             {
-                name: "input",
-                shaderType: "array<f32>"
+                name: "alpha",
+                shaderType: "f32"
             }
         ],
-        outputs: [
+        shader: `output[global_id.x] = input[global_id.x] + parameters.alpha;`
+    }),
+    ssub: _defaultKernel({
+        name: "ssub",
+        parameters: [
             {
-                name: "output",
-                shaderType: "array<f32>",
-                size: "outputSize"
+                name: "outputSize",
+                shaderType: "u32"
+            },
+            {
+                name: "alpha",
+                shaderType: "f32"
             }
         ],
-        workgroupSize: [1, 1, 1],
-        workgroupCount: ["outputSize", 1, 1],
-        shader: `
-            if(global_id.x >= parameters.outputSize) {
-                return;
+        shader: `output[global_id.x] = input[global_id.x] - parameters.alpha;`
+    }),
+    smul: _defaultKernel({
+        name: "smul",
+        parameters: [
+            {
+                name: "outputSize",
+                shaderType: "u32"
+            },
+            {
+                name: "alpha",
+                shaderType: "f32"
             }
-            output[global_id.x] = input[global_id.x] / (1.0 + exp(-input[global_id.x]));
-        `
-    },
+        ],
+        shader: `output[global_id.x] = input[global_id.x] * parameters.alpha;`
+    }),
+    sdiv: _defaultKernel({
+        name: "sdiv",
+        parameters: [
+            {
+                name: "outputSize",
+                shaderType: "u32"
+            },
+            {
+                name: "alpha",
+                shaderType: "f32"
+            }
+        ],
+        shader: `output[global_id.x] = input[global_id.x] / parameters.alpha;`
+    }),
+    min: _defaultKernel({
+        name: "min",
+        parameters: [
+            {
+                name: "outputSize",
+                shaderType: "u32"
+            },
+            {
+                name: "alpha",
+                shaderType: "f32"
+            }
+        ],
+        shader: `output[global_id.x] = min(input[global_id.x], parameters.alpha);`
+    }),
+    max: _defaultKernel({
+        name: "max",
+        parameters: [
+            {
+                name: "outputSize",
+                shaderType: "u32"
+            },
+            {
+                name: "alpha",
+                shaderType: "f32"
+            }
+        ],
+        shader: `output[global_id.x] = max(input[global_id.x], parameters.alpha);`
+    }),
+    gelu: _defaultKernel({
+        name: "gelu",
+        shader: `output[global_id.x] = 0.5 * input[global_id.x] * (1 + tanh(sqrt(2 / 3.14159265359) * (input[global_id.x] + 0.044715 * input[global_id.x]*input[global_id.x]*input[global_id.x])));`
+    }),
+    silu: _defaultKernel({
+        name: "silu",
+        shader: `output[global_id.x] = input[global_id.x] / (1.0 + exp(-input[global_id.x]));`
+    }),
     sqrt: {
         name: "sqrt",
         config: [
@@ -62,13 +168,9 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        workgroupSize: [1, 1, 1],
-        workgroupCount: ["outputSize", 1, 1],
+        //workgroupSize: [1, 1, 1],
+        workgroupCount: ["parameters.outputSize", 1, 1],
         shader: `
-            if(global_id.x >= parameters.outputSize) {
-                return;
-            }
-
             output[global_id.x] = sqrt(input[global_id.x]);
         `
     },
@@ -102,13 +204,9 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        workgroupSize: [1, 1, 1],
-        workgroupCount: ["outputSize", 1, 1],
+        //workgroupSize: [1, 1, 1],
+        workgroupCount: ["parameters.outputSize", 1, 1],
         shader: `
-            if(global_id.x >= parameters.outputSize) {
-                return;
-            }
-
             output[global_id.x] = a[global_id.x] + b[global_id.x];
         `
     },
@@ -142,13 +240,9 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        workgroupSize: [1, 1, 1],
-        workgroupCount: ["outputSize", 1, 1],
+        //workgroupSize: [1, 1, 1],
+        workgroupCount: ["parameters.outputSize", 1, 1],
         shader: `
-            if(global_id.x >= parameters.outputSize) {
-                return;
-            }
-
             output[global_id.x] = a[global_id.x] - b[global_id.x];
         `
     },
@@ -182,13 +276,9 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        workgroupSize: [1, 1, 1],
-        workgroupCount: ["outputSize", 1, 1],
+        //workgroupSize: [1, 1, 1],
+        workgroupCount: ["parameters.outputSize", 1, 1],
         shader: `
-            if(global_id.x >= parameters.outputSize) {
-                return;
-            }
-
             output[global_id.x] = a[global_id.x] * b[global_id.x];
         `
     },
@@ -222,13 +312,9 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        workgroupSize: [1, 1, 1],
-        workgroupCount: ["outputSize", 1, 1],
+        //workgroupSize: [1, 1, 1],
+        workgroupCount: ["parameters.outputSize", 1, 1],
         shader: `
-            if(global_id.x >= parameters.outputSize) {
-                return;
-            }
-
             output[global_id.x] = a[global_id.x] / b[global_id.x];
         `
     },
@@ -258,8 +344,8 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        workgroupSize: [1, 1, 1],
-        workgroupCount: ["outputSize", 1, 1],
+        //workgroupSize: [1, 1, 1],
+        workgroupCount: ["parameters.outputSize", 1, 1],
         shader: `
             output[global_id.x] = f32(global_id.x);
         `
@@ -298,13 +384,9 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        workgroupSize: [1, 1, 1],
-        workgroupCount: ["outputSize", 1, 1],
+        //workgroupSize: [1, 1, 1],
+        workgroupCount: ["parameters.outputSize", 1, 1],
         shader: `
-            if(global_id.x >= parameters.outputSize) {
-                return;
-            }
-
             output[global_id.x] = min(max(input[global_id.x], parameters.low), parameters.high);
         `
     },
@@ -338,12 +420,9 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "size"
             }
         ],
-        workgroupSize: [1, 1, 1],
-        workgroupCount: ["size", 1, 1],
+        //workgroupSize: [1, 1, 1],
+        workgroupCount: ["parameters.size", 1, 1],
         shader: `
-            if(global_id.x >= parameters.size) {
-                return;
-            }
             output[global_id.x] = input[index[global_id.x]];
         `
     },
@@ -377,8 +456,8 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size:"batches"
             }
         ],
-        workgroupSize: [1, 1, 1],
-        workgroupCount: ["batches", 1, 1],
+        //workgroupSize: [1, 1, 1],
+        workgroupCount: ["parameters.batches", 1, 1],
         shader: `
             var batch_start: u32 = global_id.x * parameters.batch_size;
 
@@ -444,13 +523,9 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        workgroupSize: [1, 1, 1],
-        workgroupCount: ["batches", "groups", 1],
+        //workgroupSize: [1, 1, 1],
+        workgroupCount: ["parameters.batches", "parameters.groups", 1],
         shader: `
-            if(global_id.x >= parameters.batches || global_id.y >= parameters.groups) {
-                return;
-            }
-
             var group_start = (global_id.x * parameters.groups + global_id.y) * parameters.groupSize;
 
             var mean: f32 = 0;
@@ -506,13 +581,9 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        workgroupSize: [1, 1, 1],
-        workgroupCount: ["outputSize", 1, 1],
+        //workgroupSize: [1, 1, 1],
+        workgroupCount: ["parameters.outputSize", 1, 1],
         shader: `
-            if(global_id.x >= parameters.outputSize) {
-                return;
-            }
-
             output[global_id.x] = parameters.step * f32(global_id.x) + parameters.start;
         `  
     },
@@ -550,13 +621,9 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        workgroupSize: [1, 1, 1],
-        workgroupCount: ["outputSize", 1, 1],
+        //workgroupSize: [1, 1, 1],
+        workgroupCount: ["parameters.outputSize", 1, 1],
         shader: `
-            if(global_id.x >= parameters.outputSize) {
-                return;
-            }
-
             var diff = parameters.end - parameters.start;
             output[global_id.x] = diff * f32(global_id.x) / f32(parameters.outputSize + 1) + parameters.start;
         `  
@@ -607,13 +674,9 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        workgroupSize: [1, 1, 1],
-        workgroupCount: ["batchSize / elSize", "outputSize / batchSize", "elSize"],
+        //workgroupSize: [1, 1, 1],
+        workgroupCount: ["parameters.batchSize / parameters.elSize", "parameters.outputSize / parameters.batchSize", "parameters.elSize"],
         shader: `
-            if(global_id.x >= (parameters.batchSize / parameters.elSize) || global_id.y >= (parameters.outputSize / parameters.batchSize) || global_id.z >= parameters.elSize) {
-                return;
-            }
-
             var i: u32 = global_id.x / parameters.stride / parameters.dim1;
             var j: u32 = global_id.x % parameters.dim1;
             var k: u32 = global_id.x / parameters.dim1 % parameters.stride;
@@ -656,13 +719,9 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "batches * batch_size"
             }
         ],
-        workgroupSize: [1, 1, 1],
-        workgroupCount: ["batches", "batch_size", 1],
+        //workgroupSize: [1, 1, 1],
+        workgroupCount: ["parameters.batches", "parameters.batch_size", 1],
         shader: `
-            if(global_id.x >= parameters.batches || global_id.y >= parameters.batch_size) {
-                return;
-            }
-
             var sum: f32 = 0;
             for(var i: u32 = 0; i < parameters.batch_size; i++) {
                 sum += exp(input[i * parameters.batches + global_id.x]);
@@ -710,13 +769,9 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        workgroupSize: [1, 1, 1],
-        workgroupCount: ["chunkSize", "outputSize / chunkSize", 1],
+        //workgroupSize: [1, 1, 1],
+        workgroupCount: ["parameters.chunkSize", "parameters.outputSize / parameters.chunkSize", 1],
         shader: `
-            if (global_id.x >= parameters.chunkSize || global_id.y >= parameters.outputSize / parameters.chunkSize) {
-                return;
-            }
-
             var input_chunk_start: u32 = global_id.y * parameters.numChunks * parameters.chunkSize;
             var input_idx: u32 = input_chunk_start + parameters.offset * parameters.chunkSize + global_id.x;
             var output_idx: u32 = global_id.y * parameters.chunkSize + global_id.x;
@@ -757,13 +812,9 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        workgroupSize: [1, 2, 1],
-        workgroupCount: ["outputSize", 1, 1],
+        //workgroupSize: [1, 2, 1],
+        workgroupCount: ["parameters.outputSize", 1, 1],
         shader: `
-            if (global_id.x + global_id.y*(parameters.outputSize / 2) >= parameters.outputSize) {
-                return;
-            }
-
             const pi = 3.1415;
             var u1: f32;
             var u2: f32;
@@ -834,15 +885,10 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        workgroupSize: [1, 1, 1],
-        workgroupCount: ["outputSize / h_out", "h_out", "d_out"],
+        //workgroupSize: [1, 1, 1],
+        workgroupCount: ["parameters.outputSize / parameters.h_out", "parameters.h_out", "parameters.d_out"],
         shader: `
-            //inputIdx = x*parameters.h_in*parameters.d_in + y*parameters.d_in + z;
-
             var output_idx = global_id.x * parameters.h_out * parameters.d_out + global_id.y * parameters.d_out + global_id.z;
-            if (output_idx >= parameters.outputSize) {
-                return;
-            }
 
             switch (parameters.mode) {
                 case 0: { // nearest
@@ -1056,13 +1102,9 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        workgroupSize: [1, 1, 1],
-        workgroupCount: ["col_len * row_len", "channel_width", "channel_height"],
+        //workgroupSize: [1, 1, 1],
+        workgroupCount: ["parameters.col_len * parameters.row_len", "parameters.channel_width", "parameters.channel_height"],
         shader: `
-            if (global_id.x >= parameters.outputSize) {
-                return;
-            }
-
             var channel_offset = parameters.channel_size * (global_id.y + global_id.z * parameters.channel_width);
 
             var pool_size = parameters.kernel_size_x * parameters.kernel_size_y;
@@ -1118,13 +1160,10 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        workgroupSize: [1, 1, 1],
-        workgroupCount: ["outputSize / norm_size", "norm_size", 1],
+        //workgroupSize: [1, 1, 1],
+        workgroupCount: ["parameters.outputSize / parameters.norm_size", "parameters.norm_size", 1],
         // y = (x - E[x]) / sqrt(Var[x] + eps) * y + B
         shader: `
-            if (global_id.x >= parameters.outputSize) {
-                return;
-            }
             var norm_shape_idx = global_id.x * parameters.norm_size;
             var expectation = 0.0;
             var variance = 0.0;
@@ -1182,12 +1221,9 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        workgroupSize: [1, 1, 1],
-        workgroupCount: ["outputSize", 1, 1],
+        //workgroupSize: [1, 1, 1],
+        workgroupCount: ["parameters.outputSize", 1, 1],
         shader: `
-            if (global_id.x >= parameters.outputSize) {
-                return;
-            }
             if(global_id.x % parameters.stride < parameters.part) { 
                 var idx = ((global_id.x / parameters.stride) * parameters.part) + (global_id.x % parameters.stride);
                 output[global_id.x] = a[idx];
@@ -1266,12 +1302,8 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "batchSize * outputChannels * outputHeight * outputWidth",
             },
         ],
-        workgroupSize: [1, 1, 1],
-        workgroupCount: ["outputWidth", "outputHeight", 1],
+        workgroupCount: ["parameters.outputWidth", "parameters.outputHeight", '1'],
         shader: `
-            if (global_id.x >= parameters.outputWidth || global_id.y >= parameters.outputHeight) {
-                return;
-            }
             // input shape = [B, C, H, W]
             for (var batch = 0u; batch < parameters.batchSize; batch++) {
                 for (var outputChannel = 0u; outputChannel < parameters.outputChannels; outputChannel++) {
@@ -1355,13 +1387,8 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "resultRows * resultCols * batches",
             },
         ],
-        workgroupSize: [1, 1, 1],
-        workgroupCount: ["resultRows", "resultCols", "batches"],
+        workgroupCount: ["parameters.resultRows", "parameters.resultCols", "parameters.batches"],
         shader: `
-            if (global_id.x >= parameters.resultRows || global_id.y >= parameters.resultCols) {
-                return;
-            }
-
             var result = 0.0;
             for (var i = 0u; i < parameters.innerDim; i = i + 1u) {
                 let a = global_id.x * parameters.innerDim + i               + parameters.resultRows * parameters.innerDim * global_id.z;
@@ -1409,8 +1436,8 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "size",
             },
         ],
-        workgroupSize: ["workgroupSize", "workgroupSize", "workgroupSize"],
-        workgroupCount: [1, 1, 1],
+        //workgroupSize: ["workgroupSize", "workgroupSize", "workgroupSize"],
+        workgroupCount: ['1', "1", '1'],
         shader: `
         // Global index flattening for the reformatted 3D tensor
         var flatGlobalId: u32 = global_id.x * parameters.inputStrides.x + global_id.y * parameters.inputStrides.y + global_id.z * parameters.inputStrides.z;

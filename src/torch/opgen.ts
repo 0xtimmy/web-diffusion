@@ -134,7 +134,7 @@ function getReductionKernelSpec(op: ReductionOpSpec): KernelSpec {
                 size: "workgroupSize",
             },
         ],
-        workgroupSize: ["workgroupSize", 1, 1],
+        //workgroupSize: ["workgroupSize", 1, 1],
         workgroupCount: ["size/workgroupSize", 1, 1],
         shader: shader,
     };
@@ -183,7 +183,7 @@ function getScalarKernelSpec(op: ScalarOpSpec): KernelSpec {
                 size: "size",
             },
         ],
-        workgroupSize: [1, 1, 1],
+        //workgroupSize: [1, 1, 1],
         workgroupCount: ["size", 1, 1],
         shader: shader,
     };
@@ -230,8 +230,8 @@ function getScalarInplaceKernelSpec(op: ScalarOpSpec): KernelSpec {
                 size: "size",
             },
         ],
-        workgroupSize: [64, 1, 1],
-        workgroupCount: ["size/8", 1, 1],
+        //workgroupSize: [64, 1, 1],
+        workgroupCount: ["size", 1, 1],
         shader: shader,
     };
 }
@@ -296,7 +296,7 @@ function getScalarGradKernelSpec(
                 size: "size",
             },
         ],
-        workgroupSize: [64, 1, 1],
+        //workgroupSize: [64, 1, 1],
         workgroupCount: ["size/8", 1, 1],
         shader: shader,
     };
@@ -345,7 +345,7 @@ function getBinaryKernelSpec(op: BinaryOpSpec): KernelSpec {
                 size: "size",
             },
         ],
-        workgroupSize: [64, 1, 1],
+        //workgroupSize: [64, 1, 1],
         workgroupCount: ["size/8", 1, 1],
         shader: shader,
     };
@@ -392,7 +392,7 @@ function getBinaryInplaceKernelSpec(op: BinaryOpSpec): KernelSpec {
                 size: "size",
             },
         ],
-        workgroupSize: [1, 1, 1],
+        //workgroupSize: [1, 1, 1],
         workgroupCount: ["size", 1, 1],
         shader: shader,
     };
@@ -458,7 +458,7 @@ function getBinaryGradKernelSpec(
                 size: "size",
             },
         ],
-        workgroupSize: [1, 1, 1],
+        //workgroupSize: [1, 1, 1],
         workgroupCount: ["size", 1, 1],
         shader: shader,
     };
@@ -504,7 +504,7 @@ function getUnaryKernelSpec(op: UnaryOpSpec): KernelSpec {
                 size: "size",
             },
         ],
-        workgroupSize: [1, 1, 1],
+        //workgroupSize: [1, 1, 1],
         workgroupCount: ["size", 1, 1],
         shader: shader,
     };
@@ -545,7 +545,7 @@ function getUnaryInplaceKernelSpec(op: UnaryOpSpec): KernelSpec {
                 size: "size",
             },
         ],
-        workgroupSize: [64, 1, 1],
+        //workgroupSize: [64, 1, 1],
         workgroupCount: ["size/8", 1, 1],
         shader: shader,
     };
@@ -600,7 +600,7 @@ function getUnaryGradKernelSpec(
                 size: "size",
             },
         ],
-        workgroupSize: [1, 1, 1],
+        //workgroupSize: [1, 1, 1],
         workgroupCount: ["size", 1, 1],
         shader: shader,
     };

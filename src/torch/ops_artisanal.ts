@@ -3,9 +3,9 @@ import type { Dtype } from "./dtype";
 import { Tensor } from "./tensor";
 import { shouldCreateGradient } from "./autograd";
 import type { TensorData, TensorSpec } from "./tensor";
-import { Shape, defaultStrides, shapeSize } from "./shape";
+import { Shape, defaultStrides, shapeSize , shapesEq} from "./shape";
 import { ones, zeros } from "./factories";
-import * as ops from "./ops_opgen";
+//import * as ops from "./ops_opgen";
 
 // ------------------------------------
 // Start Custom
@@ -20,6 +20,95 @@ export function silu(input: Tensor): Tensor {
         [input.shape]
     )[0]
 }
+
+export function gelu(input: Tensor): Tensor {
+    return input.runKernel(
+        "gelu",
+        { dtype: input.dtype },
+        {
+            outputSize: input.size
+        },
+        [input.shape]
+    )[0]
+}
+
+export function sin(input: Tensor): Tensor {
+    return input.runKernel(
+        "sin",
+        { dtype: input.dtype },
+        {
+            outputSize: input.size
+        },
+        [input.shape]
+    )[0]
+}
+
+export function cos(input: Tensor): Tensor {
+    return input.runKernel(
+        "cos",
+        { dtype: input.dtype },
+        {
+            outputSize: input.size
+        },
+        [input.shape]
+    )[0]
+}
+
+export function scalar_add(input: Tensor, alpha: number): Tensor {
+    return input.runKernel(
+        "sadd", { dtype: input.dtype }, {
+            alpha: alpha,
+            outputSize: input.size
+        }, [input.shape]
+    )[0]
+}
+
+export function scalar_sub(input: Tensor, alpha: number): Tensor {
+    return input.runKernel(
+        "ssub", { dtype: input.dtype }, {
+            alpha: alpha,
+            outputSize: input.size
+        }, [input.shape]
+    )[0]
+}
+
+export function scalar_mul(input: Tensor, alpha: number): Tensor {
+    return input.runKernel(
+        "smul", { dtype: input.dtype }, {
+            alpha: alpha,
+            outputSize: input.size
+        }, [input.shape]
+    )[0]
+}
+
+export function scalar_div(input: Tensor, alpha: number): Tensor {
+    return input.runKernel(
+        "sdiv", { dtype: input.dtype }, {
+            alpha: alpha,
+            outputSize: input.size
+        }, [input.shape]
+    )[0]
+}
+
+export function min(input: Tensor, alpha: number): Tensor {
+    return input.runKernel(
+        "min", { dtype: input.dtype }, {
+            alpha: alpha,
+            outputSize: input.size
+        }, [input.shape]
+    )[0]
+}
+
+export function max(input: Tensor, alpha: number): Tensor {
+    return input.runKernel(
+        "max", { dtype: input.dtype }, {
+            alpha: alpha,
+            outputSize: input.size
+        }, [input.shape]
+    )[0]
+}
+
+
 
 export function find_index(input: Tensor): Tensor {
     return input.runKernel(
@@ -42,6 +131,26 @@ export function clamp(input: Tensor, low: number, high: number): Tensor {
             outputSize: shapeSize(input.shape) 
         },
         [input.shape],
+    )[0]
+}
+
+export function cumprod(input: Tensor): Tensor {
+    return input.runKernel(
+        "cosh",
+        { dtype: input.dtype },
+        { outputSize :shapeSize(input.shape) },
+        [input.shape]
+    )[0]
+}
+
+export function pow(a: Tensor, b: Tensor): Tensor {
+    if(!shapesEq(a.shape, b.shape)) throw new Error(`pow reqires tensors to have the same shape, instead got: ${a.shape} and ${b.shape}`);
+    return a.runKernel(
+        "pow",
+        { dtype: a.dtype },
+        { outputSize :shapeSize(a.shape) },
+        [a.shape],
+        b
     )[0]
 }
 
@@ -209,12 +318,12 @@ export function maxpool2d(input: Tensor, kernel_size: [number, number], stride: 
     if(padding[0] != 0) {
         let zero_shape = Array.from(input.shape);
         zero_shape[shape_len-1] = padding[0];
-        input = cat(cat(ops.scalar_mul(ones(zero_shape), -256), input, 3), ops.scalar_mul(ones(zero_shape), -256), 3);
+        input = cat(cat(scalar_mul(ones(zero_shape), -256), input, 3), scalar_mul(ones(zero_shape), -256), 3);
     }
     if(padding[1] != 0) {
         let zero_shape = Array.from(input.shape);
         zero_shape[shape_len-2] = padding[1];
-        input = cat(cat(ops.scalar_mul(ones(zero_shape), -256), input, 2), ops.scalar_mul(ones(zero_shape), -256), 2);
+        input = cat(cat(scalar_mul(ones(zero_shape), -256), input, 2), scalar_mul(ones(zero_shape), -256), 2);
     }
     const params = {
         kernel_size_x: kernel_size[0],
@@ -254,7 +363,6 @@ export function upsample(
     if(mode == "trilinear") throw new Error("trilinear not implemented!");
     let output_shape;
     if(size == null) {
-        console.log("using scale factor");
         if(scale_factor == null) throw new Error("both size and scale factor cannot be undefined at once");
         if(typeof(scale_factor) == 'number') scale_factor = (new Array(input.shape.length - 2)).fill(scale_factor) as any
         else if(scale_factor.length != input.shape.length - 2) throw new Error(`Expects a ${input.shape.length - 2}D scale factor for a ${input.shape.length}D input`);
@@ -263,7 +371,6 @@ export function upsample(
             return Math.floor(v * scale_factor[i-2]);
         })
     } else {
-        console.log("using size");
         if(scale_factor != null) throw new Error("both size and scale factor cannot be defined at once");
         if(typeof(size) == 'number') size = (new Array(input.shape.length - 2)).fill(size) as any
         else if(size.length != input.shape.length - 2) throw new Error(`Expects a ${input.shape.length - 2}D scale factor for a ${input.shape.length}D input`);
@@ -446,9 +553,6 @@ export function scaled_dot_product_attention(
     dropout?: number,
     is_casual?: boolean,
 ): Tensor {
-
-    //(async () => { console.log("running scaled dot product attention with input: ", await query.toArrayAsync(), await key.toArrayAsync(), await value.toArrayAsync()); })();
-    
     if(attn_mask) console.error("attention does not support attention masks");
     if(dropout) console.error("attention does not support dropout");
     if(is_casual) console.error("attention does not support is_causal");
@@ -462,7 +566,7 @@ export function scaled_dot_product_attention(
     key = key.view([-1, key.shape[key.shape.length-2], key.shape[key.shape.length-1]]);
     value = value.view([-1, value.shape[value.shape.length-2], value.shape[value.shape.length-1]]);
 
-    let out = ops.scalar_div(mm(query, key.transpose(1,2)), Math.sqrt(dk));
+    let out = scalar_div(mm(query, key.transpose(1,2)), Math.sqrt(dk));
     out = softmax(out, 1);
     out = mm(out, value);
     return out.view(output_shape);
@@ -541,8 +645,6 @@ export function multihead_attention(
         b_v = chunks[2];
     }
 
-    //(async () => { console.log("running scaled dot product attention with query: ", await query.toArrayAsync())})();
-        
     const proj = _in_projection(query, key, value, q_proj_weight, k_proj_weight, v_proj_weight, b_q, b_k, b_v)
     q = proj.q;
     k = proj.k;
@@ -580,12 +682,8 @@ export function multihead_attention(
         v = v.view([bsz, num_heads, src_len, head_dim]);
 
         // q in missing by here
-        //(async () => { console.log("running scaled dot product attention with q, k, v, dropout, in_casual: ", await q.toArrayAsync(), await k.toArrayAsync(), await v.toArrayAsync(), dropout_p, is_causal)})();
-        //(async () => { console.log("and attn_mask: ", await attn_mask.toArrayAsync())})();
         let attn_output = scaled_dot_product_attention(q, k, v, attn_mask, dropout_p, is_causal);
-        //(async () => { console.log("got attn output: ", await attn_output.toArrayAsync())})()
         attn_output = attn_output.permute([2, 0, 1, 3]).view([bsz * tgt_len, embed_dim]);
-        //(async () => { console.log("got permuted attn output: ", await attn_output.toArrayAsync())})()
 
         attn_output = linear(attn_output, out_proj_weight, out_proj_bias);
         attn_output = attn_output.view([tgt_len, bsz, attn_output.shape[1]]);
@@ -609,9 +707,6 @@ function _in_projection(
     b_k?: Tensor,
     b_v?: Tensor,
 ): { q: Tensor, k: Tensor, v: Tensor } {
-
-    //(async () => {console.log("running in projection with query, weight, and bias: ", await q.toArrayAsync(), await w_q.toArrayAsync(), await b_q.toArrayAsync() );})();
-
     const Eq = q.shape[q.dim-1];
     const Ek = k.shape[k.dim-1];
     const Ev = v.shape[v.dim-1];
@@ -742,7 +837,7 @@ export function group_norm(input: Tensor, groups: number, weight?: Tensor, bias?
 export function conv2d(input: Tensor, weight: Tensor, bias?: Tensor, stride?: number | [number, number], padding?: number | [number, number] | "valid" | "same", dilation?: number | [number, number], groups?: number): Tensor {
     if (shouldCreateGradient(input, weight)) {
         //throw new Error("conv2d gradient not supported yet");
-        console.error("conv2d gradient not supported yet");
+        //console.error("conv2d gradient not supported yet");
     }
     if (input.shape.length !== 4 || weight.shape.length !== 4) {
         throw new Error(

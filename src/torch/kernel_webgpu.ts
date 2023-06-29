@@ -16,8 +16,9 @@ export class KernelWebGPU extends Kernel {
     private _bindGroupLayout: GPUBindGroupLayout;
     private _computePipeline: GPUComputePipeline;
     private _shaderCode: string;
+    private _workgroupSizes: { x: number, y: number, z: number };
 
-    constructor(spec: KernelSpec, config: KernelConfig, device: Device) {
+    constructor(spec: KernelSpec, config: KernelConfig, device: Device, params: null | any =null) {
         super(spec, config, device);
         const gpuDevice = (device as any).gpuDevice;
         if (!gpuDevice) {
@@ -54,7 +55,14 @@ export class KernelWebGPU extends Kernel {
         this._bindGroupLayout = gpuDevice.createBindGroupLayout({
             entries: bindGroupLayoutEntries,
         });
-        this._shaderCode = getKernelShaderCode(spec, config);
+
+        //console.log("constructing kernel with params: ", params);
+        const workgroupCounts: [number, number, number] = params == null ? [1, 1, 1] : this.getWorkgroupCounts(this.getRunEnv(params));
+        const workload = getKernelShaderCode(spec, config, workgroupCounts, this._gpuDevice);
+
+        this._shaderCode = workload.code;
+        this._workgroupSizes = workload.workgroupSizes;
+
         const shaderModule = gpuDevice.createShaderModule({
             code: this._shaderCode,
         });
@@ -77,6 +85,7 @@ export class KernelWebGPU extends Kernel {
 
         // Build the parameter environment
         const env: EvalEnv = this.getRunEnv(parameters);
+
         // Get the workgroup counts
         const [workgroupCountX, workgroupCountY, workgroupCountZ] =
             this.getWorkgroupCounts(env);
@@ -100,11 +109,13 @@ export class KernelWebGPU extends Kernel {
                 env
             )
         );
-        
-        for(let i = 0; i < workgroupCountX; i += 256) {
-            for(let j = 0; j < workgroupCountY; j += 256) {
-                for(let k = 0; k <workgroupCountZ; k += 64) {
 
+        const maxCountPerDim = this._gpuDevice.limits.maxComputeWorkgroupsPerDimension;
+        
+        for(let i = 0; i < workgroupCountX;) {
+            for(let j = 0; j < workgroupCountY;) {
+                for(let k = 0; k <workgroupCountZ;) {
+                    //console.log(`running kernel: ${this.key} with offset <${i}, ${j}, ${k}>`);
                     let paramsBufferSize = 3*getShaderTypeElementByteSize("u32");
                     for (let i = 0; i < this.spec.parameters.length; i++) {
                         const param = this.spec.parameters[i];
@@ -146,15 +157,19 @@ export class KernelWebGPU extends Kernel {
                     // Start a new command encoder
                     const commandEncoder = this._gpuDevice.createCommandEncoder();
 
-                    /*
-                    console.log(
-                        "running workgroups:",
-                        Math.min(workgroupCountX - i, 256),
-                        Math.min(workgroupCountY - j, 256),
-                        Math.min(workgroupCountZ - k, 64)
-                    );
-                    if(Math.min(workgroupCountX - i, 256)*Math.min(workgroupCountY - j, 256)*Math.min(workgroupCountZ - k, 64) > 256) console.warn("running over 256 workgroups");
-                    if(Math.min(workgroupCountX - i, 256)*Math.min(workgroupCountY - j, 256)*Math.min(workgroupCountZ - k, 64) > 65535) console.error("running over 65535 workgroups");
+                    const countX = Math.min(workgroupCountX - i, maxCountPerDim);
+                    const countY = Math.min(workgroupCountY - j, maxCountPerDim);
+                    const countZ = Math.min(workgroupCountZ - k, maxCountPerDim);
+                    /*                 
+                    console.log(`
+    running: {
+        x: ${countX} workgroups @ size ${this._workgroupSizes.x},
+        y: ${countY} workgroups @ size ${this._workgroupSizes.y},
+        z: ${countZ} workgroups @ size ${this._workgroupSizes.z},
+    }
+    with code:
+    ${this._shaderCode}
+                    `);
                     */
 
                     // Encode the kernel using pass encoder
@@ -162,15 +177,19 @@ export class KernelWebGPU extends Kernel {
                     passEncoder.setPipeline(this._computePipeline);
                     passEncoder.setBindGroup(0, bindGroup);
                     passEncoder.dispatchWorkgroups(
-                        Math.min(workgroupCountX - i, 256),
-                        Math.min(workgroupCountY - j, 256),
-                        Math.min(workgroupCountZ - k, 64)
+                        Math.ceil(countX / this._workgroupSizes.x),
+                        Math.ceil(countY / this._workgroupSizes.y),
+                        Math.ceil(countZ / this._workgroupSizes.z),
                     );
                     passEncoder.end();
 
                     // Submit GPU commands
                     const gpuCommands = commandEncoder.finish();
                     this._gpuDevice.queue.submit([gpuCommands]);
+
+                    i += countX;
+                    j += countY;
+                    k += countZ;
                     
                 }
             }
