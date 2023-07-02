@@ -84,7 +84,7 @@ export class GroupNorm extends Module {
 
     constructor(numGroups: number, numChannels: number, eps=1e-5, affine=true) {
         super();
-        if(numChannels % numGroups != 0) throw new Error("numChannels must be divisible by numGroups");
+        if(numChannels % numGroups != 0) throw new Error(`numChannels must be divisible by numGroups but got numChannels = ${numChannels} and numGroups = ${numGroups}`);
         this.numGroups = numGroups;
         this.numChannels = numChannels;
 

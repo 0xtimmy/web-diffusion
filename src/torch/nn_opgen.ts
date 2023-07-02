@@ -31,7 +31,6 @@ export class LayerNorm extends Module {
     }
 
     forward(input: Tensor): Tensor {
-        //(async () => { console.log("forwarding LayerNorm with input: ", await input.toArrayAsync()); })();
         return aops.layernorm(input, this.normalized_shape, undefined, undefined, this.eps);
     }
 }

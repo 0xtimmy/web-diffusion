@@ -48,7 +48,7 @@ def gen_nn_groupnorm(message, input, num_groups, num_channels, log="always", log
     duration = time.time() - start
     return {
         "message": message,
-        "func": "nn_layernorm",
+        "func": "nn_groupnorm",
         "args": {
             "input": input.numpy().tolist(),
             "num_groups": num_groups,

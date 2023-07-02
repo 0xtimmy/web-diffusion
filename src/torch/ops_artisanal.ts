@@ -280,14 +280,16 @@ export function repeat(input: Tensor, shape: Shape): Tensor {
 }
 
 export function layernorm(input: Tensor, normalized_shape: Shape, weight?: Tensor, bias?: Tensor, eps=1e-5): Tensor {
+    console.log("trying layer norm")
     const params = {
         eps: eps,
         norm_size: shapeSize(normalized_shape),
         outputSize: input.size
     };
 
-    if(Array.from(input.shape).splice(1).reduce((acc, v, i) => {
-        return acc || v != normalized_shape[i];
+    
+    if(Array.from(normalized_shape).reduce((acc, v, i) => {
+        return acc || v != input.shape[i + (input.shape.length - normalized_shape.length)];
     }, false)) throw new Error(`Layer norm "normalized_shape" must match the 1-n dimensions of the input, instead got input shape: ${input.shape} and normalized_shape: ${normalized_shape}`);
 
     if(typeof(weight) == 'undefined') weight = ones(Array.from(input.shape).splice(1));

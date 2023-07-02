@@ -44,7 +44,7 @@ async function run_test(func: string, args: any, target: any, control_duration: 
             console.warn(`🚩 Failed: ${msg} `, express_duration_func(duration, control_duration));
         }
     }
-    return;
+    return { res, output, duration, msg };
 }
 
 export async function run_tests(tests: Array<test>) {
@@ -125,8 +125,8 @@ async function test_nn_multihead_attention(args, target): Promise<test_result> {
      *  num_heads: number,
      * }
     **/
-   const mha = new nn.MultiheadAttention(args.emb_dim, args.num_heads);
-   const query = ops.tensor(args.input);
+   const mha = new nn.MultiheadAttention(args.embed_dim, args.num_heads);
+   const query = ops.tensor(args.query);
    const key = ops.tensor(args.key);
    const value = ops.tensor(args.value);
    const target_output = ops.tensor(target);
@@ -169,12 +169,12 @@ async function test_nn_groupnorm(args, target): Promise<test_result> {
     /**
      * args: {
      *  input: Tensor,
-     *  groups: number,
-     *  channels: number,
+     *  num_groups: number,
+     *  num_channels: number,
      * }
     **/
 
-    const gn = new nn.GroupNorm(args.groups, args.channels);
+    const gn = new nn.GroupNorm(args.num_groups, args.num_channels);
     const input = ops.tensor(args.input);
     const target_output = ops.tensor(target);
     const start = Date.now();
@@ -193,11 +193,11 @@ async function test_nn_linear(args, target): Promise<test_result> {
     /**
      * args: {
      *  input: Tensor,
-     *  inChannels: Tensor,
-     *  outChannels: Tensor
+     *  in_channels: Tensor,
+     *  out_channels: Tensor
      * }
     **/
-    const ln = new nn.Linear(args.inChannels, args.outChannels);
+    const ln = new nn.Linear(args.in_channels, args.out_channels);
     const input = ops.tensor(args.input);
     const target_output = ops.tensor(target);
     const start = Date.now();
