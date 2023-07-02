@@ -49,20 +49,25 @@ async function run_test(func: string, args: any, target: any, control_duration: 
 
 export async function run_tests(tests: Array<test>) {
 
-    const indecies = ops.find_index(factories.ones([10, 10]));
-    console.log("indecies: ", await indecies.toArrayAsync());
-
+    const results = [];
+    let avg_percent_diff = 0; // ts / python
     for(test_num = 0; test_num < tests.length; test_num++) {
-        await run_test(
-            tests[test_num].func,
-            tests[test_num].args,
-            tests[test_num].target,
-            tests[test_num].duration,
-            tests[test_num].message,
-            tests[test_num].log,
-            tests[test_num].log_config,
-        );
+        results.push({
+            test: tests[test_num],
+            result: await run_test(
+                tests[test_num].func,
+                tests[test_num].args,
+                tests[test_num].target,
+                tests[test_num].duration,
+                tests[test_num].message,
+                tests[test_num].log,
+                tests[test_num].log_config,
+            )
+        });
+        avg_percent_diff += (results[test_num].result.duration / (results[test_num].test.duration + 0.00001)) / tests.length;
     }
+
+    console.log(`🏁 Testing complete, completed in ${avg_percent_diff}% time as in pytorch`);
 }
 
 // Helpers
@@ -80,7 +85,6 @@ const funcs: { [key: string]: (args: any, target: any) => Promise<test_result>} 
     "unsqueeze": test_unsqueeze,
     "squeeze": test_squeeze,
     "linear": test_linear,
-    "nn_linear": test_nn_linear,
     "mm": test_mm,
     "transpose": test_transpose,
     "linspace": test_linspace,
@@ -100,12 +104,17 @@ const funcs: { [key: string]: (args: any, target: any) => Promise<test_result>} 
     "gelu": test_gelu,
     "softmax": test_softmax,
     "upsample": test_upsample,
-    "cat": test_cat
+    "cat": test_cat,
+    "nn_multihead_attention": test_nn_multihead_attention,
+    "nn_layernorm": test_nn_layernorm,
+    "nn_groupnorm": test_nn_groupnorm,
+    "nn_linear": test_nn_linear,
+    "nn_conv2d": test_nn_conv2d,
+    "nn_maxpool2d": test_nn_maxpool2d
 }
 
 // Tests
 
-// WIP
 async function test_nn_multihead_attention(args, target): Promise<test_result> {
     /**
      * args: {
@@ -144,10 +153,40 @@ async function test_nn_layernorm(args, target): Promise<test_result> {
     const ln = new nn.LayerNorm(args.norm_shape);
     const input = ops.tensor(args.input);
     const target_output = ops.tensor(target);
+    const start = Date.now();
+    const actual_output = ln.forward(input);
+    const duration = Date.now() - start;
+
+    const output_data = await actual_output.toArrayAsync();
+
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    if(array_eq(output_data.flat(4), target.flat(4)) > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content` };
+
+    return { res: true, output: output_data, duration: duration }
 }
 
 async function test_nn_groupnorm(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  input: Tensor,
+     *  groups: number,
+     *  channels: number,
+     * }
+    **/
 
+    const gn = new nn.GroupNorm(args.groups, args.channels);
+    const input = ops.tensor(args.input);
+    const target_output = ops.tensor(target);
+    const start = Date.now();
+    const actual_output = gn.forward(input);
+    const duration = Date.now() - start;
+
+    const output_data = await actual_output.toArrayAsync();
+
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    if(array_eq(output_data.flat(4), target.flat(4)) > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content` };
+
+    return { res: true, output: output_data, duration: duration }
 }
 
 async function test_nn_linear(args, target): Promise<test_result> {
@@ -158,7 +197,6 @@ async function test_nn_linear(args, target): Promise<test_result> {
      *  outChannels: Tensor
      * }
     **/
-    if(args.bias) console.warn("🟨 bias not yet implemented in test: \"nn_linear\"");
     const ln = new nn.Linear(args.inChannels, args.outChannels);
     const input = ops.tensor(args.input);
     const target_output = ops.tensor(target);
@@ -174,12 +212,50 @@ async function test_nn_linear(args, target): Promise<test_result> {
     return { res: true, output: output_data, duration: duration }
 }
 
-async function test_conv2d(args, target): Promise<test_result> {
+async function test_nn_conv2d(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  input: Tensor,
+     *  inChannels: number,
+     *  outChannels: number,
+     *  kernelSize: number
+     * }
+    **/
+    const conv = new nn.Conv2d(args.inChannels, args.outChannels, args.kernelSize);
+    const input = ops.tensor(args.input);
+    const target_output = ops.tensor(target);
+    const start = Date.now();
+    const actual_output = conv.forward(input);
+    const duration = Date.now() - start;
 
+    const output_data = await actual_output.toArrayAsync();
+
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    if(array_eq(output_data.flat(4), target.flat(4)) > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content` };
+
+    return { res: true, output: output_data, duration: duration }
 }
 
-async function test_maxpool2d(args, target): Promise<test_result> {
+async function test_nn_maxpool2d(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  input: Tensor,
+     *  kernelSize: number
+     * }
+    **/
+    const pool = new nn.MaxPool2d(args.kernelSize);
+    const input = ops.tensor(args.input);
+    const target_output = ops.tensor(target);
+    const start = Date.now();
+    const actual_output = pool.forward(input);
+    const duration = Date.now() - start;
 
+    const output_data = await actual_output.toArrayAsync();
+
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    if(array_eq(output_data.flat(4), target.flat(4)) > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content` };
+
+    return { res: true, output: output_data, duration: duration }
 }
 
 
