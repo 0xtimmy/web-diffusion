@@ -85,7 +85,7 @@ tests = [
 
     mt.gen_nn_layernorm("LayerNorm test 1", torch.randn([20, 5, 10]), [10]),
 
-    mt.gen_nn_groupnorm("GroupNrom test 1", torch.randn([20, 6, 10, 10], 3, 6)),
+    mt.gen_nn_groupnorm("GroupNorm test 1", torch.randn([20, 6, 10, 10]), 3, 6),
 
     mt.gen_nn_linear("Linear test 1", torch.randn([128,16]), 16, 8),
 

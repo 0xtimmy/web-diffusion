@@ -136,7 +136,7 @@ async function test_nn_multihead_attention(args, target): Promise<test_result> {
 
    const output_data = await actual_output.output.toArrayAsync();
 
-   if(array_eq(actual_output.output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+   if(array_eq(actual_output.output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.output.shape}` };
    if(array_eq(output_data.flat(4), target.flat(4)) > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content` };
 
    return { res: true, output: output_data, duration: duration }

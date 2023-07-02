@@ -5,7 +5,7 @@ import time
 def gen_nn_multihead_attention(message, query, key, value, embed_dim, num_heads, log="always", log_config="fail"):
     mha = torch.nn.MultiheadAttention(embed_dim, num_heads)
     start = time.time()
-    output = mha(query, key, value)
+    output, weights = mha(query, key, value)
     duration = time.time() - start
     return {
         "message": message,
@@ -17,7 +17,7 @@ def gen_nn_multihead_attention(message, query, key, value, embed_dim, num_heads,
             "embed_dim": embed_dim,
             "num_heads": num_heads
         },
-        "target": output.numpy().tolist(),
+        "target": output.detach().numpy().tolist(),
         "duration": duration * 1000,
         "log": log,
         "log_config": log_config
@@ -32,10 +32,10 @@ def gen_nn_layernorm(message, input, norm_shape, log="always", log_config="fail"
         "message": message,
         "func": "nn_layernorm",
         "args": {
-            "input": input.numpy.tolist(),
+            "input": input.numpy().tolist(),
             "norm_shape": norm_shape
         },
-        "target": output.numpy().tolist(),
+        "target": output.detach().numpy().tolist(),
         "duration": duration * 1000,
         "log": log,
         "log_config": log_config
@@ -50,11 +50,11 @@ def gen_nn_groupnorm(message, input, num_groups, num_channels, log="always", log
         "message": message,
         "func": "nn_layernorm",
         "args": {
-            "input": input.numpy.tolist(),
+            "input": input.numpy().tolist(),
             "num_groups": num_groups,
             "num_channels": num_channels,
         },
-        "target": output.numpy().tolist(),
+        "target": output.detach().numpy().tolist(),
         "duration": duration * 1000,
         "log": log,
         "log_config": log_config
@@ -73,7 +73,7 @@ def gen_nn_linear(message, input, in_channels, out_channels, log="always", log_c
             "out_channels": out_channels,
             "input": input.numpy().tolist()
         },
-        "target": output.numpy().tolist(),
+        "target": output.detach().numpy().tolist(),
         "duration": duration * 1000,
         "log": log,
         "log_config": log_config
@@ -81,7 +81,7 @@ def gen_nn_linear(message, input, in_channels, out_channels, log="always", log_c
 
 def gen_nn_conv2d(message, input, in_channels, out_channels, kernel_size, log="always", log_config="fail"):
     start = time.time()
-    conv = torch.nn.Conv2d(kernel_size)
+    conv = torch.nn.Conv2d(in_channels, out_channels, kernel_size)
     output = conv(input)
     duration = time.time() - start
     return {
@@ -93,7 +93,7 @@ def gen_nn_conv2d(message, input, in_channels, out_channels, kernel_size, log="a
             "out_channels": out_channels,
             "kernel_size": kernel_size
         },
-        "target": output.numpy().tolist(),
+        "target": output.detach().numpy().tolist(),
         "duration": duration * 1000,
         "log": log,
         "log_config": log_config
