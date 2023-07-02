@@ -106,12 +106,56 @@ const funcs: { [key: string]: (args: any, target: any) => Promise<test_result>} 
 // Tests
 
 // WIP
+async function test_nn_multihead_attention(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  query: Tensor,
+     *  key: Tensor,
+     *  value: Tensor,
+     *  embed_dim: number,
+     *  num_heads: number,
+     * }
+    **/
+   const mha = new nn.MultiheadAttention(args.emb_dim, args.num_heads);
+   const query = ops.tensor(args.input);
+   const key = ops.tensor(args.key);
+   const value = ops.tensor(args.value);
+   const target_output = ops.tensor(target);
+   const start = Date.now();
+   const actual_output = mha.forward(query, key, value);
+   const duration = Date.now() - start;
+
+   const output_data = await actual_output.output.toArrayAsync();
+
+   if(array_eq(actual_output.output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+   if(array_eq(output_data.flat(4), target.flat(4)) > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content` };
+
+   return { res: true, output: output_data, duration: duration }
+}
+
+async function test_nn_layernorm(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  input: Tensor,
+     *  norm_shape: Shape
+     * }
+    **/
+
+    const ln = new nn.LayerNorm(args.norm_shape);
+    const input = ops.tensor(args.input);
+    const target_output = ops.tensor(target);
+}
+
+async function test_nn_groupnorm(args, target): Promise<test_result> {
+
+}
+
 async function test_nn_linear(args, target): Promise<test_result> {
     /**
      * args: {
      *  input: Tensor,
-     *  weights: Tensor,
-     *  bias: Tensor
+     *  inChannels: Tensor,
+     *  outChannels: Tensor
      * }
     **/
     if(args.bias) console.warn("🟨 bias not yet implemented in test: \"nn_linear\"");
@@ -124,11 +168,21 @@ async function test_nn_linear(args, target): Promise<test_result> {
 
     const output_data = await actual_output.toArrayAsync();
 
-    if(!array_eq(actual_output.shape, target_output.shape)) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
-    if(!array_eq(output_data.flat(4), target.flat(4))) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content` };
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    if(array_eq(output_data.flat(4), target.flat(4)) > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content` };
 
     return { res: true, output: output_data, duration: duration }
 }
+
+async function test_conv2d(args, target): Promise<test_result> {
+
+}
+
+async function test_maxpool2d(args, target): Promise<test_result> {
+
+}
+
+
 
 async function test_cat(args, target): Promise<test_result> {
     /**

@@ -120,7 +120,6 @@ class Up extends torch.nn.Module {
         t = this.emb_layer.forward(t);
         let emb = torch.repeat(t, [1, 1, x.shape[x.shape.length-2], x.shape[x.shape.length-1]]);
         return torch.add(x, emb);
-        //return x;
     }
 }
 
