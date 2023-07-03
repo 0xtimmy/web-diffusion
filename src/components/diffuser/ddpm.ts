@@ -48,7 +48,7 @@ class Diffusion {
         model.eval();
         let x = torch.normal([n, 3, this.img_size, this.img_size]);
         for(let i = this.noise_steps -1; i >= 0; i--) {
-            console.log(`sampling... ${100*(this.noise_steps-i)/this.noise_steps}% complete - ${Date.now() - sampleStart}ms`)
+            console.log(`sampling... ${100*(this.noise_steps-i-1)/this.noise_steps}% complete - ${Date.now() - sampleStart}ms`)
             const t = torch.scalar_mul(torch.ones(n), i);
             let predicted_noise = model.forward(x, t);
             

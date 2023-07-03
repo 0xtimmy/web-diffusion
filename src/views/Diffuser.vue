@@ -1,7 +1,8 @@
 <template>
     <div>
         <h2>Diffuser</h2>
-        <button @click="generate" :disabled="active">go !!</button> <br />
+        Select Weights: <button @click="loadPokemon" :disabled="weightsSelected">Pokemon</button>
+        <button @click="generate" :disabled="active || !modelReady">go !!</button> <br />
 
         <canvas ref="canvas" width="64" height="64">
 
@@ -20,20 +21,30 @@ export default defineComponent({
     name: "Diffuser",
     data() {
         return {
+            modelReady: false,
             active: false,
-            
+            weightsSelected: false,
+            model: null,
         }
     },
     mounted: async function() {
         await init_device();
+        this.model = new UNet();
     },
     methods: {
+        loadPokemon: async function(event) {
+            this.weightsSelected = true;
+            const reader = new FileReader();
+            console.log("loading weights...");
+            await this.model.loadStateDictFromURL("../../parameters/pokemon");
+            console.log("✅ done loading weights");
+            this.modelReady = true;
+        },
         generate: function() {
             if(!this.active) {
                 this.active = true;
                 const diffuser = new Diffusion({ noise_steps: 1, img_size: 64 });
-                const model = new UNet();
-                const res = diffuser.sample(model, this.renderResult);
+                const res = diffuser.sample(this.model, () => { console.log("...") });
                 this.active = false;
                 this.renderResult(res);
             }

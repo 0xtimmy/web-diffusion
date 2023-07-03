@@ -280,7 +280,6 @@ export function repeat(input: Tensor, shape: Shape): Tensor {
 }
 
 export function layernorm(input: Tensor, normalized_shape: Shape, weight?: Tensor, bias?: Tensor, eps=1e-5): Tensor {
-    console.log("trying layer norm")
     const params = {
         eps: eps,
         norm_size: shapeSize(normalized_shape),
