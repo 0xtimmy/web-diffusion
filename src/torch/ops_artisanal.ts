@@ -483,7 +483,7 @@ export function linear(
     
     output_shape[feature_dim] = weight.shape[0];
     let output = mm(input.view([-1, input.shape[feature_dim]]), weight.t());
-    //if(bias) output = ops.add(output, repeat(bias.unsqueeze(0), [output.shape[0], 1]));
+    if(bias) output = add(output, repeat(bias.unsqueeze(0), [output.shape[0], 1]));
     output = output.view(output_shape)
     return output;
 }

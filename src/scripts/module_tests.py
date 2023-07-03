@@ -86,7 +86,7 @@ def gen_nn_conv2d(message, input, in_channels, out_channels, kernel_size, log="a
     duration = time.time() - start
     return {
         "message": message,
-        "func": "nn_linear",
+        "func": "nn_conv2d",
         "args": {
             "input": input.numpy().tolist(),
             "in_channels": in_channels,
@@ -106,7 +106,7 @@ def gen_nn_maxpool2d(message, input, kernel_size, log="always", log_config="fail
     duration = time.time() - start
     return {
         "message": message,
-        "func": "nn_linear",
+        "func": "nn_maxpool2d",
         "args": {
             "input": input.numpy().tolist(),
             "kernel_size": kernel_size

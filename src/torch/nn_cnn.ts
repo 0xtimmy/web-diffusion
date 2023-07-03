@@ -141,7 +141,6 @@ export class Linear extends Module {
     }
 
     forward(input: Tensor): Tensor {
-        //(async () => { console.log("forwarding Linear with input: ", await input.toArrayAsync()); })();
         return ops.linear(input, this.weight, this.bias);
     }
 }

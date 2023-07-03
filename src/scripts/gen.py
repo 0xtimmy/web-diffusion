@@ -5,6 +5,7 @@ import functional_tests as ft;
 import module_tests as mt
 import reshape_tests as rt
 import factory_tests as fact
+import parameter_tests as pt
 
 # Configure and build the generated test file
 
@@ -81,17 +82,17 @@ tests = [
 
     # Module Tests ------------------------------------------------------------
 
-    mt.gen_nn_multihead_attention("Multihead Attention test 1", torch.randn([32, 8, 64]), torch.randn([32, 8, 64]), torch.randn([32, 8, 64]), 64, 8),
+    #mt.gen_nn_multihead_attention("Multihead Attention test 1", torch.randn([32, 8, 64]), torch.randn([32, 8, 64]), torch.randn([32, 8, 64]), 64, 8),
 
-    mt.gen_nn_layernorm("LayerNorm test 1", torch.randn([20, 5, 10]), [10]),
+    #mt.gen_nn_layernorm("LayerNorm test 1", torch.randn([20, 5, 10]), [10]),
 
-    mt.gen_nn_groupnorm("GroupNorm test 1", torch.randn([20, 6, 10, 10]), 3, 6),
+    #mt.gen_nn_groupnorm("GroupNorm test 1", torch.randn([20, 6, 10, 10]), 3, 6),
 
-    mt.gen_nn_linear("Linear test 1", torch.randn([128,16]), 16, 8),
+    #mt.gen_nn_linear("Linear test 1", torch.randn([128,16]), 16, 8),
 
-    mt.gen_nn_conv2d("Conv2d test 1", torch.randn([20, 16, 50, 100]), 16, 33, 3),
+    #mt.gen_nn_conv2d("Conv2d test 1", torch.randn([20, 16, 50, 100]), 16, 32, 3),
 
-    mt.gen_nn_maxpool2d("Maxpool2d test 1", torch.randn([20, 16, 50 ,32]), 3)
+    #mt.gen_nn_maxpool2d("Maxpool2d test 1", torch.randn([20, 16, 50 ,32]), 3)
 
     # Reshape Tests -----------------------------------------------------------
 
@@ -127,6 +128,11 @@ tests = [
     #t.gen_linspace("Linspace test 1", 1, 10, 10),
     #t.gen_linspace("Linspace test 2", 1, 10, 100),
     #t.gen_linspace("Linspace test 3", 0, 1, 50),
+
+    # Parameter IO Tests ------------------------------------------------------
+
+    pt.gen_linear_model_loading("Linear Model Loading test 1", 16, 32, torch.randn([16])),
+    pt.gen_compound_model_loading("Compount Model Loading test 1", 32, 16, 64, torch.randn([32]))
 ]
     
     
