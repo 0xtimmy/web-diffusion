@@ -415,7 +415,7 @@ export class Module {
     }
 
     async loadStateDictFromURL(dirname: string): Promise<void> {
-        //console.log("loading state dict: ", dirname);
+        console.log("loading state for module with children: ", this.namedChildren);
         async function load(
             module: Module,
             localDirname: string,
@@ -424,6 +424,7 @@ export class Module {
             await module._loadStateDictFromURL(localDirname, prefix);
             for (const [name, child] of module.namedChildren) {
                 if (child) {
+                    console.log("loading module: ", name, ", type: ", );
                     const childPrefix = prefix + name + ".";
                     await load(child, localDirname, childPrefix);
                 }
@@ -437,12 +438,18 @@ export class Module {
         //console.log("loading module: ", this);
         //console.log("with local named children: ", this.namedChildren);
         //console.log("and local parameters: ", this.immediateParameters);
-        for(const [name, _] of this.immediateParameters) {
+        for(const [name, old] of this.immediateParameters) {
             const completeName = prefix + name;
+            console.log("loading parameter: ", completeName);
             const state = await (await fetch(`${dirname}/${completeName}`)).json();
+            const parameter = new Parameter(tensor(state as any));
+            
+
+            if(old.shape.length != parameter.shape.length || parameter.shape.reduce((acc, v, i) => {
+                return acc || v != old.shape[i];
+            }, false)) throw new Error(`Provided parameter for ${completeName} does not have the same shape as the existing parameter; expected ${old.shape}, got ${parameter.shape}`);
             //console.log(`loading parameter ${name}:`, state);
-            //console.log("loading parameter: ", completeName);
-            this[name] = new Parameter(tensor(state as any));
+            this[name] = parameter;
         }
         return;
     }

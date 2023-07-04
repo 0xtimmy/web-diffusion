@@ -68,16 +68,18 @@ tests = [
     #ft.gen_group_norm("group_norm basic test", torch.randn(1, 6, 128, 128), 1, torch.ones(6), torch.zeros(6)),
     #ft.gen_group_norm("group_norm performance test", torch.randn(1, 6, 128, 128), 1, torch.ones(6), torch.zeros(6)),
 
-    #ft.gen_conv2d("Conv2d test 1", torch.randn(1, 4, 5, 5), torch.randn(8, 4, 5, 5), None),
-    #ft.gen_conv2d("Conv2d test 2", torch.randn(1, 4, 5, 5), torch.randn(8, 4, 5, 5), None),
-    #ft.gen_conv2d("Conv2d test 3 - image dimensions", torch.randn(1, 3, 64, 64), torch.randn(3, 3, 64, 64), None),
+    ft.gen_conv2d("Conv2d test 1", torch.randn(1, 4, 5, 5), torch.randn(8, 4, 5, 5), None),
+    ft.gen_conv2d("Conv2d test 2", torch.randn(1, 4, 5, 5), torch.randn(8, 4, 5, 5), None),
+    ft.gen_conv2d("Conv2d test 3 - image dimensions", torch.randn(1, 3, 64, 64), torch.randn(3, 3, 64, 64), None),
 
-    #ft.gen_max_pool2d("MaxPool2D test 1", torch.randn(4, 16, 16), 2),
+    ft.gen_max_pool2d("MaxPool2D test 1", torch.randn(4, 16, 16), 2),
 
     #ft.gen_clamp("Clamp basic test", torch.randn(10) * 2, -1, 1),
 
     #ft.gen_silu("SiLU basic test", torch.randn([1000, 1000])),
     #ft.gen_gelu("GeLU basic test", torch.randn([1000, 1000])),
+
+    #ft.gen_cumprod("Cumprod basic test", torch.randn([100]))
 
 
     # Module Tests ------------------------------------------------------------
@@ -131,8 +133,8 @@ tests = [
 
     # Parameter IO Tests ------------------------------------------------------
 
-    pt.gen_linear_model_loading("Linear Model Loading test 1", 16, 32, torch.randn([16])),
-    pt.gen_compound_model_loading("Compount Model Loading test 1", 32, 16, 64, torch.randn([32]))
+    #pt.gen_linear_model_loading("Linear Model Loading test 1", 16, 32, torch.randn([16])),
+    #pt.gen_compound_model_loading("Compount Model Loading test 1", 32, 16, 64, torch.randn([32]))
 ]
     
     

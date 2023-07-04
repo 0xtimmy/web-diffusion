@@ -53,14 +53,12 @@ export class Conv2d extends Module {
     }
 
     reset_parameters() {
-        //this.weight = kaiming_uniform(this.weight, Math.sqrt(5));
-        this.weight = new Parameter(factories.ones([this.outChannels, Math.floor(this.inChannels / this.groups), this.kernelSize[0], this.kernelSize[1]]))
-        this.bias = new Parameter(factories.zeros(this.outChannels));
+        this.weight = new Parameter(kaiming_uniform(this.weight, Math.sqrt(5)));
         if(this.bias) {
             const { fan_in, fan_out } = _calculate_fan_in_fan_out(this.weight);
             if(fan_in != 0) {
                 const bound = 1 / Math.sqrt(fan_in);
-                this.bias = factories.uniform(this.bias.shape, -bound, bound);
+                this.bias = new Parameter(factories.uniform(this.bias.shape, -bound, bound));
             }
         }
     }

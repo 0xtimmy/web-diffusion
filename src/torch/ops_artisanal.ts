@@ -134,11 +134,14 @@ export function clamp(input: Tensor, low: number, high: number): Tensor {
     )[0]
 }
 
-export function cumprod(input: Tensor): Tensor {
+export function cumprod(input: Tensor, dim=0): Tensor {
     return input.runKernel(
-        "cosh",
+        "cumprod",
         { dtype: input.dtype },
-        { outputSize :shapeSize(input.shape) },
+        { 
+            batchSize: shapeSize(Array.from(input.shape).splice(dim)),
+            outputSize: shapeSize(input.shape) 
+        },
         [input.shape]
     )[0]
 }
@@ -850,6 +853,9 @@ export function conv2d(input: Tensor, weight: Tensor, bias?: Tensor, stride?: nu
             `Expected number of channels in input image to match number of channels in kernel, got ${input.shape} and ${weight.shape}`
         );
     }
+
+    if(!bias) bias = zeros(weight.shape[0]);
+
     if(typeof(padding) != 'undefined') {
         if(typeof(padding) == 'number') padding = [padding, padding];
         if(padding[0] != 0) {
@@ -875,12 +881,14 @@ export function conv2d(input: Tensor, weight: Tensor, bias?: Tensor, stride?: nu
         outputHeight: input.shape[2] - weight.shape[2] + 1,
         outputWidth: input.shape[3] - weight.shape[3] + 1,
     };
+    console.log("running conv2d with params: ", params);
     return input.runKernel(
         "conv2d",
         { dtype: input.dtype },
         params,
         [[params.batchSize, params.outputChannels, params.outputHeight, params.outputWidth]],
-        //weight,
+        weight,
+        bias
     )[0];
 }
 

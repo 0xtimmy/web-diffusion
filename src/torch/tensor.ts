@@ -240,6 +240,11 @@ export class Tensor extends TensorBase {
         ...additionalInputs: Tensor[]
     ): Tensor[] {
         //console.log("running kernel: ", name);
+
+        outputShapes.forEach((shape) => {
+            if (shapeSize(shape) == 0) throw new Error(`Output shapes cannot have a 0 dimention, got: ${outputShapes}`);
+        })
+
         const d = this.device;
         const kernel = d.getKernel(name, config, params);
         const inputBuffers = [

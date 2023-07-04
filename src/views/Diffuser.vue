@@ -21,7 +21,7 @@ export default defineComponent({
     name: "Diffuser",
     data() {
         return {
-            modelReady: false,
+            modelReady: true,
             active: false,
             weightsSelected: false,
             model: null,
@@ -39,6 +39,7 @@ export default defineComponent({
             await this.model.loadStateDictFromURL("../../parameters/pokemon");
             console.log("✅ done loading weights");
             this.modelReady = true;
+            this.generate();
         },
         generate: function() {
             if(!this.active) {

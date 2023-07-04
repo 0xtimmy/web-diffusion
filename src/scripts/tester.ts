@@ -112,10 +112,32 @@ const funcs: { [key: string]: (args: any, target: any) => Promise<test_result>} 
     "nn_conv2d": test_nn_conv2d,
     "nn_maxpool2d": test_nn_maxpool2d,
     "linear_model_loading": test_linear_model_loading,
-    "compound_model_loading": test_compound_model_loading
+    "compound_model_loading": test_compound_model_loading,
+    "cumprod": test_cumprod
 }
 
 // Tests
+
+async function test_cumprod(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  input: Tensor,
+     *  dim: number
+     * }
+     */
+    const input = ops.tensor(args.input);
+    const target_output = ops.tensor(target);
+    const start = Date.now();
+    const actual_output = ops.cumprod(input);
+    const duration = Date.now() - start;
+    const output_data = await actual_output.toArrayAsync()
+
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    const diff = array_eq(output_data.flat(4), [target].flat(4))
+    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
+
+    return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` };
+}
 
 async function test_linear_model_loading(args, target): Promise<test_result> {
     /**
@@ -701,12 +723,12 @@ async function test_conv2d(args, target): Promise<test_result> {
     const bias = args.bias ? ops.tensor(args.bias) : undefined;
     const target_output = ops.tensor(target);
     const start = Date.now();
-    const actual_output = ops.conv2d(input, weight, bias);
+    const actual_output = ops.conv2d(input, weight, bias, 1, 0, 1, 1);
     const duration = Date.now() - start;
     const output_data = await actual_output.toArrayAsync();
     if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
     const diff = array_eq(output_data.flat(4), [target].flat(4));
-    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content` };
+    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
 
     return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` };
 }
