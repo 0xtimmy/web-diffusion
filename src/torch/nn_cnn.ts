@@ -179,7 +179,7 @@ export class Linear extends Module {
     }
 
     forward(input: Tensor): Tensor {
-        this.reset_parameters();
+        //this.reset_parameters();
         return ops.linear(input, this.weight, this.bias);
     }
 }
