@@ -16,25 +16,6 @@ export class GeLU extends Module {
     }
 }
 
-export class LayerNorm extends Module {
-
-    normalized_shape: Shape;
-    eps: number;
-    elementwise_affine: boolean;
-
-    constructor(normalized_shape: Shape, eps=0.00001, elementwise_affine=true) {
-        super();
-        this.normalized_shape = normalized_shape;
-        this.eps = eps;
-        this.elementwise_affine=elementwise_affine;
-
-    }
-
-    forward(input: Tensor): Tensor {
-        return aops.layernorm(input, this.normalized_shape, undefined, undefined, this.eps);
-    }
-}
-
 export class MaxPool2d extends Module {
 
     kernel_size: [number, number];

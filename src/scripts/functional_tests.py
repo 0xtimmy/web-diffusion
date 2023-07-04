@@ -182,7 +182,7 @@ def gen_max_pool2d(message, input, kernelSize, log="always", log_config="fail"):
             "log_config": log_config
         }
 
-def gen_conv2d(message, input, weight, bias, log="always", log_config="fail"):
+def gen_conv2d(message, input, weight, bias, kernel_size=1, padding=0, log="always", log_config="fail"):
     start = time.time()
     output = torch.conv2d(input, weight, bias)
     duration = time.time() - start
@@ -193,7 +193,7 @@ def gen_conv2d(message, input, weight, bias, log="always", log_config="fail"):
             "args": {
                 "input": input.numpy().tolist(),
                 "weight": weight.numpy().tolist(),
-                "bias": bias.numpy().tolist()
+                "bias": bias.numpy().tolist(),
             },
             "target": output.numpy().tolist(),
             "duration": duration * 1000,

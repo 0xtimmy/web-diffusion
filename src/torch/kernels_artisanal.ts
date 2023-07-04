@@ -158,7 +158,9 @@ export const kernels: { [name: string]: KernelSpec } = {
     }),
     gelu: _defaultKernel({
         name: "gelu",
-        shader: `output[global_id.x] = 0.5 * input[global_id.x] * (1 + tanh(sqrt(2 / 3.14159265359) * (input[global_id.x] + 0.044715 * input[global_id.x]*input[global_id.x]*input[global_id.x])));`
+        shader: `
+        output[global_id.x] = 0.5 * input[global_id.x] * (1 + tanh(sqrt(2 / 3.14159265359) * (input[global_id.x] + 0.044715 * pow(input[global_id.x], 3))));
+        `
     }),
     silu: _defaultKernel({
         name: "silu",
@@ -227,7 +229,7 @@ export const kernels: { [name: string]: KernelSpec } = {
             }
         ],
         //workgroupSize: [1, 1, 1],
-        workgroupCount: ["parameters.outputSize", 1, 1],
+        workgroupCount: ["parameters.outputSize", '1', '1'],
         shader: `
             output[global_id.x] = a[global_id.x] + b[global_id.x];
         `
@@ -263,7 +265,7 @@ export const kernels: { [name: string]: KernelSpec } = {
             }
         ],
         //workgroupSize: [1, 1, 1],
-        workgroupCount: ["parameters.outputSize", 1, 1],
+        workgroupCount: ["parameters.outputSize", "1", "1"],
         shader: `
             output[global_id.x] = a[global_id.x] - b[global_id.x];
         `
@@ -299,7 +301,7 @@ export const kernels: { [name: string]: KernelSpec } = {
             }
         ],
         //workgroupSize: [1, 1, 1],
-        workgroupCount: ["parameters.outputSize", 1, 1],
+        workgroupCount: ["parameters.outputSize", "1", '1'],
         shader: `
             output[global_id.x] = a[global_id.x] * b[global_id.x];
         `
@@ -335,7 +337,7 @@ export const kernels: { [name: string]: KernelSpec } = {
             }
         ],
         //workgroupSize: [1, 1, 1],
-        workgroupCount: ["parameters.outputSize", 1, 1],
+        workgroupCount: ["parameters.outputSize", "1", "1"],
         shader: `
             output[global_id.x] = a[global_id.x] / b[global_id.x];
         `
@@ -367,7 +369,7 @@ export const kernels: { [name: string]: KernelSpec } = {
             }
         ],
         //workgroupSize: [1, 1, 1],
-        workgroupCount: ["parameters.outputSize", 1, 1],
+        workgroupCount: ["parameters.outputSize", "1", "1"],
         shader: `
             output[global_id.x] = f32(global_id.x);
         `
@@ -545,7 +547,7 @@ export const kernels: { [name: string]: KernelSpec } = {
             }
         ],
         //workgroupSize: [1, 1, 1],
-        workgroupCount: ["parameters.batches", "parameters.groups", 1],
+        workgroupCount: ["parameters.batches", "parameters.groups", "1"],
         shader: `
             var group_start = (global_id.x * parameters.groups + global_id.y) * parameters.groupSize;
 
@@ -558,11 +560,11 @@ export const kernels: { [name: string]: KernelSpec } = {
             }
 
             mean = mean / f32(parameters.groupSize);
-            var variance = (mean_sqrd / f32(parameters.groupSize)) - (mean * mean) + parameters.eps;
+            var variance: f32 = (mean_sqrd / f32(parameters.groupSize)) - (mean * mean) + parameters.eps;
             
-            var channel = (global_id.x * parameters.groups + global_id.y / (parameters.groupSize / parameters.groups)) % parameters.channels;
+            var channel: u32 = (global_id.x * parameters.groups + global_id.y / (parameters.groupSize / parameters.groups)) % parameters.channels;
             for(var i: u32 = 0; i < parameters.groupSize; i++) {
-                output[group_start + i] = ((input[group_start + i] - mean) / sqrt(variance)) * weight[channel] + bias[channel];
+                output[group_start + i] = ((input[group_start + i] - mean) / sqrt(abs(variance))) * weight[channel] + bias[channel];
             }
             
 
@@ -849,7 +851,7 @@ export const kernels: { [name: string]: KernelSpec } = {
                 u2 = input[global_id.x];
                 idx = global_id.x + (parameters.outputSize / 2);
             }
-            output[idx] = sqrt(-2 * log(u1)) * cos(2 * pi * u2) * parameters.sdev + parameters.mean;
+            output[idx] = sqrt(abs(-2 * log(u1))) * cos(2 * pi * u2) * parameters.sdev + parameters.mean;
         `
     },
     upsample: {
@@ -1050,6 +1052,10 @@ export const kernels: { [name: string]: KernelSpec } = {
         ],
         parameters: [
             {
+                name: "batches",
+                shaderType: "u32"
+            },
+            {
                 name: "kernel_size_x",
                 shaderType: "u32"
             },
@@ -1066,43 +1072,19 @@ export const kernels: { [name: string]: KernelSpec } = {
                 shaderType: "u32"
             },
             {
-                name: "padding_x",
+                name: "input_height",
                 shaderType: "u32"
             },
             {
-                name: "padding_y",
+                name: "input_width",
                 shaderType: "u32"
             },
             {
-                name: "dilation_x",
+                name: "output_height",
                 shaderType: "u32"
             },
             {
-                name: "dilation_y",
-                shaderType: "u32"
-            },
-            {
-                name: "width_y",
-                shaderType: "u32"
-            },
-            {
-                name: "row_len",
-                shaderType: "u32"
-            },
-            {
-                name: "col_len",
-                shaderType: "u32"
-            },
-            {
-                name: "channel_width",
-                shaderType: "u32"
-            },
-            {
-                name: "channel_height",
-                shaderType: "u32"
-            },
-            {
-                name: "channel_size",
+                name: "output_width",
                 shaderType: "u32"
             },
             {
@@ -1124,10 +1106,26 @@ export const kernels: { [name: string]: KernelSpec } = {
             }
         ],
         //workgroupSize: [1, 1, 1],
-        workgroupCount: ["parameters.col_len * parameters.row_len", "parameters.channel_width", "parameters.channel_height"],
+        workgroupCount: ["parameters.batches", "parameters.output_height", "parameters.output_width"],
         shader: `
-            var channel_offset = parameters.channel_size * (global_id.y + global_id.z * parameters.channel_width);
+            var input_batch_idx = global_id.x * parameters.input_height * parameters.input_width;
+            var output_batch_idx = global_id.x * parameters.output_height * parameters.output_width;
 
+            var base_y = global_id.y * parameters.stride_y;
+            var base_x = global_id.z * parameters.stride_x;
+
+            var walker = input[input_batch_idx + base_y * parameters.input_width + base_x];
+            for(var i: u32 = 0; i < parameters.kernel_size_y; i++) {
+                for(var j: u32 = 0; j < parameters.kernel_size_x; j++) {
+                    var input_idx: u32 = input_batch_idx + (base_y + i) * parameters.input_width + (base_x + j);
+                    walker = max(walker, input[input_idx]);
+                }
+            }
+
+            var output_idx: u32 = output_batch_idx + global_id.y * parameters.output_width + global_id.z;
+            output[output_idx] = walker; 
+
+            /*
             var pool_size = parameters.kernel_size_x * parameters.kernel_size_y;
             var row = global_id.x / parameters.row_len;
             var col = global_id.x % parameters.row_len;
@@ -1145,6 +1143,8 @@ export const kernels: { [name: string]: KernelSpec } = {
             var output_channel_size = parameters.col_len * parameters.row_len;
             var output_idx = global_id.x + global_id.y * output_channel_size + global_id.z * output_channel_size * parameters.channel_width;
             output[output_idx] = walker;
+            output[output_idx] = 1;
+            */
         `
     },
     layernorm: {
@@ -1172,6 +1172,14 @@ export const kernels: { [name: string]: KernelSpec } = {
             {
                 name: "input",
                 shaderType: "array<f32>"
+            },
+            {
+                name: "weight",
+                shaderType: "array<f32>"
+            },
+            {
+                name: "bias",
+                shaderType: "array<f32>"
             }
         ],
         outputs: [
@@ -1196,7 +1204,7 @@ export const kernels: { [name: string]: KernelSpec } = {
             variance = variance / f32(parameters.norm_size);
             variance = abs(variance - pow(expectation, 2));
 
-            output[norm_shape_idx + global_id.y] = (input[norm_shape_idx + global_id.y] - expectation) / sqrt(variance + parameters.eps);
+            output[norm_shape_idx + global_id.y] = (input[norm_shape_idx + global_id.y] - expectation) / sqrt(abs(variance + parameters.eps)) * weight[global_id.y] + bias[global_id.y];
         `
     },
     cat: {
@@ -1321,41 +1329,39 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "batchSize * outputChannels * outputHeight * outputWidth",
             },
         ],
-        workgroupCount: ["parameters.outputWidth", "parameters.outputHeight", '1'],
+        //workgroupCount: ["parameters.outputWidth", "parameters.outputHeight", '1'],
+        workgroupCount: ["parameters.outputChannels", "parameters.outputHeight", "parameters.outputWidth"],
         shader: `
-            // input shape = [B, C, H, W]
-            for (var batch = 0u; batch < parameters.batchSize; batch++) {
-                for (var outputChannel = 0u; outputChannel < parameters.outputChannels; outputChannel++) {
-                    var result = 0.0;
-                    // Do the convolution
-                    for (var inputChannel = 0u; inputChannel < parameters.inputChannels; inputChannel++) {
-                        for (var kernelY = 0u; kernelY < parameters.kernelHeight; kernelY++) {
-                            for (var kernelX = 0u; kernelX < parameters.kernelWidth; kernelX++) {
-                                var inputY = global_id.y + kernelY;
-                                var inputX = global_id.x + kernelX;
-                                var inputIndex =
-                                    batch * parameters.inputChannels * parameters.inputHeight * parameters.inputWidth +
-                                        inputChannel * parameters.inputHeight * parameters.inputWidth +
-                                        inputY * parameters.inputWidth +
-                                        inputX;
-                                var kernelIndex =
-                                    outputChannel * parameters.inputChannels * parameters.kernelHeight * parameters.kernelWidth +
-                                    inputChannel * parameters.kernelHeight * parameters.kernelWidth +
-                                    kernelY * parameters.kernelWidth +
-                                    kernelX;
-                                result = result + input[inputIndex] * weight[kernelIndex] + bias[kernelIndex];
-                                //result = f32(inputIndex);
-                            }
+
+            var max_input_idx: u32 = parameters.batchSize * parameters.inputChannels * parameters.inputHeight * parameters.inputWidth;
+            var max_weight_idx: u32 = parameters.outputChannels * parameters.inputChannels * parameters.kernelHeight * parameters.kernelWidth;
+
+            for(var batch: u32 = 0; batch < parameters.batchSize; batch++) {
+                var input_batch_idx: u32 = batch * parameters.inputChannels * parameters.inputHeight * parameters.inputWidth;
+                var weight_batch_idx: u32 = batch * parameters.outputChannels * parameters.inputChannels * parameters.kernelHeight * parameters.kernelWidth;
+                var output_batch_idx: u32 = batch * parameters.outputChannels * parameters.outputHeight * parameters.outputWidth;
+                
+                
+                var weight_out_channel_idx: u32 = weight_batch_idx + global_id.x * parameters.inputChannels * parameters.kernelHeight * parameters.kernelWidth;
+
+                var output_channel_idx: u32 = output_batch_idx + global_id.x * parameters.outputHeight * parameters.outputWidth;
+                var output_idx: u32 = output_channel_idx + global_id.y * parameters.outputWidth + global_id.z;
+
+                var result: f32 = 0;
+                for(var i: u32 = 0; i < parameters.inputChannels; i++) {
+                    var input_channel_idx: u32 = input_batch_idx + i * parameters.inputHeight * parameters.inputWidth;
+                    var weight_channel_idx: u32 = weight_out_channel_idx + i * parameters.kernelHeight * parameters.kernelWidth;
+
+                    for(var j: u32 = 0; j < parameters.kernelHeight; j++) {
+                        for(var k: u32 = 0; k < parameters.kernelWidth; k++) {
+                            var input_idx: u32 = input_channel_idx + (global_id.y + j) * parameters.inputWidth + (global_id.z + k);
+                            var weight_idx: u32 = weight_channel_idx + j * parameters.kernelWidth + k;
+                            result += input[input_idx] * weight[weight_idx];
                         }
                     }
-                    // Output
-                    let outputIndex = 
-                        batch * parameters.outputChannels * parameters.outputHeight * parameters.outputWidth +
-                        outputChannel * parameters.outputHeight * parameters.outputWidth +
-                        global_id.y * parameters.outputWidth +
-                        global_id.x;
-                    output[outputIndex] = result;
                 }
+                var bias_idx: u32 = batch * parameters.outputChannels + global_id.x;
+                output[output_idx] = result + bias[bias_idx];
             }
         `
     },

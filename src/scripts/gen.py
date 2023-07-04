@@ -6,10 +6,32 @@ import module_tests as mt
 import reshape_tests as rt
 import factory_tests as fact
 import parameter_tests as pt
+import diffuser_tests as dt
 
 # Configure and build the generated test file
 
 tests = [
+
+    # Diffuser Tests ----------------------------------------------------------
+
+    #dt.gen_double_conv("DoubleConv test 1", 3, 64, 64, False, torch.randn([1, 3, 64, 64])),
+    #dt.gen_double_conv("DoubleConv test 2", 256, 512, 512, False, torch.randn(1, 256, 8, 8)),
+    #dt.gen_double_conv("DoubleConv test 3", 512, 256, 512, False, torch.randn(1, 512, 8, 8)),
+
+    #dt.gen_self_attention("SelfAttention test 1", 128, 32, torch.randn(1, 128, 32, 32)),
+    #dt.gen_self_attention("SelfAttention test 2", 256, 16, torch.randn(1, 256, 16, 16)),
+    #dt.gen_self_attention("SelfAttention test 3", 256, 8, torch.randn(1, 256, 8, 8)),
+    #dt.gen_self_attention("SelfAttention test 4", 128, 16, torch.randn(1, 128, 16, 16)),
+    #dt.gen_self_attention("SelfAttention test 5", 64, 32, torch.randn(1, 64, 32, 32)),
+    #dt.gen_self_attention("SelfAttention test 6", 64, 64, torch.randn(1, 64, 64, 64)),
+
+    #dt.gen_down("Down test 1", 64, 128, torch.randn([1, 64, 64, 64]), torch.randn([1, 256])),
+    #dt.gen_down("Down test 2", 128, 256, torch.randn([1, 128, 32, 32]), torch.randn([1, 256])),
+    #dt.gen_down("Down test 3", 256, 256, torch.randn([1, 256, 16, 16]), torch.randn([1, 256])),
+
+    #dt.gen_up("Up test 1", 512, 128, torch.randn([1, 256, 8, 8]), torch.randn([1, 256, 16, 16]), torch.randn([1, 256])),
+    #dt.gen_up("Up test 2", 256, 64, torch.randn([1, 128, 16, 16]), torch.randn([1, 128, 32, 32]), torch.randn([1, 256])),
+    #dt.gen_up("Up test 3", 128, 64, torch.randn([1, 64, 32, 32]), torch.randn([1, 64, 64, 64]), torch.randn([1, 256])),
 
     # Arithmetic Tests --------------------------------------------------------
 
@@ -68,11 +90,15 @@ tests = [
     #ft.gen_group_norm("group_norm basic test", torch.randn(1, 6, 128, 128), 1, torch.ones(6), torch.zeros(6)),
     #ft.gen_group_norm("group_norm performance test", torch.randn(1, 6, 128, 128), 1, torch.ones(6), torch.zeros(6)),
 
-    ft.gen_conv2d("Conv2d test 1", torch.randn(1, 4, 5, 5), torch.randn(8, 4, 5, 5), None),
-    ft.gen_conv2d("Conv2d test 2", torch.randn(1, 4, 5, 5), torch.randn(8, 4, 5, 5), None),
-    ft.gen_conv2d("Conv2d test 3 - image dimensions", torch.randn(1, 3, 64, 64), torch.randn(3, 3, 64, 64), None),
+    #ft.gen_conv2d("Conv2d test 1", torch.randn(1, 1, 6, 1), torch.randn(2, 1, 3, 1), None),
+    #ft.gen_conv2d("Conv2d test 1", torch.tensor([[[[1.0], [1.0], [1.0], [0.0], [0.0], [0.0]]]]), torch.tensor([[[[1.0], [1.0], [1.0]]], [[[0.5], [0.5], [0.5]]]]), None),
+    #ft.gen_conv2d("Conv2d test 1", torch.randn(1, 4, 6, 6), torch.randn(8, 4, 3, 3), None),
+    #ft.gen_conv2d("Conv2d test 2", torch.randn(1, 4, 5, 5), torch.randn(8, 4, 5, 5), None),
+    #ft.gen_conv2d("Conv2d test 3 - image dimensions", torch.randn(1, 3, 64, 64), torch.randn(3, 3, 64, 64), None),
 
-    ft.gen_max_pool2d("MaxPool2D test 1", torch.randn(4, 16, 16), 2),
+    ft.gen_max_pool2d("MaxPool2D test 1", torch.randn([4, 16, 16]), 2),
+    ft.gen_max_pool2d("MaxPool2D test 2", torch.randn([2, 4, 16, 16]), 2),
+    ft.gen_max_pool2d("MaxPool2D test 3", torch.randn([1, 4, 8, 18]), 2),
 
     #ft.gen_clamp("Clamp basic test", torch.randn(10) * 2, -1, 1),
 

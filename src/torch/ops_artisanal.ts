@@ -174,10 +174,28 @@ export function index(input: Tensor, index: Tensor): Tensor {
 }
 
 export function add(a: Tensor, b: Tensor): Tensor {
+    if(shapeSize(a.shape) != shapeSize(b.shape)) throw new Error("trying to add mismatched shapes");
+    let ascale = 1;
+    let bscale = 1;
+    if(a.shape.length < b.shape.length) {
+        a.shape.forEach((dim, i) => {
+            if(dim != b.shape[i]) throw new Error(`Expected shared dimensions to match, instead got: ${a.shape}, and ${b.shape}`);
+        })
+        bscale = shapeSize(Array.from(a.shape).splice(a.shape.length));
+    } else if(a.shape.length > b.shape.length) {
+        b.shape.forEach((dim, i) => {
+            if(dim != a.shape[i]) throw new Error(`Expected shared dimensions to match, instead got: ${a.shape}, and ${b.shape}`);
+        })
+        ascale = shapeSize(Array.from(b.shape).splice(b.shape.length));
+    }
     return a.runKernel(
         "add",
         { dtype: a.dtype },
-        { outputSize: shapeSize(a.shape) },
+        { 
+            ascale: ascale,
+            bscale: bscale,
+            outputSize: shapeSize(a.shape) 
+        },
         [a.shape],
         b
     )[0]
@@ -294,8 +312,8 @@ export function layernorm(input: Tensor, normalized_shape: Shape, weight?: Tenso
         return acc || v != input.shape[i + (input.shape.length - normalized_shape.length)];
     }, false)) throw new Error(`Layer norm "normalized_shape" must match the 1-n dimensions of the input, instead got input shape: ${input.shape} and normalized_shape: ${normalized_shape}`);
 
-    if(typeof(weight) == 'undefined') weight = ones(Array.from(input.shape).splice(1));
-    if(typeof(bias) == 'undefined') bias = zeros(Array.from(input.shape).splice(1));
+    if(typeof(weight) == 'undefined') weight = ones(normalized_shape);
+    if(typeof(bias) == 'undefined') bias = zeros(normalized_shape);
 
     return input.runKernel(
         "layernorm",
@@ -307,15 +325,18 @@ export function layernorm(input: Tensor, normalized_shape: Shape, weight?: Tenso
     )[0];
 }
 
-export function maxpool2d(input: Tensor, kernel_size: [number, number], stride: [number, number], padding: [number, number], dilation: [number, number], ceil_mode= false): Tensor {
+export function maxpool2d(input: Tensor, kernel_size: [number, number], stride?:[number,number], padding=[0,0], dilation=[1,1], ceil_mode=false): Tensor {
     if(input.shape.length < 2) throw new Error("MaxPool2d requires a shape that's at least 2d");
+    if(typeof(stride) == 'undefined') stride = kernel_size;
+
     const shape_len = input.shape.length;
-    const output_shape = ceil_mode ? 
-        [ ...(shape_len > 3 ? [input.shape[shape_len-4]] : []), ...(shape_len > 2 ? [input.shape[shape_len-3]] : []),
+
+    const [h_out, w_out] = ceil_mode ? 
+        [
             Math.ceil((input.shape[shape_len-2] + 2*padding[0] - dilation[0] * (kernel_size[0] - 1) - 1) / stride[0]) + 1,
             Math.ceil((input.shape[shape_len-1] + 2*padding[1] - dilation[1] * (kernel_size[1] - 1) - 1) / stride[1]) + 1
         ] :
-        [ ...(shape_len > 3 ? [input.shape[shape_len-4]] : []), ...(shape_len > 2 ? [input.shape[shape_len-3]] : []),
+        [ 
             Math.floor((input.shape[shape_len-2] + 2*padding[0] - dilation[0] * (kernel_size[0] - 1) - 1) / stride[0]) + 1,
             Math.floor((input.shape[shape_len-1] + 2*padding[1] - dilation[1] * (kernel_size[1] - 1) - 1) / stride[1]) + 1
         ];
@@ -329,23 +350,22 @@ export function maxpool2d(input: Tensor, kernel_size: [number, number], stride: 
         zero_shape[shape_len-2] = padding[1];
         input = cat(cat(scalar_mul(ones(zero_shape), -256), input, 2), scalar_mul(ones(zero_shape), -256), 2);
     }
+
+    const output_shape = [...Array.from(input.shape).splice(0, input.shape.length-2), h_out, w_out]
+
     const params = {
+        batches: shapeSize(output_shape) / h_out / w_out,
+        output_height: h_out,
+        output_width: w_out,
+        input_height: input.shape[input.shape.length-2],
+        input_width: input.shape[input.shape.length-1], 
         kernel_size_x: kernel_size[0],
         kernel_size_y: kernel_size[1],
         stride_x: stride[0],
         stride_y: stride[1],
-        padding_x: padding[0],
-        padding_y: padding[1],
-        dilation_x: dilation[0],
-        dilation_y: dilation[1],
-        width_y: input.shape[shape_len-1],
-        row_len: output_shape[shape_len-1],
-        col_len: output_shape[shape_len-2],
-        channel_width: shape_len > 2 ? input.shape[shape_len-3] : 1,
-        channel_height: shape_len > 3 ? input.shape[shape_len-4] : 1,
-        channel_size: input.shape[shape_len-1] * input.shape[shape_len-2],
-        outputSize: shapeSize(output_shape)
+        outputSize: shapeSize(output_shape),
     };
+
     return input.runKernel(
         "maxpool2d",
         { dtype: input.dtype },
@@ -838,7 +858,7 @@ export function group_norm(input: Tensor, groups: number, weight?: Tensor, bias?
  *     However, this mode can only be used when `stride` is 1.
  * @returns 
  */
-export function conv2d(input: Tensor, weight: Tensor, bias?: Tensor, stride?: number | [number, number], padding?: number | [number, number] | "valid" | "same", dilation?: number | [number, number], groups?: number): Tensor {
+export function conv2d(input: Tensor, weight: Tensor, bias?: Tensor, stride: number | [number, number]=1, padding: number | [number, number] | "valid" | "same"=0, dilation: number | [number, number]=1, groups=1): Tensor {
     if (shouldCreateGradient(input, weight)) {
         //throw new Error("conv2d gradient not supported yet");
         //console.error("conv2d gradient not supported yet");
@@ -856,15 +876,17 @@ export function conv2d(input: Tensor, weight: Tensor, bias?: Tensor, stride?: nu
 
     if(!bias) bias = zeros(weight.shape[0]);
 
+    if(weight.shape[1] != input.shape[1] / groups) throw new Error(`Expected weight to match shape [out_channels, in_channels / groups, kH, kW] but got input: ${input.shape} and weight: ${weight.shape}`)
+
     if(typeof(padding) != 'undefined') {
         if(typeof(padding) == 'number') padding = [padding, padding];
         if(padding[0] != 0) {
-            let zero_shape = Array.from(input.shape);
+            const zero_shape = Array.from(input.shape);
             zero_shape[input.shape.length-1] = padding[0] as any;
             input = cat(cat(zeros(zero_shape), input, 3), zeros(zero_shape), 3);
         }
         if(padding[1] != 0) {
-            let zero_shape = Array.from(input.shape);
+            const zero_shape = Array.from(input.shape);
             zero_shape[input.shape.length-2] = padding[1] as any;
             input = cat(cat(zeros(zero_shape), input, 2), zeros(zero_shape), 2);
         }
@@ -881,7 +903,7 @@ export function conv2d(input: Tensor, weight: Tensor, bias?: Tensor, stride?: nu
         outputHeight: input.shape[2] - weight.shape[2] + 1,
         outputWidth: input.shape[3] - weight.shape[3] + 1,
     };
-    console.log("running conv2d with params: ", params);
+    
     return input.runKernel(
         "conv2d",
         { dtype: input.dtype },
