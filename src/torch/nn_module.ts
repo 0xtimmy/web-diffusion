@@ -1,6 +1,7 @@
 import { FunctionInput } from "./autograd";
 import { Tensor } from "./tensor";
 import { Shape } from "./shape";
+import { tensor } from "./ops";
 
 export type StateDict = { [key: string]: Tensor };
 
@@ -197,11 +198,18 @@ export class Module {
         name: string,
         param: Parameter,
     ) {
-        if(this._parameters == null) this._parameters = [];
-        if(name.includes["."]) throw new Error("parameter cannot be registered with \".\" in the name");
-        if(name.length <= 0) throw new Error("parameter name cannot be empty");
-        if(this._parameters[name] != undefined) throw new Error(`parameter of name: "${name}" already exists`);
-        this._parameters[name] = param;
+        if ((this as any)[name] !== undefined) {
+            throw new Error(`Module already has a parameter named ${name}`);
+        }
+        if (typeof name === "string" && name.indexOf(".") !== -1) {
+            throw new Error(`Parameter name cannot contain "."`);
+        }
+        if(name.length <= 0) {
+            throw new Error("parameter name cannot be empty");
+        }
+
+        (this as any)[name] = param;
+        this._parameters = null;
     }
     /**
      * Gets this module and its descendants' (if `recurse = true`) parameters along with their prefixed names.
@@ -372,6 +380,7 @@ export class Module {
      * @param stateDict The state dictionary containing the state of the module to load.
      */
     loadStateDict(stateDict: StateDict): void {
+        console.log("loading state dict: ", stateDict);
         function load(
             module: Module,
             localStateDict: StateDict,
@@ -394,7 +403,55 @@ export class Module {
         load(this, stateDict, "");
     }
     private _loadFromStateDict(stateDict: StateDict, prefix: string): void {
-        throw new Error("State dict loading not implemented");
+        //console.log("loading module: ", this);
+        //console.log("with local named children: ", this.namedChildren);
+        //console.log("and local parameters: ", this.immediateParameters);
+        //console.log("with state dict: ", stateDict);
+        for(const [name, _] of this.immediateParameters) {
+            const completeName = prefix + name;
+            console.log(`loading parameter ${name}:`, stateDict[completeName]);
+            this[name] = new Parameter(tensor(stateDict[completeName] as any));
+        }
+    }
+
+    async loadStateDictFromURL(dirname: string): Promise<void> {
+        console.log("loading state for module with children: ", this.namedChildren);
+        async function load(
+            module: Module,
+            localDirname: string,
+            prefix: string
+        ) {
+            await module._loadStateDictFromURL(localDirname, prefix);
+            for (const [name, child] of module.namedChildren) {
+                if (child) {
+                    console.log("loading module: ", name, ", type: ", );
+                    const childPrefix = prefix + name + ".";
+                    await load(child, localDirname, childPrefix);
+                }
+            }
+            return;
+        }
+        await load(this, dirname, "");
+        return;
+    }
+    private async _loadStateDictFromURL(dirname: string, prefix: string): Promise<void> {
+        //console.log("loading module: ", this);
+        //console.log("with local named children: ", this.namedChildren);
+        //console.log("and local parameters: ", this.immediateParameters);
+        for(const [name, old] of this.immediateParameters) {
+            const completeName = prefix + name;
+            console.log("loading parameter: ", completeName);
+            const state = await (await fetch(`${dirname}/${completeName}`)).json();
+            const parameter = new Parameter(tensor(state as any));
+            
+
+            if(old.shape.length != parameter.shape.length || parameter.shape.reduce((acc, v, i) => {
+                return acc || v != old.shape[i];
+            }, false)) throw new Error(`Provided parameter for ${completeName} does not have the same shape as the existing parameter; expected ${old.shape}, got ${parameter.shape}`);
+            //console.log(`loading parameter ${name}:`, state);
+            this[name] = parameter;
+        }
+        return;
     }
 }
 

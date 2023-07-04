@@ -44,25 +44,30 @@ async function run_test(func: string, args: any, target: any, control_duration: 
             console.warn(`🚩 Failed: ${msg} `, express_duration_func(duration, control_duration));
         }
     }
-    return;
+    return { res, output, duration, msg };
 }
 
 export async function run_tests(tests: Array<test>) {
 
-    const indecies = ops.find_index(factories.ones([10, 10]));
-    console.log("indecies: ", await indecies.toArrayAsync());
-
+    const results = [];
+    let avg_percent_diff = 0; // ts / python
     for(test_num = 0; test_num < tests.length; test_num++) {
-        await run_test(
-            tests[test_num].func,
-            tests[test_num].args,
-            tests[test_num].target,
-            tests[test_num].duration,
-            tests[test_num].message,
-            tests[test_num].log,
-            tests[test_num].log_config,
-        );
+        results.push({
+            test: tests[test_num],
+            result: await run_test(
+                tests[test_num].func,
+                tests[test_num].args,
+                tests[test_num].target,
+                tests[test_num].duration,
+                tests[test_num].message,
+                tests[test_num].log,
+                tests[test_num].log_config,
+            )
+        });
+        avg_percent_diff += (results[test_num].result.duration / (results[test_num].test.duration + 0.00001)) / tests.length;
     }
+
+    console.log(`🏁 Testing complete, completed in ${avg_percent_diff}% time as in pytorch`);
 }
 
 // Helpers
@@ -80,7 +85,6 @@ const funcs: { [key: string]: (args: any, target: any) => Promise<test_result>} 
     "unsqueeze": test_unsqueeze,
     "squeeze": test_squeeze,
     "linear": test_linear,
-    "nn_linear": test_nn_linear,
     "mm": test_mm,
     "transpose": test_transpose,
     "linspace": test_linspace,
@@ -100,22 +104,137 @@ const funcs: { [key: string]: (args: any, target: any) => Promise<test_result>} 
     "gelu": test_gelu,
     "softmax": test_softmax,
     "upsample": test_upsample,
-    "cat": test_cat
+    "cat": test_cat,
+    "nn_multihead_attention": test_nn_multihead_attention,
+    "nn_layernorm": test_nn_layernorm,
+    "nn_groupnorm": test_nn_groupnorm,
+    "nn_linear": test_nn_linear,
+    "nn_conv2d": test_nn_conv2d,
+    "nn_maxpool2d": test_nn_maxpool2d,
+    "linear_model_loading": test_linear_model_loading,
+    "compound_model_loading": test_compound_model_loading,
+    "cumprod": test_cumprod
 }
 
 // Tests
 
-// WIP
-async function test_nn_linear(args, target): Promise<test_result> {
+async function test_cumprod(args, target): Promise<test_result> {
     /**
      * args: {
      *  input: Tensor,
-     *  weights: Tensor,
-     *  bias: Tensor
+     *  dim: number
+     * }
+     */
+    const input = ops.tensor(args.input);
+    const target_output = ops.tensor(target);
+    const start = Date.now();
+    const actual_output = ops.cumprod(input);
+    const duration = Date.now() - start;
+    const output_data = await actual_output.toArrayAsync()
+
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    const diff = array_eq(output_data.flat(4), [target].flat(4))
+    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
+
+    return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` };
+}
+
+async function test_linear_model_loading(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  in_channels: number,
+     *  out_channels: number,
+     *  input: Tensor,
+     *  state_dict: { weight: Tensor, bias: Tensor }
+     * }
+     */
+    const ln = new nn.Linear(args.in_channels, args.out_channels);
+    const start = Date.now()
+    ln.loadStateDict(args.state_dict);
+    const duration = Date.now() - start;
+
+    const input = ops.tensor(args.input);
+    const target_output = ops.tensor(target);
+    const actual_output = ln.forward(input);
+
+    const output_data = await actual_output.toArrayAsync();
+
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    const diff = array_eq(output_data.flat(4), target.flat(4));
+    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
+
+    return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` };
+}
+
+async function test_compound_model_loading(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  in_channels: number,
+     *  mid_channels: number,
+     *  out_channels: number,
+     *  input: Tensor,
+     *  state_dict: { weight: Tensor, bias: Tensor }
+     * }
+     */
+    const model = new nn.Sequential([
+        new nn.Linear(args.in_channels, args.mid_channels),
+        new nn.Linear(args.mid_channels, args.out_channels)
+    ]);
+
+    const start = Date.now()
+    model.loadStateDict(args.state_dict);
+    const duration = Date.now() - start;
+
+    const input = ops.tensor(args.input);
+    const target_output = ops.tensor(target);
+    const actual_output = model.forward(input);
+
+    const output_data = await actual_output.toArrayAsync();
+
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    const diff = array_eq(output_data.flat(4), target.flat(4));
+    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
+
+    return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` };
+}
+
+async function test_nn_multihead_attention(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  query: Tensor,
+     *  key: Tensor,
+     *  value: Tensor,
+     *  embed_dim: number,
+     *  num_heads: number,
      * }
     **/
-    if(args.bias) console.warn("🟨 bias not yet implemented in test: \"nn_linear\"");
-    const ln = new nn.Linear(args.inChannels, args.outChannels);
+   const mha = new nn.MultiheadAttention(args.embed_dim, args.num_heads);
+   const query = ops.tensor(args.query);
+   const key = ops.tensor(args.key);
+   const value = ops.tensor(args.value);
+   const target_output = ops.tensor(target);
+   const start = Date.now();
+   const actual_output = mha.forward(query, key, value);
+   const duration = Date.now() - start;
+
+   const output_data = await actual_output.output.toArrayAsync();
+
+   if(array_eq(actual_output.output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.output.shape}` };
+   const diff = array_eq(output_data.flat(4), target.flat(4));
+   if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
+
+   return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` }
+}
+
+async function test_nn_layernorm(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  input: Tensor,
+     *  norm_shape: Shape
+     * }
+    **/
+
+    const ln = new nn.LayerNorm(args.norm_shape);
     const input = ops.tensor(args.input);
     const target_output = ops.tensor(target);
     const start = Date.now();
@@ -124,11 +243,111 @@ async function test_nn_linear(args, target): Promise<test_result> {
 
     const output_data = await actual_output.toArrayAsync();
 
-    if(!array_eq(actual_output.shape, target_output.shape)) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
-    if(!array_eq(output_data.flat(4), target.flat(4))) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content` };
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    const diff = array_eq(output_data.flat(4), target.flat(4));
+    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
 
-    return { res: true, output: output_data, duration: duration }
+    return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` }
 }
+
+async function test_nn_groupnorm(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  input: Tensor,
+     *  num_groups: number,
+     *  num_channels: number,
+     * }
+    **/
+
+    const gn = new nn.GroupNorm(args.num_groups, args.num_channels);
+    const input = ops.tensor(args.input);
+    const target_output = ops.tensor(target);
+    const start = Date.now();
+    const actual_output = gn.forward(input);
+    const duration = Date.now() - start;
+
+    const output_data = await actual_output.toArrayAsync();
+
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    const diff = array_eq(output_data.flat(4), target.flat(4));
+    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
+
+    return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` }
+}
+
+async function test_nn_linear(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  input: Tensor,
+     *  in_channels: Tensor,
+     *  out_channels: Tensor
+     * }
+    **/
+    const ln = new nn.Linear(args.in_channels, args.out_channels);
+    const input = ops.tensor(args.input);
+    const target_output = ops.tensor(target);
+    const start = Date.now();
+    const actual_output = ln.forward(input);
+    const duration = Date.now() - start;
+
+    const output_data = await actual_output.toArrayAsync();
+
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    const diff = array_eq(output_data.flat(4), target.flat(4));
+    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
+
+    return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` }
+}
+
+async function test_nn_conv2d(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  input: Tensor,
+     *  in_channels: number,
+     *  out_channels: number,
+     *  kernel_size: number
+     * }
+    **/
+    const conv = new nn.Conv2d(args.in_channels, args.out_channels, args.kernel_size);
+    const input = ops.tensor(args.input);
+    const target_output = ops.tensor(target);
+    const start = Date.now();
+    const actual_output = conv.forward(input);
+    const duration = Date.now() - start;
+
+    const output_data = await actual_output.toArrayAsync();
+
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    const diff = array_eq(output_data.flat(4), target.flat(4));
+    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
+
+    return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` }
+}
+
+async function test_nn_maxpool2d(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  input: Tensor,
+     *  kernel_size: number
+     * }
+    **/
+    const pool = new nn.MaxPool2d(args.kernel_size);
+    const input = ops.tensor(args.input);
+    const target_output = ops.tensor(target);
+    const start = Date.now();
+    const actual_output = pool.forward(input);
+    const duration = Date.now() - start;
+
+    const output_data = await actual_output.toArrayAsync();
+
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    const diff = array_eq(output_data.flat(4), target.flat(4));
+    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
+
+    return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` }
+}
+
+
 
 async function test_cat(args, target): Promise<test_result> {
     /**
@@ -504,12 +723,12 @@ async function test_conv2d(args, target): Promise<test_result> {
     const bias = args.bias ? ops.tensor(args.bias) : undefined;
     const target_output = ops.tensor(target);
     const start = Date.now();
-    const actual_output = ops.conv2d(input, weight, bias);
+    const actual_output = ops.conv2d(input, weight, bias, 1, 0, 1, 1);
     const duration = Date.now() - start;
     const output_data = await actual_output.toArrayAsync();
     if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
     const diff = array_eq(output_data.flat(4), [target].flat(4));
-    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content` };
+    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
 
     return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` };
 }

@@ -30,6 +30,28 @@ function _defaultKernel({
 }
 
 export const kernels: { [name: string]: KernelSpec } = {
+    cumprod: _defaultKernel({
+        name: "cumprod",
+        parameters: [
+            {
+                name: "batchSize",
+                shaderType: "u32"
+            },
+            {
+                name: "outputSize",
+                shaderType: "u32"
+            }
+        ],
+        workgroupCount: ["parameters.outputSize / parameters.batchSize", "parameters.batchSize", 1],
+        shader: `
+            var batchStart: u32 = global_id.x * parameters.batchSize;
+            var out: f32 = 1.0;
+            for(var i: u32 = 0; i <= global_id.y; i++) {
+                out = out * input[batchStart + i];
+            }
+            output[batchStart + global_id.y] = out;
+        `
+    }),
     pow: _defaultKernel({
         name: "pow",
         inputs: [
@@ -384,8 +406,7 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        //workgroupSize: [1, 1, 1],
-        workgroupCount: ["parameters.outputSize", 1, 1],
+        workgroupCount: ["parameters.outputSize", '1', '1'],
         shader: `
             output[global_id.x] = min(max(input[global_id.x], parameters.low), parameters.high);
         `
@@ -1284,7 +1305,6 @@ export const kernels: { [name: string]: KernelSpec } = {
                 name: "input",
                 shaderType: "array<f32>",
             },
-            /*
             {
                 name: "weight",
                 shaderType: "array<f32>",
@@ -1293,7 +1313,6 @@ export const kernels: { [name: string]: KernelSpec } = {
                 name: "bias",
                 shaderType: "array<f32>"
             }
-            */
         ],
         outputs: [
             {
@@ -1324,7 +1343,7 @@ export const kernels: { [name: string]: KernelSpec } = {
                                     inputChannel * parameters.kernelHeight * parameters.kernelWidth +
                                     kernelY * parameters.kernelWidth +
                                     kernelX;
-                                result = result + input[inputIndex]; // * weight[kernelIndex] + bias[kernelIndex];
+                                result = result + input[inputIndex] * weight[kernelIndex] + bias[kernelIndex];
                                 //result = f32(inputIndex);
                             }
                         }
@@ -1335,8 +1354,7 @@ export const kernels: { [name: string]: KernelSpec } = {
                         outputChannel * parameters.outputHeight * parameters.outputWidth +
                         global_id.y * parameters.outputWidth +
                         global_id.x;
-                    //output[outputIndex] = result;
-                    output[outputIndex] = 1;
+                    output[outputIndex] = result;
                 }
             }
         `

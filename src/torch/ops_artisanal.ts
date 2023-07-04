@@ -134,11 +134,14 @@ export function clamp(input: Tensor, low: number, high: number): Tensor {
     )[0]
 }
 
-export function cumprod(input: Tensor): Tensor {
+export function cumprod(input: Tensor, dim=0): Tensor {
     return input.runKernel(
-        "cosh",
+        "cumprod",
         { dtype: input.dtype },
-        { outputSize :shapeSize(input.shape) },
+        { 
+            batchSize: shapeSize(Array.from(input.shape).splice(dim)),
+            outputSize: shapeSize(input.shape) 
+        },
         [input.shape]
     )[0]
 }
@@ -286,8 +289,9 @@ export function layernorm(input: Tensor, normalized_shape: Shape, weight?: Tenso
         outputSize: input.size
     };
 
-    if(Array.from(input.shape).splice(1).reduce((acc, v, i) => {
-        return acc || v != normalized_shape[i];
+    
+    if(Array.from(normalized_shape).reduce((acc, v, i) => {
+        return acc || v != input.shape[i + (input.shape.length - normalized_shape.length)];
     }, false)) throw new Error(`Layer norm "normalized_shape" must match the 1-n dimensions of the input, instead got input shape: ${input.shape} and normalized_shape: ${normalized_shape}`);
 
     if(typeof(weight) == 'undefined') weight = ones(Array.from(input.shape).splice(1));
@@ -481,7 +485,7 @@ export function linear(
     
     output_shape[feature_dim] = weight.shape[0];
     let output = mm(input.view([-1, input.shape[feature_dim]]), weight.t());
-    //if(bias) output = ops.add(output, repeat(bias.unsqueeze(0), [output.shape[0], 1]));
+    if(bias) output = add(output, repeat(bias.unsqueeze(0), [output.shape[0], 1]));
     output = output.view(output_shape)
     return output;
 }
@@ -849,6 +853,9 @@ export function conv2d(input: Tensor, weight: Tensor, bias?: Tensor, stride?: nu
             `Expected number of channels in input image to match number of channels in kernel, got ${input.shape} and ${weight.shape}`
         );
     }
+
+    if(!bias) bias = zeros(weight.shape[0]);
+
     if(typeof(padding) != 'undefined') {
         if(typeof(padding) == 'number') padding = [padding, padding];
         if(padding[0] != 0) {
@@ -874,12 +881,14 @@ export function conv2d(input: Tensor, weight: Tensor, bias?: Tensor, stride?: nu
         outputHeight: input.shape[2] - weight.shape[2] + 1,
         outputWidth: input.shape[3] - weight.shape[3] + 1,
     };
+    console.log("running conv2d with params: ", params);
     return input.runKernel(
         "conv2d",
         { dtype: input.dtype },
         params,
         [[params.batchSize, params.outputChannels, params.outputHeight, params.outputWidth]],
-        //weight,
+        weight,
+        bias
     )[0];
 }
 
