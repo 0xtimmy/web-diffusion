@@ -1,5 +1,6 @@
 import { Module } from "./nn_module";
 import { Tensor } from "./tensor"
+import { Shape } from "./shape";
 import * as factories from "./factories"
 import * as ops from "./ops"
 import { Parameter } from "./nn_module";
@@ -47,7 +48,7 @@ export class Conv2d extends Module {
         this.groups = groups;
         
         this.weight = new Parameter(factories.empty([outChannels, Math.floor(inChannels / groups), this.kernelSize[0], this.kernelSize[1]]))
-        if(bias) this.bias = new Parameter(factories.empty(outChannels));
+        if(bias) this.bias = new Parameter(factories.empty([outChannels]));
 
         this.reset_parameters();
     }
@@ -59,17 +60,56 @@ export class Conv2d extends Module {
             if(fan_in != 0) {
                 const bound = 1 / Math.sqrt(fan_in);
                 this.bias = new Parameter(factories.uniform(this.bias.shape, -bound, bound));
+            } else {
+                this.bias = new Parameter(factories.zeros(this.bias.shape));
             }
+
         }
     }
 
     forward(input: Tensor): Tensor {
+        //this.reset_parameters();
+        if(this.weight.shape[0] != this.outChannels) throw new Error("fuck up 1");
+        if(this.weight.shape[1] != this.inChannels) throw new Error("fuck up 2");
         return ops.conv2d(input, this.weight, this.bias, this.stride, this.padding, this.dilation, this.groups);
 
     }
 }
 
 export class ConvTranspose2d extends Module {}
+
+export class LayerNorm extends Module {
+
+    normalized_shape: Shape;
+    eps: number;
+    elementwise_affine: boolean;
+
+    weight: Parameter;
+    bias: Parameter;
+
+    constructor(normalized_shape: Shape, eps=0.00001, elementwise_affine=true) {
+        super();
+        this.normalized_shape = normalized_shape;
+        this.eps = eps;
+        this.elementwise_affine=elementwise_affine;
+
+        if(elementwise_affine) {
+            this.weight = new Parameter(factories.empty(normalized_shape));
+            this.bias = new Parameter(factories.empty(normalized_shape));
+        }
+
+        this.reset_parameters();
+    }
+
+    reset_parameters() {
+        if(this.weight) this.weight = new Parameter(factories.ones(this.weight.shape));
+        if(this.bias) this.bias = new Parameter(factories.zeros(this.bias.shape));
+    }
+
+    forward(input: Tensor): Tensor {
+        return ops.layernorm(input, this.normalized_shape, this.weight, this.bias, this.eps);
+    }
+}
 
 export class GroupNorm extends Module {
     numGroups: number;
@@ -108,7 +148,7 @@ export class GroupNorm extends Module {
     }
 
     forward(input: Tensor): Tensor {
-        //(async () => { console.log("forwarding GroupNorm with input: ", await input.toArrayAsync()); })();
+        //this.reset_parameters();
         return ops.group_norm(input, this.numGroups, this.weight, this.bias, this.eps);
     }
 }
@@ -139,6 +179,7 @@ export class Linear extends Module {
     }
 
     forward(input: Tensor): Tensor {
+        //this.reset_parameters();
         return ops.linear(input, this.weight, this.bias);
     }
 }

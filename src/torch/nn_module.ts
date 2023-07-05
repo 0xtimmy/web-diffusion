@@ -380,7 +380,6 @@ export class Module {
      * @param stateDict The state dictionary containing the state of the module to load.
      */
     loadStateDict(stateDict: StateDict): void {
-        console.log("loading state dict: ", stateDict);
         function load(
             module: Module,
             localStateDict: StateDict,
@@ -403,19 +402,13 @@ export class Module {
         load(this, stateDict, "");
     }
     private _loadFromStateDict(stateDict: StateDict, prefix: string): void {
-        //console.log("loading module: ", this);
-        //console.log("with local named children: ", this.namedChildren);
-        //console.log("and local parameters: ", this.immediateParameters);
-        //console.log("with state dict: ", stateDict);
         for(const [name, _] of this.immediateParameters) {
             const completeName = prefix + name;
-            console.log(`loading parameter ${name}:`, stateDict[completeName]);
             this[name] = new Parameter(tensor(stateDict[completeName] as any));
         }
     }
 
     async loadStateDictFromURL(dirname: string): Promise<void> {
-        console.log("loading state for module with children: ", this.namedChildren);
         async function load(
             module: Module,
             localDirname: string,
@@ -424,7 +417,6 @@ export class Module {
             await module._loadStateDictFromURL(localDirname, prefix);
             for (const [name, child] of module.namedChildren) {
                 if (child) {
-                    console.log("loading module: ", name, ", type: ", );
                     const childPrefix = prefix + name + ".";
                     await load(child, localDirname, childPrefix);
                 }
@@ -435,20 +427,14 @@ export class Module {
         return;
     }
     private async _loadStateDictFromURL(dirname: string, prefix: string): Promise<void> {
-        //console.log("loading module: ", this);
-        //console.log("with local named children: ", this.namedChildren);
-        //console.log("and local parameters: ", this.immediateParameters);
         for(const [name, old] of this.immediateParameters) {
             const completeName = prefix + name;
-            console.log("loading parameter: ", completeName);
             const state = await (await fetch(`${dirname}/${completeName}`)).json();
             const parameter = new Parameter(tensor(state as any));
             
-
             if(old.shape.length != parameter.shape.length || parameter.shape.reduce((acc, v, i) => {
                 return acc || v != old.shape[i];
             }, false)) throw new Error(`Provided parameter for ${completeName} does not have the same shape as the existing parameter; expected ${old.shape}, got ${parameter.shape}`);
-            //console.log(`loading parameter ${name}:`, state);
             this[name] = parameter;
         }
         return;

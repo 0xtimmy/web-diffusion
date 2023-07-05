@@ -1,6 +1,6 @@
 import * as torch from "../../torch"
 
-class SelfAttention extends torch.nn.Module {
+export class SelfAttention extends torch.nn.Module {
 
     channels: number;
     size: number;
@@ -13,9 +13,9 @@ class SelfAttention extends torch.nn.Module {
         this.channels = channels;
         this.size = size;
         this.mha = new torch.nn.MultiheadAttention(channels, 4);
-        this.ln = new torch.nn.LayerNorm([size * size, channels]);
+        this.ln = new torch.nn.LayerNorm([channels]);
         this.ff_self = new torch.nn.Sequential([
-            new torch.nn.LayerNorm([size * size, channels]),
+            new torch.nn.LayerNorm([channels]),
             new torch.nn.Linear(channels, channels),
             new torch.nn.GeLU(),
             new torch.nn.Linear(channels, channels)
@@ -33,7 +33,7 @@ class SelfAttention extends torch.nn.Module {
     }
 }
 
-class DoubleConv extends torch.nn.Module {
+export class DoubleConv extends torch.nn.Module {
 
     residual: boolean;
     double_conv: torch.nn.Sequential;
@@ -62,18 +62,27 @@ class DoubleConv extends torch.nn.Module {
     }
 }
 
-class Down extends torch.nn.Module {
+export class Down extends torch.nn.Module {
 
-    maxpool_conv: torch.nn.Sequential;
+    //maxpool_conv: torch.nn.Sequential;
+    "maxpool_conv.0": torch.nn.MaxPool2d;
+    "maxpool_conv.1": DoubleConv;
+    "maxpool_conv.2": DoubleConv;
     emb_layer: torch.nn.Sequential;
 
     constructor(in_channels: number, out_channels: number, emb_dim=256) {
         super();
+        
+        /*
         this.maxpool_conv = new torch.nn.Sequential([
             new torch.nn.MaxPool2d(2),
             new DoubleConv(in_channels, in_channels, in_channels, true),
             new DoubleConv(in_channels, out_channels)
         ]);
+        */
+       this["maxpool_conv.0"] = new torch.nn.MaxPool2d(2),
+       this["maxpool_conv.1"] = new DoubleConv(in_channels, in_channels, in_channels, true);
+       this["maxpool_conv.2"] = new DoubleConv(in_channels, out_channels, out_channels)
 
         this.emb_layer = new torch.nn.Sequential([
             new torch.nn.SiLU(),
@@ -85,15 +94,17 @@ class Down extends torch.nn.Module {
     }
 
     forward(x: torch.Tensor, t: torch.Tensor): torch.Tensor {
-        x = this.maxpool_conv.forward(x);
-        console.log("post-maxpool shape: ", x.shape);
+        //x = await this.maxpool_conv.forward(x);
+        x = this["maxpool_conv.0"].forward(x)
+        x = this["maxpool_conv.1"].forward(x)
+        x = this["maxpool_conv.2"].forward(x)
         t = this.emb_layer.forward(t);
         const emb = torch.repeat(t, [1, 1, x.shape[x.shape.length-2], x.shape[x.shape.length-1]]);
         return torch.add(x, emb);
     }
 }
 
-class Up extends torch.nn.Module {
+export class Up extends torch.nn.Module {
 
     up: torch.nn.UpSample;
     conv: torch.nn.Sequential;
@@ -181,42 +192,35 @@ export class UNet extends torch.nn.Module {
         return pos_enc;
     }
 
-    forward(x: torch.Tensor, t: torch.Tensor) {
+    forward(x: torch.Tensor, t: torch.Tensor): torch.Tensor {
         let status = 0;
         t = torch.unsqueeze(t, -1);
         t = this.pos_encoding(t, this.time_dim);
-    
+        
         let x1 = this.inc.forward(x);
-        (async () => { console.log("x1: ", await x1.toArrayAsync()) })();
         
         let x2 = this.down1.forward(x1, t);
-        (async () => { console.log("down1: ", await x2.toArrayAsync()) })();
-        x2 = this.sa1.forward(x2);
-        (async () => { console.log("sa1: ", await x2.toArrayAsync()) })();
-        let x3 = this.down2.forward(x2, t);
-        (async () => { console.log("down2: ", await x3.toArrayAsync()) })();
-        x3 = this.sa2.forward(x3);
-        (async () => { console.log("sa2: ", await x3.toArrayAsync()) })();
-        let x4 = this.down3.forward(x3, t);
-        (async () => { console.log("down3: ", await x4.toArrayAsync()) })();
-        x4 = this.sa3.forward(x4);
-        (async () => { console.log("sa3: ", await x4.toArrayAsync()) })();
+        x2 =  this.sa1.forward(x2);
+        let x3 =  this.down2.forward(x2, t);
+        x3 =  this.sa2.forward(x3);
+        let x4 =  this.down3.forward(x3, t);
+        x4 =  this.sa3.forward(x4);
 
-        x4 = this.bot1.forward(x4);
-        x4 = this.bot2.forward(x4);
-        x4 = this.bot3.forward(x4);
-        (async () => { console.log("end of bot: ", await x4.toArrayAsync()) })();
+        x4 =  this.bot1.forward(x4);
+        x4 =  this.bot2.forward(x4);
+        x4 =  this.bot3.forward(x4);
 
         x = this.up1.forward(x4, x3, t);
-        x = this.sa4.forward(x);
-        x = this.up2.forward(x, x2, t);
-        x = this.sa5.forward(x);
+        x =  this.sa4.forward(x);
+        x =  this.up2.forward(x, x2, t);
+        x =  this.sa5.forward(x);
         x = this.up3.forward(x, x1, t);
-        x = this.sa6.forward(x);
-        (async () => { console.log("last x: ", await x.toArrayAsync()) })();
+        x =  this.sa6.forward(x);
+
+        //(async () => { console.log("x: ", await x.toArrayAsync()) })();
+        //throw new Error("finished testing :(")
         
         const output = this.outc.forward(x);
-        (async () => { console.log("output: ", await output.toArrayAsync()) })();
         return output;
     }
 }

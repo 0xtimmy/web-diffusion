@@ -37,16 +37,19 @@ class Diffusion {
         return torch.randint(1, this.noise_steps, [n]);
     }
 
-    sample(model, handleStep?: (img: torch.Tensor) => void, n=1): torch.Tensor {
+    async sample(model, handleStep?: (img: torch.Tensor) => void, n=1): Promise<torch.Tensor> {
         console.log(`Sampling ${n} new images...`);
         const sampleStart = Date.now();
         model.eval();
         let x = torch.normal([n, 3, this.img_size, this.img_size]);
-        for(let i = this.noise_steps -1; i >= 0; i--) {
-            console.log(`sampling... ${100*(this.noise_steps-i-1)/this.noise_steps}% complete - ${Date.now() - sampleStart}ms`)
-            const t = torch.scalar_mul(torch.ones(n), i);
+        //for(let i = this.noise_steps -1; i >= 0; i--) {
+            const t = torch.scalar_mul(torch.ones(n), this.noise_steps-1);
             let predicted_noise = model.forward(x, t);
+
+            console.log("predicted noise: ", await predicted_noise.toArrayAsync());
+            return torch.scalar_mul(torch.scalar_add(torch.clamp(x, -1, 1), 1), 255/2);
             
+            /*
             const alpha = this.alpha.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
             const alpha_hat = this.alpha_hat.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
             const beta = this.beta.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
@@ -58,7 +61,9 @@ class Diffusion {
                 console.log("zero noise");
                 noise = torch.zeros(x.shape);
             }
+            
             let one_div_sqrt_alpha = torch.div(torch.ones(alpha.shape), torch.sqrt(alpha));
+            
             (async () => { console.log("one_div_sqrt_alpha: ", await one_div_sqrt_alpha.toArrayAsync()) })();
             let sqrt_one_minus_alpha_hat = torch.sqrt(torch.sub(torch.ones(alpha_hat.shape), alpha_hat));
             (async () => { console.log("sqrt_one_minus_alpha_hat: ", await sqrt_one_minus_alpha_hat.toArrayAsync()) })();
@@ -81,12 +86,12 @@ class Diffusion {
                 step = torch.scalar_mul(step, 255)
                 handleStep(step);
             }   
-        }
+            */
+        //}
         //model.train();
-        x = torch.scalar_div(torch.scalar_add(torch.clamp(x, -1, 1), 1), 2);
-        (async () => { console.log("clamped x : ", 1, await x.toArrayAsync()) })();
-        x = torch.scalar_mul(x, 255)
-        return x;
+        //x = torch.scalar_div(torch.scalar_add(torch.clamp(x, -1, 1), 1), 2);
+        //x = torch.scalar_mul(x, 255)
+        //return x;
     }
 
 }

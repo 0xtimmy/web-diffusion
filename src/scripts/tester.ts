@@ -3,6 +3,12 @@ import { Tensor } from "../torch/tensor";
 import * as ops from "../torch/ops";
 import * as nn from  "../torch/nn"
 import * as factories from "../torch/factories";
+import { 
+    SelfAttention,
+    DoubleConv,
+    Down,
+    Up
+} from "@/components/diffuser/modules"
 
 // Tester
 
@@ -113,10 +119,130 @@ const funcs: { [key: string]: (args: any, target: any) => Promise<test_result>} 
     "nn_maxpool2d": test_nn_maxpool2d,
     "linear_model_loading": test_linear_model_loading,
     "compound_model_loading": test_compound_model_loading,
-    "cumprod": test_cumprod
+    "cumprod": test_cumprod,
+    "self_attention": test_self_attention,
+    "double_conv": test_double_conv,
+    "down": test_down,
+    "up": test_up
 }
 
 // Tests
+
+async function test_down(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  in_channels: number,
+     *  out_channels: number,
+     *  input: Tensor,
+     *  t: Tensor,
+     *  state_dict: { weight: Tensor, bias: Tensor }
+     * }
+     */
+    const down = new Down(args.in_channels, args.out_channels);
+    const start = Date.now()
+    down.loadStateDict(args.state_dict);
+    const duration = Date.now() - start;
+
+    const input = ops.tensor(args.input);
+    const t = ops.tensor(args.t);
+    const target_output = ops.tensor(target);
+    const actual_output = await down.forward(input, t);
+
+    const output_data = await actual_output.toArrayAsync();
+
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    const diff = array_eq(output_data.flat(4), target.flat(4));
+    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
+
+    return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` };
+}
+
+async function test_up(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  in_channels: number,
+     *  out_channels: number,
+     *  input: Tensor,
+     *  skip: Tensor
+     *  t: Tensor,
+     *  state_dict: { weight: Tensor, bias: Tensor }
+     * }
+     */
+    const up = new Up(args.in_channels, args.out_channels);
+    const start = Date.now()
+    up.loadStateDict(args.state_dict);
+    const duration = Date.now() - start;
+
+    const input = ops.tensor(args.input);
+    const t = ops.tensor(args.t);
+    const skip = ops.tensor(args.skip);
+    const target_output = ops.tensor(target);
+    const actual_output = up.forward(input, skip, t);
+
+    const output_data = await actual_output.toArrayAsync();
+
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    const diff = array_eq(output_data.flat(4), target.flat(4));
+    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
+
+    return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` };
+}
+
+async function test_double_conv(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  in_channels: number,
+     *  out_channels: number,
+     *  mid_channels: number,
+     *  residual: boolean
+     *  input: Tensor,
+     *  state_dict: { weight: Tensor, bias: Tensor }
+     * }
+     */
+    const conv = new DoubleConv(args.in_channels, args.out_channels, args.mid_channels, args.residual);
+    const start = Date.now()
+    conv.loadStateDict(args.state_dict);
+    const duration = Date.now() - start;
+
+    const input = ops.tensor(args.input);
+    const target_output = ops.tensor(target);
+    const actual_output = await conv.forward(input);
+
+    const output_data = await actual_output.toArrayAsync();
+
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    const diff = array_eq(output_data.flat(4), target.flat(4));
+    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
+
+    return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` };
+}
+
+async function test_self_attention(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  channels: number,
+     *  size: number,
+     *  input: Tensor,
+     *  state_dict: { weight: Tensor, bias: Tensor }
+     * }
+     */
+    const sa = new SelfAttention(args.channels, args.size);
+    const start = Date.now()
+    sa.loadStateDict(args.state_dict);
+    const duration = Date.now() - start;
+
+    const input = ops.tensor(args.input);
+    const target_output = ops.tensor(target);
+    const actual_output = await sa.forward(input);
+
+    const output_data = await actual_output.toArrayAsync();
+
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    const diff = array_eq(output_data.flat(4), target.flat(4));
+    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
+
+    return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` };
+}
 
 async function test_cumprod(args, target): Promise<test_result> {
     /**
@@ -187,7 +313,7 @@ async function test_compound_model_loading(args, target): Promise<test_result> {
 
     const input = ops.tensor(args.input);
     const target_output = ops.tensor(target);
-    const actual_output = model.forward(input);
+    const actual_output = await model.forward(input);
 
     const output_data = await actual_output.toArrayAsync();
 

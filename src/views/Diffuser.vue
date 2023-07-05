@@ -39,13 +39,13 @@ export default defineComponent({
             await this.model.loadStateDictFromURL("../../parameters/pokemon");
             console.log("✅ done loading weights");
             this.modelReady = true;
-            this.generate();
+            //this.generate();
         },
-        generate: function() {
+        generate: async function() {
             if(!this.active) {
                 this.active = true;
                 const diffuser = new Diffusion({ noise_steps: 1, img_size: 64 });
-                const res = diffuser.sample(this.model, () => { console.log("...") });
+                const res = await diffuser.sample(this.model, () => { console.log("...") });
                 this.active = false;
                 this.renderResult(res);
             }
