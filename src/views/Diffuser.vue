@@ -44,9 +44,8 @@ export default defineComponent({
         generate: async function() {
             if(!this.active) {
                 this.active = true;
-                const diffuser = new Diffusion({ noise_steps: 5, img_size: 64 });
+                const diffuser = new Diffusion({ noise_steps: 100, img_size: 64 });
                 const res = await diffuser.sample(this.model, async (res: torch.Tensor) => { 
-                    console.log("handing step???");
                     await this.renderResult(res)
                 });
                 this.active = false;
