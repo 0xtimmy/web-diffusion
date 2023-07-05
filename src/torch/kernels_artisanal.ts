@@ -836,7 +836,7 @@ export const kernels: { [name: string]: KernelSpec } = {
             }
         ],
         //workgroupSize: [1, 2, 1],
-        workgroupCount: ["parameters.outputSize", 1, 1],
+        workgroupCount: ["parameters.outputSize", "2", "1"],
         shader: `
             const pi = 3.1415;
             var u1: f32;

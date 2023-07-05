@@ -44,23 +44,25 @@ export default defineComponent({
         generate: async function() {
             if(!this.active) {
                 this.active = true;
-                const diffuser = new Diffusion({ noise_steps: 1, img_size: 64 });
-                const res = await diffuser.sample(this.model, () => { console.log("...") });
+                const diffuser = new Diffusion({ noise_steps: 5, img_size: 64 });
+                const res = await diffuser.sample(this.model, async (res: torch.Tensor) => { 
+                    console.log("handing step???");
+                    await this.renderResult(res)
+                });
                 this.active = false;
                 this.renderResult(res);
             }
         },
-        renderResult: function(result: torch.Tensor) {
+        renderResult: async function(result: torch.Tensor) {
             result = result.cat(torch.constant([1, 1, ...Array.from(result.shape).splice(2)], 255), 1);
             result = result.transpose(1, 2).transpose(2, 3);
-            result.toArrayAsync().then((res_data) => {
-                if(!this.active) console.log("Result: ", res_data);
-                const img_data = new Uint8ClampedArray(res_data.flat(3) as any);
-                const context = this.$refs["canvas"].getContext("2d");
-                context.putImageData(
-                    new ImageData(img_data, 64, 64), 
-                    0, 0);
-            })
+            const data = await result.toArrayAsync()
+            if(!this.active) console.log("Result: ", data);
+            const img_data = new Uint8ClampedArray(data.flat(4) as any);
+            const context = this.$refs["canvas"].getContext("2d");
+            context.putImageData(
+                new ImageData(img_data, 64, 64), 
+                0, 0);
         }
     }
 })
