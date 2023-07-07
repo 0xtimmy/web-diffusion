@@ -267,11 +267,11 @@ export class KernelWebGPU extends Kernel {
             });
         }
         for (let i = 0; i < this.spec.outputs.length; i++, bindingIndex++) {
-            const outputBuffer = outputBuffers[i];
+            if(outputBuffers[i].size > 134217728) throw new Error("Buffer size too big!");
             entries.push({
                 binding: bindingIndex,
                 resource: {
-                    buffer: outputBuffer,
+                    buffer: outputBuffers[i],
                 },
             });
         }

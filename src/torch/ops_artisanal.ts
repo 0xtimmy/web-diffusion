@@ -594,17 +594,35 @@ export function scaled_dot_product_attention(
     const output_shape = Array.from(query.shape);
     output_shape[output_shape.length-1] = value.shape[value.shape.length-1];
 
-    const dk = key.shape[key.shape.length-1];
+    const sqrt_dk = Math.sqrt(key.shape[key.shape.length-1]);
 
     query = query.view([-1, query.shape[query.shape.length-2], query.shape[query.shape.length-1]]);
     key = key.view([-1, key.shape[key.shape.length-2], key.shape[key.shape.length-1]]);
     value = value.view([-1, value.shape[value.shape.length-2], value.shape[value.shape.length-1]]);
 
-    const dot_product = mm(query, key.transpose(1,2));
-    console.log("dot_product shape: ", dot_product.shape);
-    let out = scalar_div(dot_product, Math.sqrt(dk));
-    out = softmax(out, out.shape.length-1);
-    out = mm(out, value);
+    // batch the attention calculations
+    const batches = query.shape[0];
+    const query_batches = query.chunk(batches, 0);
+    const key_batches = key.transpose(1,2).chunk(batches, 0);
+    const value_batches = value.chunk(batches);
+
+    const dot_products = query_batches.map((q, i) => {
+        return scalar_div(mm(q, key_batches[i]), sqrt_dk);
+    });
+
+    const softmaxxes = dot_products.map((dot_product) => {
+        return softmax(dot_product, dot_product.shape.length-1);
+    })
+
+    
+    let outs = softmaxxes.map((batch, i) => {
+        return mm(batch, value_batches[i]);
+    })
+    
+    let out = outs[0];
+    for(let i = 1; i < batches; i++) {
+        out = cat(out, outs[i], 0);
+    }
     return out.view(output_shape);
 }
 
