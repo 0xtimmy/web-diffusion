@@ -199,6 +199,7 @@ export const registry: AnOpSpec[] = [
     // erf: special
     // erfc: special
     // erfinv: special
+    /*
     {
         name: "exp",
         type: "unary",
@@ -211,6 +212,7 @@ export const registry: AnOpSpec[] = [
         forward: "output = exp2(input)",
         backward: "inputGrad = outputGrad * exp2(input) * 0.6931471805599453",
     },
+    */
     {
         name: "expm1",
         type: "unary",

@@ -188,6 +188,7 @@ export function add(a: Tensor, b: Tensor): Tensor {
         })
         ascale = shapeSize(Array.from(b.shape).splice(b.shape.length));
     }
+    
     return a.runKernel(
         "add",
         { dtype: a.dtype },
@@ -219,10 +220,30 @@ export function mul(a: Tensor, b: Tensor): Tensor {
     )[0]
 }
 export function div(a: Tensor, b: Tensor): Tensor {
+    //if(shapeSize(a.shape) != shapeSize(b.shape)) throw new Error("trying to add mismatched shapes");
+
+    let ascale = 1;
+    let bscale = 1;
+    if(a.shape.length < b.shape.length) {
+        a.shape.forEach((dim, i) => {
+            if(dim != b.shape[i]) throw new Error(`Expected shared dimensions to match, instead got: ${a.shape}, and ${b.shape}`);
+        })
+        ascale = shapeSize(Array.from(b.shape).splice(a.shape.length));
+    } else if(a.shape.length > b.shape.length) {
+        b.shape.forEach((dim, i) => {
+            if(dim != a.shape[i]) throw new Error(`Expected shared dimensions to match, instead got: ${a.shape}, and ${b.shape}`);
+        })
+        bscale = shapeSize(Array.from(a.shape).splice(b.shape.length));
+    }
+
     return a.runKernel(
         "div",
         { dtype: a.dtype },
-        { outputSize: shapeSize(a.shape) },
+        { 
+            ascale: ascale,
+            bscale: bscale,
+            outputSize: shapeSize(a.shape) 
+        },
         [a.shape],
         b
     )[0]
@@ -519,6 +540,8 @@ export function sum(
     const batches = shapeSize(output_shape);
     const batch_size = shapeSize(Array.from(input.shape).splice(dim));
 
+    //console.log("batch_size: ", batch_size);
+
     return input.runKernel(
         "sum", 
         { dtype: input.dtype }, 
@@ -529,6 +552,17 @@ export function sum(
         }, 
         [output_shape]
     )[0];
+}
+
+export function exp(
+    input: Tensor
+): Tensor {
+    return input.runKernel(
+        "exp",
+        { dtype: input.dtype },
+        { outputSize: shapeSize(input.shape) },
+        [input.shape]
+    )[0]
 }
 
 export function softmax(
@@ -547,12 +581,18 @@ export function softmax(
         stride: stride
     };
 
+    const exps = exp(input).transpose(dim, input.shape.length-1);
+    const sums = sum(exps, input.shape.length-1);
+    return div(exps, sums).transpose(dim, input.shape.length-1);
+
+    /*
     return input.runKernel(
         "softmax",
         { dtype: input.dtype },
         params,
         [input.shape],
-    )[0]
+    )[0];
+    */
 }
 
 export function permute(
@@ -606,21 +646,22 @@ export function scaled_dot_product_attention(
     const key_batches = key.transpose(1,2).chunk(batches, 0);
     const value_batches = value.chunk(batches);
 
+    //console.log("dot product input shapes: ", query_batches[0].shape, key_batches[0].shape);
     const dot_products = query_batches.map((q, i) => {
         return scalar_div(mm(q, key_batches[i]), sqrt_dk);
     });
-    console.log("dot product shape: ", dot_products[0].shape);
+    //console.log("dot product shape: ", dot_products[0].shape);
 
     const softmaxxes = dot_products.map((dot_product) => {
         return softmax(dot_product, dot_product.shape.length-1);
     });
-    console.log("softmaxxes shape: ", softmaxxes[0].shape);
+    //console.log("softmaxxes shape: ", softmaxxes[0].shape);
 
     
     let outs = softmaxxes.map((batch, i) => {
         return mm(batch, value_batches[i]);
     })
-    console.log("outs shape: ", outs[0].shape);
+    //console.log("outs shape: ", outs[0].shape);
     
     let out = outs[0];
     for(let i = 1; i < batches; i++) {
@@ -976,10 +1017,42 @@ export function mm(input: Tensor, other: Tensor): Tensor {
             batches: is_batched ? input.shape[0] : 1,
             resultRows: is_batched ? input.shape[1] : input.shape[0],
             resultCols: is_batched ? other.shape[2] : other.shape[1],
-            innerDim: is_batched ? input.shape[2] : input.shape[1],
+            trueInnerDim: is_batched ? input.shape[2] : input.shape[1],
             alpha: 1.0,
         };
 
+        //console.log("running linear with params: ", params);
+        //console.log("output shape: ", [...(is_batched ? [params.batches] : []), params.resultRows, params.resultCols])
+        const a = input.runKernel(
+            "mm",
+            { resultDtype: input.dtype },
+            { ...params, innerDim: params.trueInnerDim / 4, innerDimOffset: 0 },
+            [[...(is_batched ? [params.batches] : []), params.resultRows, params.resultCols]],
+            other
+        )[0];
+        const b = input.runKernel(
+            "mm",
+            { resultDtype: input.dtype },
+            { ...params, innerDim: params.trueInnerDim * 2 / 4, innerDimOffset: params.trueInnerDim / 4 },
+            [[...(is_batched ? [params.batches] : []), params.resultRows, params.resultCols]],
+            other
+        )[0];
+        const c = input.runKernel(
+            "mm",
+            { resultDtype: input.dtype },
+            { ...params, innerDim: params.trueInnerDim * 3 / 4, innerDimOffset: params.trueInnerDim * 2 / 4 },
+            [[...(is_batched ? [params.batches] : []), params.resultRows, params.resultCols]],
+            other
+        )[0];
+        const d = input.runKernel(
+            "mm",
+            { resultDtype: input.dtype },
+            { ...params, innerDim: params.trueInnerDim, innerDimOffset: params.trueInnerDim * 3 / 4 },
+            [[...(is_batched ? [params.batches] : []), params.resultRows, params.resultCols]],
+            other
+        )[0];
+        return add(add(add(a, b), c), d);
+        /*
         return input.runKernel(
             "mm",
             { resultDtype: input.dtype },
@@ -987,11 +1060,14 @@ export function mm(input: Tensor, other: Tensor): Tensor {
             [[...(is_batched ? [params.batches] : []), params.resultRows, params.resultCols]],
             other
         )[0];
+        */
     }
 }
 
 export function transpose(input: Tensor, dim0=0, dim1=1): Tensor {
-    if(dim1 < dim0) {
+    if(dim1 == dim0) {
+        return input;
+    } else if(dim1 < dim0) {
         const temp = dim0;
         dim0 = dim1;
         dim1 = temp;

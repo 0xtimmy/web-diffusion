@@ -506,9 +506,11 @@ export function divide(input: Tensor, other: Tensor, alpha?: number): Tensor {
 * @param input the input tensor of any shape
 * @returns the output tensor
 */
+/*
 export function exp(input: Tensor): Tensor {
     return unary(functions.ExpFunction, input);
 }
+*/
 /**
 * ![Plot of exp2 and its gradient](/plots/exp2.svg)
 *
@@ -525,9 +527,11 @@ export function exp(input: Tensor): Tensor {
 * @param input the input tensor of any shape
 * @returns the output tensor
 */
+/*
 export function exp2(input: Tensor): Tensor {
     return unary(functions.Exp2Function, input);
 }
+*/
 /**
 * ![Plot of expm1 and its gradient](/plots/expm1.svg)
 *

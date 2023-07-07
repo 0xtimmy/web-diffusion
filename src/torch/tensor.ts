@@ -1117,7 +1117,7 @@ export class Tensor extends TensorBase {
     * @returns the output tensor
     */
     exp(): Tensor {
-        return ops.exp(this);
+        return aops.exp(this);
     }
     /**
     * ![Plot of exp and its gradient](/plots/exp.svg)
@@ -1155,9 +1155,11 @@ export class Tensor extends TensorBase {
     *
     * @returns the output tensor
     */
+   /*
     exp2(): Tensor {
-        return ops.exp2(this);
+        return aops.exp2(this);
     }
+    */
     /**
     * ![Plot of exp2 and its gradient](/plots/exp2.svg)
     *
