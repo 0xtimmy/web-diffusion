@@ -537,12 +537,14 @@ export function softmax(
 ): Tensor {
     if(dim < 0 || dim >= input.shape.length) throw new Error(`Expected dim that's within the tensor but input has shape: ${input.shape} and got dim ${dim}`);
 
-    const batches = input.shape.length == 1 ? 1 : shapeSize(Array.from(input.shape).splice(dim+1));
-    const batch_size = dim == 0 ? input.shape[0] : shapeSize(Array.from(input.shape).splice(1, dim));
+    const batches = dim == 0 ? 1 : shapeSize(Array.from(input.shape).splice(0, dim));
+    const batch_size = input.shape[dim];
+    const stride = dim+1 == input.shape.length ? 1 : shapeSize(Array.from(input.shape).splice(dim+1));
 
     const params = {
         batches: batches,
         batch_size: batch_size,
+        stride: stride
     };
 
     return input.runKernel(
@@ -560,13 +562,21 @@ export function permute(
     if(dims.length != input.shape.length) throw new Error("permute need the same number of dimentions as it's input");
     const seen = [];
     dims.forEach((v) => {
-        if(seen.includes(v)) throw new Error(`Permute cannot take duplicate dimentions (${dims})`);
-        if(v < 0 || v >= dims.length) throw new Error(`No dimention ${v} in input shape: ${input.shape}`);
-    })
-    const output_shape = dims.map((v: number) => {
-        return input.shape[v];
+        if(seen.includes(v)) throw new Error(`Permute cannot take duplicated dims: ${dims}`);
+        seen.push(v);
     });
-    return input.view(output_shape);
+    
+    for(let i = 0; i < dims.length; i++) {
+        if(dims[i] < 0 || dims[i] >= dims.length) throw new Error(`No dimention ${dims[i]} in input shape: ${input.shape}`);
+
+        if(i != dims[i]) {
+            input = input.transpose(i, dims[i]);
+            dims[dims.indexOf(i)] = dims[i];
+        }
+        
+    }
+    
+    return input
 }
 
 export function scaled_dot_product_attention(
@@ -584,14 +594,16 @@ export function scaled_dot_product_attention(
     const output_shape = Array.from(query.shape);
     output_shape[output_shape.length-1] = value.shape[value.shape.length-1];
 
-    const dk = shapeSize(Array.from(key.shape).splice(key.shape.length - 2));
+    const dk = key.shape[key.shape.length-1];
 
     query = query.view([-1, query.shape[query.shape.length-2], query.shape[query.shape.length-1]]);
     key = key.view([-1, key.shape[key.shape.length-2], key.shape[key.shape.length-1]]);
     value = value.view([-1, value.shape[value.shape.length-2], value.shape[value.shape.length-1]]);
 
-    let out = scalar_div(mm(query, key.transpose(1,2)), Math.sqrt(dk));
-    out = softmax(out, 1);
+    const dot_product = mm(query, key.transpose(1,2));
+    console.log("dot_product shape: ", dot_product.shape);
+    let out = scalar_div(dot_product, Math.sqrt(dk));
+    out = softmax(out, out.shape.length-1);
     out = mm(out, value);
     return out.view(output_shape);
 }
@@ -634,6 +646,7 @@ export function multihead_attention(
         if(key_padding_mask != null) key_padding_mask = key_padding_mask.unsqueeze(0);
     }
 
+
     const tgt_len = query.shape[0];
     const bsz = query.shape[1];
     const embed_dim = query.shape[2];
@@ -646,7 +659,6 @@ export function multihead_attention(
     let q, k, v;
     if(!use_separate_proj_weight) {
         if(in_proj_weight == null) throw new Error("use_separate_proj_weight is False but in_proj_weight is null")
-
         const unpacked_weights = in_proj_weight.chunk(3);
         q_proj_weight = unpacked_weights[0];
         k_proj_weight = unpacked_weights[1];
@@ -656,7 +668,7 @@ export function multihead_attention(
         if(k_proj_weight == null) throw new Error("use_separate_proj_weight is True but k_proj_weight is null");
         if(v_proj_weight == null) throw new Error("use_separate_proj_weight is True but v_proj_weight is null");
     }
-    
+
     let b_q, b_k, b_v;
     if(in_proj_bias == null) {
         b_q = null;
@@ -669,7 +681,8 @@ export function multihead_attention(
         b_v = chunks[2];
     }
 
-    const proj = _in_projection(query, key, value, q_proj_weight, k_proj_weight, v_proj_weight, b_q, b_k, b_v)
+    const proj = _in_projection(query, key, value, q_proj_weight, k_proj_weight, v_proj_weight, b_q, b_k, b_v);
+    
     q = proj.q;
     k = proj.k;
     v = proj.v;
@@ -693,6 +706,7 @@ export function multihead_attention(
     if (need_weights) {
         console.error("need weights");
     } else {
+        /*
         if(attn_mask != null) {
             if(attn_mask.shape[0] == 1 && attn_mask.dim == 3) {
                 attn_mask = attn_mask.unsqueeze(0);
@@ -700,6 +714,7 @@ export function multihead_attention(
                 attn_mask = attn_mask.view([bsz, num_heads, -1, src_len]);
             }
         }
+        */
 
         q = q.view([bsz, num_heads, tgt_len, head_dim]);
         k = k.view([bsz, num_heads, src_len, head_dim]);
@@ -731,6 +746,7 @@ function _in_projection(
     b_k?: Tensor,
     b_v?: Tensor,
 ): { q: Tensor, k: Tensor, v: Tensor } {
+
     const Eq = q.shape[q.dim-1];
     const Ek = k.shape[k.dim-1];
     const Ev = v.shape[v.dim-1];
@@ -740,7 +756,11 @@ function _in_projection(
     if(b_q && b_q.shape[0] != Eq) throw new Error(`expecting query bias shape of ${[Eq]}, but got ${b_q.shape}`);
     if(b_k && b_k.shape[0] != Eq) throw new Error(`expecting key bias shape of ${[Eq]}, but got ${b_k.shape}`);
     if(b_v && b_v.shape[0] != Eq) throw new Error(`expecting value bias shape of ${[Eq]}, but got ${b_v.shape}`);
-    return { q: linear(q, w_q, b_q), k: linear(k, w_k, b_k), v: linear(v, w_v, b_v)}
+    return { 
+        q: linear(q, w_q, b_q), 
+        k: linear(k, w_k, b_k), 
+        v: linear(v, w_v, b_v)
+    }
 }
 
 export function chunk(

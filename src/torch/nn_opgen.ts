@@ -76,6 +76,8 @@ export class MultiheadAttention extends Module {
     vdim: number;
     _qkv_same_embed_dim: boolean;
 
+    self_attention: boolean;
+
     num_heads: number;
     dropout: number;
     batch_first: boolean;
@@ -94,12 +96,14 @@ export class MultiheadAttention extends Module {
 
     add_zero_attn: boolean;
 
-    constructor(embed_dim: number, num_heads: number, dropout=0, bias=true, add_bias_kv=false, add_zero_attn=false, kdim=null, vdim=null, batch_first=false) {
+    constructor(embed_dim: number, num_heads: number, self_attention=false, batch_first=false, dropout=0, bias=true, add_bias_kv=false, add_zero_attn=false, kdim=null, vdim=null, ) {
         super();
         this.embed_dim = embed_dim;
         this.kdim = kdim ? kdim : embed_dim;
         this.vdim = vdim ? vdim : embed_dim;
         this._qkv_same_embed_dim = this.kdim == embed_dim && this.vdim == embed_dim; 
+
+        this.self_attention = self_attention;
 
         this.num_heads = num_heads;
         this.dropout = dropout;
@@ -135,19 +139,19 @@ export class MultiheadAttention extends Module {
 
     _reset_parameters() {
         if(this._qkv_same_embed_dim) {
-            this.in_proj_weight = xavier_uniform(this.in_proj_weight);
+            this.in_proj_weight = new Parameter(xavier_uniform(this.in_proj_weight));
         } else {
-            this.q_proj_weight = xavier_uniform(this.q_proj_weight);
-            this.k_proj_weight = xavier_uniform(this.k_proj_weight);
-            this.v_proj_weight = xavier_uniform(this.v_proj_weight);
+            this.q_proj_weight = new Parameter(xavier_uniform(this.q_proj_weight));
+            this.k_proj_weight = new Parameter(xavier_uniform(this.k_proj_weight));
+            this.v_proj_weight = new Parameter(xavier_uniform(this.v_proj_weight));
         }
 
         if(this.in_proj_bias != null) {
-            this.in_proj_bias = constant(this.in_proj_bias.shape, 0.0);
-            this.out_proj.bias = constant(this.out_proj.bias.shape, 0.0);
+            this.in_proj_bias = new Parameter(constant(this.in_proj_bias.shape, 0.0));
+            this.out_proj.bias = new Parameter(constant(this.out_proj.bias.shape, 0.0));
         }
-        if(this.bias_k != null) this.bias_k = xavier_normal(this.bias_k);
-        if(this.bias_v != null) this.bias_v = xavier_normal(this.bias_v);
+        if(this.bias_k != null) this.bias_k = new Parameter(xavier_normal(this.bias_k));
+        if(this.bias_v != null) this.bias_v = new Parameter(xavier_normal(this.bias_v));
     }
 
     forward(
@@ -183,6 +187,7 @@ export class MultiheadAttention extends Module {
         );
         */
 
+        /*
         let why_not_fast_path = "";
         if(!is_batched) why_not_fast_path = `input not batched, expexted dim of 3 but got ${query.dim}`;
         else if(query != key || key != value) why_not_fast_path = `non self attention used`;
@@ -196,10 +201,21 @@ export class MultiheadAttention extends Module {
         else if(this.bias_v != null) why_not_fast_path = "bias_v was nt null";
         else if(this.add_zero_attn) why_not_fast_path = "add_zero_attn was enabled";
         else if(!this._qkv_same_embed_dim) why_not_fast_path = "qkv_same_embed_dim was not true";
+        */
 
         let res;
-        
 
+        if (this.batch_first && is_batched) {
+            if(this.self_attention) {
+                query = query.transpose(0, 1);
+                key = key.transpose(0, 1);
+                value = value.transpose(0, 1);
+            }
+                
+        }
+            
+        
+        
         if (!this._qkv_same_embed_dim) {
             res = aops.multihead_attention(
                 query, key, value, this.embed_dim, this.num_heads,
@@ -245,7 +261,9 @@ export class MultiheadAttention extends Module {
                 */
             )
         }
-            
+        if(this.batch_first && is_batched) {
+            return { output: res.output.transpose(0, 1), weights: res.weights };
+        }
         return { output: res.output, weights: res.weights };
     }
 }

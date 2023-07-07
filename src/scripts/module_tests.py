@@ -1,6 +1,7 @@
 import torch
 import numpy
 import time
+from model_loading import gen_state_dict
 
 def gen_nn_multihead_attention(message, query, key, value, embed_dim, num_heads, log="always", log_config="fail"):
     mha = torch.nn.MultiheadAttention(embed_dim, num_heads)
@@ -15,7 +16,8 @@ def gen_nn_multihead_attention(message, query, key, value, embed_dim, num_heads,
             "key": key.numpy().tolist(),
             "value": value.numpy().tolist(),
             "embed_dim": embed_dim,
-            "num_heads": num_heads
+            "num_heads": num_heads,
+            "state_dict": gen_state_dict(mha)
         },
         "target": output.detach().numpy().tolist(),
         "duration": duration * 1000,

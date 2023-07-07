@@ -433,7 +433,7 @@ export const kernels: { [name: string]: KernelSpec } = {
             },
             {
                 name: "index",
-                shaderType: "array<u32>"
+                shaderType: "array<f32>"
             }
         ],
         outputs: [
@@ -443,10 +443,9 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "size"
             }
         ],
-        //workgroupSize: [1, 1, 1],
-        workgroupCount: ["parameters.size", 1, 1],
+        workgroupCount: ["parameters.size", "1", "1"],
         shader: `
-            output[global_id.x] = input[index[global_id.x]];
+            output[global_id.x] = input[u32(index[global_id.x])];
         `
     },
     sum: {
@@ -727,6 +726,10 @@ export const kernels: { [name: string]: KernelSpec } = {
             {
                 name: "batch_size",
                 shaderType: "u32"
+            },
+            {
+                name: "stride",
+                shaderType: "u32"
             }
         ],
         inputs: [
@@ -739,18 +742,18 @@ export const kernels: { [name: string]: KernelSpec } = {
             {
                 name: "output",
                 shaderType: "array<f32>",
-                size: "batches * batch_size"
+                size: "batches * batch_size * stride"
             }
         ],
         //workgroupSize: [1, 1, 1],
-        workgroupCount: ["parameters.batches", "parameters.batch_size", 1],
+        workgroupCount: ["parameters.batches", "parameters.batch_size", "parameters.stride"],
         shader: `
             var sum: f32 = 0;
             for(var i: u32 = 0; i < parameters.batch_size; i++) {
-                sum += exp(input[i * parameters.batches + global_id.x]);
+                sum += exp(input[global_id.x * parameters.batch_size + i * parameters.stride + global_id.z]);
             } 
 
-            var idx: u32 = global_id.y * parameters.batches + global_id.x;
+            var idx: u32 = global_id.x * parameters.batch_size * parameters.stride + global_id.y * parameters.stride + global_id.z;
             output[idx] = exp(input[idx]) / sum;
         `
     },

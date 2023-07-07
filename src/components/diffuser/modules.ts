@@ -12,7 +12,7 @@ export class SelfAttention extends torch.nn.Module {
         super();
         this.channels = channels;
         this.size = size;
-        this.mha = new torch.nn.MultiheadAttention(channels, 4);
+        this.mha = new torch.nn.MultiheadAttention(channels, 4, true, true);
         this.ln = new torch.nn.LayerNorm([channels]);
         this.ff_self = new torch.nn.Sequential([
             new torch.nn.LayerNorm([channels]),
@@ -28,7 +28,8 @@ export class SelfAttention extends torch.nn.Module {
         let x_ln = this.ln.forward(x);
         let attention_value = this.mha.forward(x_ln, x_ln, x_ln).output;
         attention_value = torch.add(attention_value, x);
-        attention_value = torch.add(this.ff_self.forward(attention_value), attention_value);
+        const ff = this.ff_self.forward(attention_value);
+        attention_value = torch.add(ff, attention_value);
         return attention_value.transpose(2, 1).view([-1, this.channels, this.size, this.size]);
     }
 }
@@ -64,25 +65,17 @@ export class DoubleConv extends torch.nn.Module {
 
 export class Down extends torch.nn.Module {
 
-    //maxpool_conv: torch.nn.Sequential;
-    "maxpool_conv.0": torch.nn.MaxPool2d;
-    "maxpool_conv.1": DoubleConv;
-    "maxpool_conv.2": DoubleConv;
+    maxpool_conv: torch.nn.Sequential;
     emb_layer: torch.nn.Sequential;
 
     constructor(in_channels: number, out_channels: number, emb_dim=256) {
         super();
         
-        /*
         this.maxpool_conv = new torch.nn.Sequential([
             new torch.nn.MaxPool2d(2),
             new DoubleConv(in_channels, in_channels, in_channels, true),
             new DoubleConv(in_channels, out_channels)
         ]);
-        */
-       this["maxpool_conv.0"] = new torch.nn.MaxPool2d(2),
-       this["maxpool_conv.1"] = new DoubleConv(in_channels, in_channels, in_channels, true);
-       this["maxpool_conv.2"] = new DoubleConv(in_channels, out_channels, out_channels)
 
         this.emb_layer = new torch.nn.Sequential([
             new torch.nn.SiLU(),
@@ -94,10 +87,7 @@ export class Down extends torch.nn.Module {
     }
 
     forward(x: torch.Tensor, t: torch.Tensor): torch.Tensor {
-        //x = await this.maxpool_conv.forward(x);
-        x = this["maxpool_conv.0"].forward(x)
-        x = this["maxpool_conv.1"].forward(x)
-        x = this["maxpool_conv.2"].forward(x)
+        x = this.maxpool_conv.forward(x);
         t = this.emb_layer.forward(t);
         const emb = torch.repeat(t, [1, 1, x.shape[x.shape.length-2], x.shape[x.shape.length-1]]);
         return torch.add(x, emb);
@@ -193,7 +183,6 @@ export class UNet extends torch.nn.Module {
     }
 
     forward(x: torch.Tensor, t: torch.Tensor): torch.Tensor {
-        let status = 0;
         t = torch.unsqueeze(t, -1);
         t = this.pos_encoding(t, this.time_dim);
         
@@ -216,9 +205,6 @@ export class UNet extends torch.nn.Module {
         x =  this.sa5.forward(x);
         x = this.up3.forward(x, x1, t);
         x =  this.sa6.forward(x);
-
-        //(async () => { console.log("x: ", await x.toArrayAsync()) })();
-        //throw new Error("finished testing :(")
         
         const output = this.outc.forward(x);
         return output;

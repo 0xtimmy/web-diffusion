@@ -1,12 +1,12 @@
 <template>
     <div>
-        <h2>Diffuser</h2>
-        Select Weights: <button @click="loadPokemon" :disabled="weightsSelected">Pokemon</button>
+        <h2>Web Diffusion</h2>
+        Select Weights: <button @click="loadPokemon" :disabled="weightsSelected">Pokemon</button> <br>
         <button @click="generate" :disabled="active || !modelReady">go !!</button> <br />
 
-        <canvas ref="canvas" width="64" height="64">
+        <div ref="cycle-list" class="cycle-list">
 
-        </canvas>
+        </div>
     </div>
 </template>
 
@@ -45,24 +45,57 @@ export default defineComponent({
             if(!this.active) {
                 this.active = true;
                 const diffuser = new Diffusion({ noise_steps: 100, img_size: 64 });
-                const res = await diffuser.sample(this.model, async (res: torch.Tensor) => { 
-                    await this.renderResult(res)
+                const res = await diffuser.sample(this.model, async (res: torch.Tensor, step_num: number) => { 
+                    await this.renderResult(res, `iteration: ${step_num}`);
+                    return;
                 });
                 this.active = false;
-                this.renderResult(res);
+                this.renderResult(res, "final");
             }
         },
-        renderResult: async function(result: torch.Tensor) {
+        renderResult: async function(result: torch.Tensor, caption: string) {
             result = result.cat(torch.constant([1, 1, ...Array.from(result.shape).splice(2)], 255), 1);
             result = result.transpose(1, 2).transpose(2, 3);
             const data = await result.toArrayAsync()
             if(!this.active) console.log("Result: ", data);
             const img_data = new Uint8ClampedArray(data.flat(4) as any);
-            const context = this.$refs["canvas"].getContext("2d");
+            const box = document.createElement("div");
+            box.className = "result-box";
+
+            const canvas = document.createElement("canvas");
+            canvas.setAttribute("width", "64px");
+            canvas.setAttribute("height", "64px");
+            const context = canvas.getContext("2d");
             context.putImageData(
                 new ImageData(img_data, 64, 64), 
                 0, 0);
+            box.appendChild(canvas);
+            const cap = document.createElement("div");
+            cap.innerHTML = caption;
+            box.appendChild(cap);
+            this.$refs["cycle-list"].appendChild(box);
+            return;
         }
     }
 })
 </script>
+
+<style>
+.cycle-list {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 16px;
+}
+
+canvas {
+    width: 64px;
+    height: 64px;
+}
+
+.result-box {
+    display: flex;
+    flex-direction: column;
+    align-items: left;
+    font-size: 15px;
+}
+</style>

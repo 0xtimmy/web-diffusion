@@ -12,6 +12,11 @@ export class DeviceWebGPU extends Device {
     constructor(id: string, adapter: GPUAdapter, device: GPUDevice) {
         super(id, "webgpu");
         this._device = device;
+        this._device.lost.then(async (lostInfo: GPUDeviceLostInfo) => {
+            console.warn("lost info:", lostInfo);
+            const adapter = await (navigator as any).gpu.requestAdapter();
+            this._device = await adapter.requestDevice();
+        })
 
     }
     alloc(byteSize: number): GPUBufferStorage {

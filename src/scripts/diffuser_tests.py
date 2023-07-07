@@ -178,3 +178,45 @@ def gen_up(message, in_channels, out_channels, input, skip, t, log="always", log
         "log": log,
         "log_config": log_config
     }
+
+def gen_denoise(message, input, i, log="always", log_config="fail"):
+    
+    
+    _beta = torch.linspace(1e-4, 0.02, 1000)
+    _alpha = 1. - _beta
+    _alpha_hat = torch.cumprod(_alpha, dim=0)
+
+    t = (torch.ones(1) * i).long()
+
+    original_noise = torch.randn((1, 3, 64, 64))
+
+    alpha = _alpha[t][:, None, None, None]
+    alpha_hat = _alpha_hat[t][:, None, None, None]
+    beta = _beta[t][:, None, None, None]
+
+    if i > 1:
+        noise = torch.randn(original_noise.shape)
+    else:
+        noise = torch.zeros(original_noise.shape)
+
+    start = time.time()
+    output = 1 / torch.sqrt(alpha) * (original_noise - ((1 - alpha) / torch.sqrt(1 - alpha_hat)) * input) + torch.sqrt(beta) * noise
+    duration = time.time() - start
+
+    return {
+        "message": message,
+        "func": "denoise",
+        "args": {
+            "input": input.numpy().tolist(),
+            "i": i,
+            "original_noise": original_noise.numpy().tolist(),
+            "noise": noise.numpy().tolist(),
+            "alpha": _alpha.numpy().tolist(),
+            "alpha_hat": _alpha_hat.numpy().tolist(),
+            "beta": _beta.numpy().tolist(),
+        },
+        "target": output.detach().numpy().tolist(),
+        "duration": duration * 1000,
+        "log": log,
+        "log_config": log_config
+    }

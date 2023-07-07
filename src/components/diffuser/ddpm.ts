@@ -15,7 +15,7 @@ class Diffusion {
 
     constructor({
         noise_steps=1000,
-        beta_start=0.0001,
+        beta_start=1e-4,
         beta_end=0.02,
         img_size=64
     }) {
@@ -37,18 +37,19 @@ class Diffusion {
         return torch.randint(1, this.noise_steps, [n]);
     }
 
-    async sample(model, handleStep?: (img: torch.Tensor) => void, n=1): Promise<torch.Tensor> {
+    async sample(model, handleStep?: (img: torch.Tensor, step_num: number) => void, n=1): Promise<torch.Tensor> {
         console.log(`Sampling ${n} new images...`);
         const sampleStart = Date.now();
         model.eval();
         let x = torch.normal([n, 3, this.img_size, this.img_size]);
         for(let i = this.noise_steps -1; i >= 0; i--) {
-            const t = torch.scalar_mul(torch.ones(n), i);
+            const t = torch.constant([n], i);
             let predicted_noise = model.forward(x, t);
             
             const alpha = this.alpha.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
             const alpha_hat = this.alpha_hat.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
             const beta = this.beta.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
+            
             let noise;
             if(i > 1) {
                 noise = torch.randn(x.shape);
@@ -67,10 +68,11 @@ class Diffusion {
             const beta_noise = torch.mul(torch.sqrt(beta), noise);
             x = torch.add(x, beta_noise);
             
-            console.log(`${(this.noise_steps-i)/this.noise_steps*100}%`);
+            console.log(`${(this.noise_steps-i)/this.noise_steps*100}% - ${Date.now() - sampleStart}ms`);
             if(typeof(handleStep) != 'undefined') {
-                await handleStep(torch.scalar_mul(torch.scalar_add(torch.clamp(x, -1, 1), 1), 255/2));
+                await handleStep(torch.scalar_mul(torch.scalar_add(torch.clamp(x, -1, 1), 1), 255/2), (this.noise_steps-i));
             }   
+            
         }
         //model.train();
         return torch.scalar_mul(torch.scalar_add(torch.clamp(x, -1, 1), 1), 255/2);

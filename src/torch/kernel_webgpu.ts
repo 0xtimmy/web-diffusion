@@ -254,8 +254,11 @@ export class KernelWebGPU extends Kernel {
         outputBuffers: GPUBuffer[]
     ): GPUBindGroup {
         const entries: GPUBindGroupEntry[] = [];
+
         let bindingIndex = 0;
         for (let i = 0; i < inputBuffers.length; i++, bindingIndex++) {
+            if(inputBuffers[i].size > 134217728) throw new Error("Buffer size too big!");
+            //console.log("Buffer size:", inputBuffers[i].size);
             entries.push({
                 binding: bindingIndex,
                 resource: {

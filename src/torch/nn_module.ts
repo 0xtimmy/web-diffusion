@@ -404,6 +404,7 @@ export class Module {
     private _loadFromStateDict(stateDict: StateDict, prefix: string): void {
         for(const [name, _] of this.immediateParameters) {
             const completeName = prefix + name;
+            console.log("loading parameter: ", completeName);
             this[name] = new Parameter(tensor(stateDict[completeName] as any));
         }
     }
