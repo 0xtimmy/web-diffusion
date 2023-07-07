@@ -43,36 +43,45 @@ class Diffusion {
         model.eval();
         let x = torch.normal([n, 3, this.img_size, this.img_size]);
         for(let i = this.noise_steps -1; i >= 0; i--) {
-            const t = torch.constant([n], i);
-            let predicted_noise = model.forward(x, t);
-            
-            const alpha = this.alpha.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
-            const alpha_hat = this.alpha_hat.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
-            const beta = this.beta.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
-            
-            let noise;
-            if(i > 1) {
-                noise = torch.randn(x.shape);
-            } else {
-                noise = torch.zeros(x.shape);
+            console.log(`Starting pass #${this.noise_steps-i}`)
+            try {
+                const t = torch.constant([n], i);
+                let predicted_noise = model.forward(x, t);
+                
+                const alpha = this.alpha.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
+                const alpha_hat = this.alpha_hat.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
+                const beta = this.beta.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
+                
+                let noise;
+                if(i > 1) {
+                    noise = torch.randn(x.shape);
+                } else {
+                    noise = torch.zeros(x.shape);
+                }
+                
+                let one_div_sqrt_alpha = torch.div(torch.ones(alpha.shape), torch.sqrt(alpha));
+                
+                let sqrt_one_minus_alpha_hat = torch.sqrt(torch.sub(torch.ones(alpha_hat.shape), alpha_hat));
+                let one_minus_alpha = torch.sub(torch.ones(alpha.shape), alpha);
+                predicted_noise = torch.mul(predicted_noise, torch.div(one_minus_alpha, sqrt_one_minus_alpha_hat));
+                let nx = torch.sub(x, predicted_noise);
+                nx = torch.mul(one_div_sqrt_alpha, nx);
+                
+                const beta_noise = torch.mul(torch.sqrt(beta), noise);
+                nx = torch.add(nx, beta_noise);
+                
+                console.log(`${(this.noise_steps-i)/this.noise_steps*100}% - ${Date.now() - sampleStart}ms`);
+                if(typeof(handleStep) != 'undefined') {
+                    await handleStep(torch.scalar_mul(torch.scalar_add(torch.clamp(x, -1, 1), 1), 255/2), (this.noise_steps-i));
+                }
+                
+                x = nx;
+            } catch(e: any) {
+                console.log("caught error while sampling, retrying ", e);
+                if(e == "DOMException: Device is lost") console.log("we got em");
+                await torch.initWebGPUAsync();
+                i++;
             }
-            
-            let one_div_sqrt_alpha = torch.div(torch.ones(alpha.shape), torch.sqrt(alpha));
-            
-            let sqrt_one_minus_alpha_hat = torch.sqrt(torch.sub(torch.ones(alpha_hat.shape), alpha_hat));
-            let one_minus_alpha = torch.sub(torch.ones(alpha.shape), alpha);
-            predicted_noise = torch.mul(predicted_noise, torch.div(one_minus_alpha, sqrt_one_minus_alpha_hat));
-            x = torch.sub(x, predicted_noise);
-            x = torch.mul(one_div_sqrt_alpha, x);
-            
-            const beta_noise = torch.mul(torch.sqrt(beta), noise);
-            x = torch.add(x, beta_noise);
-            
-            console.log(`${(this.noise_steps-i)/this.noise_steps*100}% - ${Date.now() - sampleStart}ms`);
-            if(typeof(handleStep) != 'undefined') {
-                await handleStep(torch.scalar_mul(torch.scalar_add(torch.clamp(x, -1, 1), 1), 255/2), (this.noise_steps-i));
-            }   
-            
         }
         //model.train();
         return torch.scalar_mul(torch.scalar_add(torch.clamp(x, -1, 1), 1), 255/2);

@@ -537,17 +537,31 @@ export function sum(
 ): Tensor {
     if(dim < 0 || dim >= input.shape.length) throw new Error(`Expected dim that's within the tensor but input has shape: ${input.shape} and got dim ${dim}`);
     const output_shape = dim == 0 ? [1] : Array.from(input.shape).splice(0, dim);
-    const batches = shapeSize(output_shape);
-    const batch_size = shapeSize(Array.from(input.shape).splice(dim));
 
-    //console.log("batch_size: ", batch_size);
+    let output = input;
+    let batch_size = shapeSize(Array.from(output.shape).splice(dim));
+    while(batch_size % 2 == 0) {
+        const pass_shape = [...output_shape, batch_size / 2];
+        let batches = shapeSize(pass_shape);
+        output = output.runKernel(
+            "sum", 
+            { dtype: input.dtype }, 
+            { 
+                batches: batches,
+                batch_size: 2,
+                size: input.size 
+            }, 
+            [pass_shape]
+        )[0];
+        batch_size = shapeSize(Array.from(output.shape).splice(dim));
+    }
 
-    return input.runKernel(
+    return output.runKernel(
         "sum", 
         { dtype: input.dtype }, 
         { 
-            batches: batches,
-            batch_size: batch_size,
+            batches: shapeSize(output_shape),
+            batch_size: shapeSize(Array.from(output.shape).splice(dim)),
             size: input.size 
         }, 
         [output_shape]

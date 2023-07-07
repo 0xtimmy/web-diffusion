@@ -58,8 +58,8 @@ tests = [
 
     #at.gen_mm("mm limits test 3 - 2048 x 2048", torch.randn([2048, 2048]), torch.randn([2048, 2048])),
 
-    #t.gen_sum("Sum test small", torch.ones(2, 2)),
-    #t.gen_sum("Sum test 100x100", torch.ones(100, 100)),
+    at.gen_sum("Sum test small", torch.ones(2, 2)),
+    at.gen_sum("Sum test 100x100", torch.ones(100, 100)),
     #t.gen_sum("Sum test 1000x1000", torch.ones(1000, 1000)),
 
 
