@@ -609,15 +609,18 @@ export function scaled_dot_product_attention(
     const dot_products = query_batches.map((q, i) => {
         return scalar_div(mm(q, key_batches[i]), sqrt_dk);
     });
+    console.log("dot product shape: ", dot_products[0].shape);
 
     const softmaxxes = dot_products.map((dot_product) => {
         return softmax(dot_product, dot_product.shape.length-1);
-    })
+    });
+    console.log("softmaxxes shape: ", softmaxxes[0].shape);
 
     
     let outs = softmaxxes.map((batch, i) => {
         return mm(batch, value_batches[i]);
     })
+    console.log("outs shape: ", outs[0].shape);
     
     let out = outs[0];
     for(let i = 1; i < batches; i++) {

@@ -63,6 +63,8 @@ export class KernelWebGPU extends Kernel {
         this._shaderCode = workload.code;
         this._workgroupSizes = workload.workgroupSizes;
 
+        console.log("running shader: \n", this._shaderCode)
+
         const shaderModule = gpuDevice.createShaderModule({
             code: this._shaderCode,
         });
@@ -255,9 +257,14 @@ export class KernelWebGPU extends Kernel {
     ): GPUBindGroup {
         const entries: GPUBindGroupEntry[] = [];
 
+        this._gpuDevice.limits.maxBufferSize;
+
         let bindingIndex = 0;
         for (let i = 0; i < inputBuffers.length; i++, bindingIndex++) {
-            if(inputBuffers[i].size > 134217728) throw new Error("Buffer size too big!");
+            if(inputBuffers[i].size*4 >= 268435456) {
+                //console.error("input buffer: ", inputBuffers[i], " exceedes maximum buffer size: ", this._gpuDevice.limits.maxBufferSize);
+                //throw new Error(`Buffer size too big!`);
+            }
             //console.log("Buffer size:", inputBuffers[i].size);
             entries.push({
                 binding: bindingIndex,
@@ -267,7 +274,10 @@ export class KernelWebGPU extends Kernel {
             });
         }
         for (let i = 0; i < this.spec.outputs.length; i++, bindingIndex++) {
-            if(outputBuffers[i].size > 134217728) throw new Error("Buffer size too big!");
+            if(outputBuffers[i].size*2 >= 134217728) {
+                //console.error("output buffer: ", outputBuffers[i], " exceedes maximum buffer size: ", this._gpuDevice.limits.maxBufferSize);
+                //throw new Error("Buffer size too big!");
+            }
             entries.push({
                 binding: bindingIndex,
                 resource: {
@@ -281,6 +291,13 @@ export class KernelWebGPU extends Kernel {
                 buffer: paramsBuffer,
             },
         });
+        const bindGroupSize = entries.reduce((acc, v) => {
+            return acc + (v.resource as any).buffer.size;
+        }, 0);
+        if(bindGroupSize >= 268435456) {
+            console.error("Bind group size, ", bindGroupSize, " exceedes maximum buffer size: ", this._gpuDevice.limits);
+            throw new Error("Buffer size too big!");
+        }
         const bindGroup = this._gpuDevice.createBindGroup({
             layout: this._bindGroupLayout,
             entries: entries,

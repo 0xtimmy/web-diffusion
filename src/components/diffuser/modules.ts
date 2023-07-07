@@ -206,7 +206,7 @@ export class UNet extends torch.nn.Module {
         x = this.up3.forward(x, x1, t);
         x =  this.sa6.forward(x);
         
-        const output = this.outc.forward(x);
-        return output;
+        //const output = this.outc.forward(x);
+        return x;
     }
 }

@@ -20,8 +20,8 @@ tests = [
     #dt.gen_double_conv("DoubleConv test 2", 256, 512, 512, False, torch.randn(1, 256, 8, 8)),
     #dt.gen_double_conv("DoubleConv test 3", 512, 256, 512, False, torch.randn(1, 512, 8, 8)),
 
-    dt.gen_self_attention("SelfAttention test 1", 128, 32, torch.randn(1, 128, 32, 32)),
-    dt.gen_self_attention("SelfAttention test 2", 256, 16, torch.randn(1, 256, 16, 16)),
+    #dt.gen_self_attention("SelfAttention test 1", 128, 32, torch.randn(1, 128, 32, 32)),
+    #dt.gen_self_attention("SelfAttention test 2", 256, 16, torch.randn(1, 256, 16, 16)),
     #dt.gen_self_attention("SelfAttention test 3", 256, 8, torch.randn(1, 256, 8, 8)),
     #dt.gen_self_attention("SelfAttention test 4", 128, 16, torch.randn(1, 128, 16, 16)),
     #dt.gen_self_attention("SelfAttention test 5", 64, 32, torch.randn(1, 64, 32, 32)),
@@ -52,6 +52,8 @@ tests = [
     #t.gen_mm("mm test 1 - 2 x 3", torch.randint(1, 5, [2, 3]), torch.randint(1, 5, [3, 2])),
     #t.gen_mm("mm test 1 - 2 x 3", torch.randint(1, 5, [1, 3]), torch.randint(1, 5, [3, 2])),
     #at.gen_mm("mm limits test 1 - 512 x 512", torch.randn([512, 512]), torch.randn([512, 512])),
+    at.gen_mm("mm limits test 2 - 1024 x 1024", torch.randn([1024, 1024]), torch.randn([1024, 1024])),
+    #at.gen_mm("mm limits test 3 - 2048 x 2048", torch.randn([2048, 2048]), torch.randn([2048, 2048])),
 
     #t.gen_sum("Sum test small", torch.ones(2, 2)),
     #t.gen_sum("Sum test 100x100", torch.ones(100, 100)),
@@ -67,18 +69,20 @@ tests = [
     #ft.gen_upsample("Upsample performance 1", torch.randn([1, 1, 256, 256]), scale_factor=[2, 2], mode="bilinear"),
 
     #ft.gen_softmax("Softmax basic test", torch.randn(10) * 10, 0),
-    ft.gen_softmax("Softmax basic test", torch.randn([2, 5]) * 10, 0),
+    #ft.gen_softmax("Softmax basic test", torch.randn([2, 5]) * 10, 0),
     #ft.gen_softmax("Softmax basic test", torch.randn(10) * 10, 0),
-    ft.gen_softmax("Softmax basic test dim 1", torch.randn([2, 5]) * 10, 1),
-    ft.gen_softmax("Softmax basic test dim 2", torch.randn([2, 5, 3]) * 10, 2),
+    #ft.gen_softmax("Softmax basic test dim 1", torch.randn([2, 5]) * 10, 1),
+    #ft.gen_softmax("Softmax basic test dim 2", torch.randn([2, 5, 3]) * 10, 2),
     #ft.gen_softmax("Softmax basic test", torch.randn([2, 3, 3,]) * 10, 0),
     #ft.gen_softmax("Softmax basic test", torch.randn([2, 2, 3, 3,]) * 10, 0),
     #ft.gen_softmax("Softmax performance test 1", torch.randn([2, 128, 128]) * 10, 0),
     #ft.gen_softmax("Softmax performance test 2", torch.randn([2, 256, 256]) * 10, 0),
 
-    ft.gen_scaled_dot_product_attention("Scaled dot product attention test 1", torch.rand(1, 8, 128, 64), torch.rand(1, 8, 128, 64), torch.rand(1, 8, 128, 64)),
-    ft.gen_scaled_dot_product_attention("Scaled dot product attention performance test 1", torch.rand(1, 1, 64, 64), torch.rand(1, 1, 64, 64), torch.rand(1, 1, 64, 64)),
-    ft.gen_scaled_dot_product_attention("Scaled dot product attention performance test 2", torch.rand(1, 64, 64, 64), torch.rand(1, 64, 64, 64), torch.rand(1, 64, 64, 64)),
+    #ft.gen_scaled_dot_product_attention("Scaled dot product attention test 1", torch.rand(1, 8, 128, 64), torch.rand(1, 8, 128, 64), torch.rand(1, 8, 128, 64)),
+    #ft.gen_scaled_dot_product_attention("Scaled dot product attention performance test 1", torch.rand(1, 1, 64, 64), torch.rand(1, 1, 64, 64), torch.rand(1, 1, 64, 64)),
+    #ft.gen_scaled_dot_product_attention("Scaled dot product attention performance test 2", torch.rand(1, 64, 64, 64), torch.rand(1, 64, 64, 64), torch.rand(1, 64, 64, 64)),
+    #ft.gen_scaled_dot_product_attention("Scaled dot product attention performance test 3", torch.rand(8, 128, 128, 128), torch.rand(8, 128, 128, 128), torch.rand(8, 128, 128, 128)),
+    #ft.gen_scaled_dot_product_attention("Scaled dot product attention performance test 4", torch.rand(8, 256, 256, 256), torch.rand(8, 256, 256, 256), torch.rand(8, 256, 256, 256)),
 
     #ft.gen_linear("Linear test 1 - small no bias", torch.randint(1, 5, [3]), torch.randint(1, 5, [2, 3])),
     #ft.gen_linear("Linear test 2 - small with bias", torch.randint(1, 5, [3]), torch.randint(1, 5, [2, 3]), torch.randint(0, 1, [2])),
@@ -109,13 +113,14 @@ tests = [
 
     #ft.gen_silu("SiLU basic test", torch.randn([1000, 1000])),
     #ft.gen_gelu("GeLU basic test", torch.randn([1000, 1000])),
+    ft.gen_gelu("GeLU limits test", torch.randn([2048, 2048])),
 
     #ft.gen_cumprod("Cumprod basic test", torch.randn([100]))
 
 
     # Module Tests ------------------------------------------------------------
 
-    mt.gen_nn_multihead_attention("Multihead Attention test 1", torch.randn([32, 8, 64]), torch.randn([32, 8, 64]), torch.randn([32, 8, 64]), 64, 8),
+    #mt.gen_nn_multihead_attention("Multihead Attention test 1", torch.randn([32, 8, 64]), torch.randn([32, 8, 64]), torch.randn([32, 8, 64]), 64, 8),
 
     #mt.gen_nn_layernorm("LayerNorm test 1", torch.randn([20, 5, 10]), [10]),
 
@@ -129,21 +134,21 @@ tests = [
 
     # Reshape Tests -----------------------------------------------------------
 
-    rt.gen_permute("Permute basic test", torch.randn([2, 2]), [1, 0]),
-    rt.gen_permute("Permute test 1", torch.randn([3, 3, 3, 3]), [2, 0, 1, 3]),
+    #rt.gen_permute("Permute basic test", torch.randn([2, 2]), [1, 0]),
+    #rt.gen_permute("Permute test 1", torch.randn([3, 3, 3, 3]), [2, 0, 1, 3]),
 
     #rt.gen_chunk("chunk test 1 - dim start", torch.randint(0, 10, [3, 5, 5]), 3, 0),
     #rt.gen_chunk("chunk test 1 - dim mid", torch.randint(0, 10, [5, 3, 5]), 3, 1),
     #rt.gen_chunk("chunk test 1 - dim end", torch.randint(0, 10, [5, 5, 3]), 3, 2),
     #rt.gen_chunk("chunk test 1 - non-one output shape", torch.randint(0, 10, [5, 6, 5]), 2, 1),
     
-    rt.gen_transpose("Transpose test 1 - 3 x 2", torch.randint(1, 10, [3, 2])),
-    rt.gen_transpose("Transpose test 2 - transpose dims: 1 & 2 for matrix: 3 x 2 x 2", torch.randint(1, 10, [3, 2, 2]), 1, 2),
-    rt.gen_transpose("Transpose test 3 - transpose dims: 0 & 2 for matrix: 3 x 2 x 2", torch.randint(1, 10, [3, 2, 2]), 0, 2),
-    rt.gen_transpose("Transpose test 4 - transpose dims: 0 & 2 for matrix: 2 x 3 x 2", torch.randint(1, 10, [2, 3, 2]), 0, 2),
-    rt.gen_transpose("Transpose test 5 - transpose dims: 0 & 2 for matrix: 2 x 2 x 3", torch.randint(1, 10, [2, 2, 3]), 0, 2),
-    rt.gen_transpose("Transpose test 6 - transpose dims: matrix: 128 x 256", torch.randint(1, 10, [256, 128])),
-    rt.gen_transpose("Transpose performance test - transpose dims: 1024 x 512", torch.randint(1, 10, [1024, 512])),
+    #rt.gen_transpose("Transpose test 1 - 3 x 2", torch.randint(1, 10, [3, 2])),
+    #rt.gen_transpose("Transpose test 2 - transpose dims: 1 & 2 for matrix: 3 x 2 x 2", torch.randint(1, 10, [3, 2, 2]), 1, 2),
+    #rt.gen_transpose("Transpose test 3 - transpose dims: 0 & 2 for matrix: 3 x 2 x 2", torch.randint(1, 10, [3, 2, 2]), 0, 2),
+    #rt.gen_transpose("Transpose test 4 - transpose dims: 0 & 2 for matrix: 2 x 3 x 2", torch.randint(1, 10, [2, 3, 2]), 0, 2),
+    #rt.gen_transpose("Transpose test 5 - transpose dims: 0 & 2 for matrix: 2 x 2 x 3", torch.randint(1, 10, [2, 2, 3]), 0, 2),
+    #rt.gen_transpose("Transpose test 6 - transpose dims: matrix: 128 x 256", torch.randint(1, 10, [256, 128])),
+    #rt.gen_transpose("Transpose performance test - transpose dims: 1024 x 512", torch.randint(1, 10, [1024, 512])),
 
     #rt.gen_unsqueeze("Unsqueeze test 1", [10], 0),
     #rt.gen_unsqueeze("Unsqueeze test 2", [10, 3, 2], 0),

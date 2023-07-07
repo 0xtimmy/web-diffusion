@@ -997,7 +997,7 @@ async function test_mm(args, target): Promise<test_result> {
     const output_data = await actual_output.toArrayAsync();
     if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
     const diff = array_eq(output_data.flat(4), [target].flat(4));
-    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content` };
+    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
 
     return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` }
 }
