@@ -204,9 +204,12 @@ export class UNet extends torch.nn.Module {
         x =  this.up2.forward(x, x2, t);
         x =  this.sa5.forward(x);
         x = this.up3.forward(x, x1, t);
+        (async () => { console.log("up3: ", await x.toArrayAsync()); } )();
         x =  this.sa6.forward(x);
+        (async () => { console.log("sa6: ", await x.toArrayAsync()); } )();
         
-        //const output = this.outc.forward(x);
-        return x;
+        const output = this.outc.forward(x);
+        (async () => { console.log("output: ", await output.toArrayAsync()); } )();
+        return output;
     }
 }

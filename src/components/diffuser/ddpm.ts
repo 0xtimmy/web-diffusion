@@ -44,7 +44,7 @@ class Diffusion {
         let x = torch.normal([n, 3, this.img_size, this.img_size]);
         for(let i = this.noise_steps -1; i >= 0; i--) {
             console.log(`Starting pass #${this.noise_steps-i}`)
-            try {
+            //try {
                 const t = torch.constant([n], i);
                 let predicted_noise = model.forward(x, t);
                 
@@ -71,17 +71,27 @@ class Diffusion {
                 nx = torch.add(nx, beta_noise);
                 
                 console.log(`${(this.noise_steps-i)/this.noise_steps*100}% - ${Date.now() - sampleStart}ms`);
+
+                const dev = torch.devices["webgpu"] as any;
+                const err = await dev.gpuDevice.popErrorScope();
+                console.log("error? ", err);
+
+                /*
                 if(typeof(handleStep) != 'undefined') {
-                    await handleStep(torch.scalar_mul(torch.scalar_add(torch.clamp(x, -1, 1), 1), 255/2), (this.noise_steps-i));
+                    await handleStep(torch.scalar_mul(torch.scalar_add(torch.clamp(nx, -1, 1), 1), 255/2), (this.noise_steps-i));
                 }
+                */
                 
                 x = nx;
+                
+                /*
             } catch(e: any) {
                 console.log("caught error while sampling, retrying ", e);
                 if(e == "DOMException: Device is lost") console.log("we got em");
                 await torch.initWebGPUAsync();
                 i++;
             }
+            */
         }
         //model.train();
         return torch.scalar_mul(torch.scalar_add(torch.clamp(x, -1, 1), 1), 255/2);

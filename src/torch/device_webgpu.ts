@@ -12,6 +12,13 @@ export class DeviceWebGPU extends Device {
     constructor(id: string, adapter: GPUAdapter, device: GPUDevice) {
         super(id, "webgpu");
         this._device = device;
+        this._device.pushErrorScope("out-of-memory");
+        this._device.addEventListener("uncapturederror", (error: any) => {
+            console.error("Uncaptured error emited from GPU: ", error);
+        })
+        this._device.onuncapturederror = (error: any) => {
+            console.error("Uncaptured error emited from GPU: ", error);
+        };
         this._device.lost.then((lostInfo: GPUDeviceLostInfo) => {
             console.warn("lost gpu info:", lostInfo);
         })

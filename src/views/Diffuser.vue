@@ -74,6 +74,9 @@ export default defineComponent({
             cap.innerHTML = caption;
             box.appendChild(cap);
             this.$refs["cycle-list"].appendChild(box);
+            await new Promise<void>((resolve) => {
+                setTimeout(() => { resolve(); }, 100);
+            })
             return;
         }
     }

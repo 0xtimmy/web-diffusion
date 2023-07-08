@@ -5,7 +5,7 @@ import { DeviceWebGPU } from "./device_webgpu";
 const cpuDevice = new DeviceCPU();
 let webgpuDevice: DeviceWebGPU | null = null;
 
-const devices: { [id: string]: Device } = {
+export const devices: { [id: string]: Device } = {
     cpu: cpuDevice,
 };
 
