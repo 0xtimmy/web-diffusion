@@ -1,9 +1,7 @@
 
-import * as torch from "../../torch"
+import * as torch from "@/torch"
 
-export 
-
-class Diffusion {
+export class Diffusion {
     noise_steps: number;
     beta_start: number;
     beta_end: number;
@@ -37,10 +35,10 @@ class Diffusion {
         return torch.randint(1, this.noise_steps, [n]);
     }
 
-    async sample(model, handleStep?: (img: torch.Tensor, step_num: number) => void, n=1): Promise<torch.Tensor> {
+    sample(model, handleStep?: (img: torch.Tensor, step_num: number) => void, n=1): torch.Tensor {
         console.log(`Sampling ${n} new images...`);
         const sampleStart = Date.now();
-        model.eval();
+        //model.eval();
         let x = torch.normal([n, 3, this.img_size, this.img_size]);
         for(let i = this.noise_steps -1; i >= 0; i--) {
             console.log(`Starting pass #${this.noise_steps-i}`)
@@ -72,15 +70,15 @@ class Diffusion {
                 
                 console.log(`${(this.noise_steps-i)/this.noise_steps*100}% - ${Date.now() - sampleStart}ms`);
 
+                /*
                 const dev = torch.devices["webgpu"] as any;
                 const err = await dev.gpuDevice.popErrorScope();
                 console.log("error? ", err);
-
-                /*
-                if(typeof(handleStep) != 'undefined') {
-                    await handleStep(torch.scalar_mul(torch.scalar_add(torch.clamp(nx, -1, 1), 1), 255/2), (this.noise_steps-i));
-                }
                 */
+
+                if(typeof(handleStep) != 'undefined') {
+                    handleStep(torch.scalar_mul(torch.scalar_add(torch.clamp(nx, -1, 1), 1), 255/2), (this.noise_steps-i));
+                }
                 
                 x = nx;
                 

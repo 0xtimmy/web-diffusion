@@ -1,4 +1,5 @@
 import { Device } from "./device";
+import { DeviceWebGPU } from "./device_webgpu";
 import { EvalEnv } from "./expr";
 import {
     Kernel,
@@ -10,6 +11,8 @@ import {
     getKernelShaderCode,
     getShaderTypeElementByteSize,
 } from "./kernel";
+
+const buffers = [];
 
 export class KernelWebGPU extends Kernel {
     private _gpuDevice: GPUDevice;
@@ -132,7 +135,7 @@ export class KernelWebGPU extends Kernel {
                     }
 
                     // Build the params buffer
-                    const paramsBuffer = this._gpuDevice.createBuffer({
+                    const paramsBuffer = (this.device as DeviceWebGPU).createBuffer({
                         mappedAtCreation: true,
                         size: paramsBufferSize,
                         usage: GPUBufferUsage.STORAGE,
@@ -185,6 +188,7 @@ export class KernelWebGPU extends Kernel {
                     // Submit GPU commands
                     const gpuCommands = commandEncoder.finish();
                     this._gpuDevice.queue.submit([gpuCommands]);
+                    (this.device as DeviceWebGPU).destroyBuffer(paramsBuffer);
 
                     i += countX;
                     j += countY;
@@ -239,7 +243,7 @@ export class KernelWebGPU extends Kernel {
             );
             // console.log("output size", outputElementCount, outputElementByteSize);
             const outputBufferSize = outputElementByteSize * outputElementCount;
-            const outputBuffer = this._gpuDevice.createBuffer({
+            const outputBuffer = (this.device as DeviceWebGPU).createBuffer({
                 mappedAtCreation: false,
                 size: outputBufferSize,
                 usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,

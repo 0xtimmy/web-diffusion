@@ -13,8 +13,8 @@
 <script lang="ts">
 import { defineComponent } from "vue"
 import { init_device } from "@/components/device";
-import { Diffusion } from "@/components/diffuser/ddpm"
 import { UNet } from "@/components/diffuser/modules"
+import { Diffusion } from "@/components/diffuser/ddpm"
 import * as torch from "@/torch";
 
 export default defineComponent({
@@ -34,50 +34,50 @@ export default defineComponent({
     methods: {
         loadPokemon: async function(event) {
             this.weightsSelected = true;
-            const reader = new FileReader();
             console.log("loading weights...");
             await this.model.loadStateDictFromURL("../../parameters/pokemon");
             console.log("✅ done loading weights");
             this.modelReady = true;
-            //this.generate();
+            this.generate();
         },
-        generate: async function() {
+        generate: function() {
+            const worker = new Worker("../../worker.js", { type: "module" });
+            worker.onmessage = (e: any) => {
+                console.log("received message from worker");
+            }
             if(!this.active) {
                 this.active = true;
-                const diffuser = new Diffusion({ noise_steps: 100, img_size: 64 });
-                const res = await diffuser.sample(this.model, async (res: torch.Tensor, step_num: number) => { 
-                    await this.renderResult(res, `iteration: ${step_num}`);
-                    return;
+                const diffuser = new Diffusion({ noise_steps: 5, img_size: 64 });
+                const res = diffuser.sample(this.model, (res: torch.Tensor, step_num: number) => { 
+                    //this.renderResult(res, `Iteration ${step_num}`);
+                    (torch.devices["webgpu"] as any).logBuffers();
                 });
                 this.active = false;
                 this.renderResult(res, "final");
             }
         },
-        renderResult: async function(result: torch.Tensor, caption: string) {
+        renderResult: function(result: torch.Tensor, caption: string) {
             result = result.cat(torch.constant([1, 1, ...Array.from(result.shape).splice(2)], 255), 1);
             result = result.transpose(1, 2).transpose(2, 3);
-            const data = await result.toArrayAsync()
-            if(!this.active) console.log("Result: ", data);
-            const img_data = new Uint8ClampedArray(data.flat(4) as any);
-            const box = document.createElement("div");
-            box.className = "result-box";
+            result.toArrayAsync().then((data) => {
+                if(!this.active) console.log("Result: ", data);
+                const img_data = new Uint8ClampedArray(data.flat(4) as any);
+                const box = document.createElement("div");
+                box.className = "result-box";
 
-            const canvas = document.createElement("canvas");
-            canvas.setAttribute("width", "64px");
-            canvas.setAttribute("height", "64px");
-            const context = canvas.getContext("2d");
-            context.putImageData(
-                new ImageData(img_data, 64, 64), 
-                0, 0);
-            box.appendChild(canvas);
-            const cap = document.createElement("div");
-            cap.innerHTML = caption;
-            box.appendChild(cap);
-            this.$refs["cycle-list"].appendChild(box);
-            await new Promise<void>((resolve) => {
-                setTimeout(() => { resolve(); }, 100);
-            })
-            return;
+                const canvas = document.createElement("canvas");
+                canvas.setAttribute("width", "64px");
+                canvas.setAttribute("height", "64px");
+                const context = canvas.getContext("2d");
+                context.putImageData(
+                    new ImageData(img_data, 64, 64), 
+                    0, 0);
+                box.appendChild(canvas);
+                const cap = document.createElement("div");
+                cap.innerHTML = caption;
+                box.appendChild(cap);
+                this.$refs["cycle-list"].appendChild(box);
+            });
         }
     }
 })
