@@ -5,6 +5,7 @@ export {
     GradientFunctionOutput,
 } from "./autograd";
 export { ATypedArray, Dtype } from "./dtype";
+export * from "./devices"
 export { Device, Deviceish, DeviceId, DeviceType } from "./device";
 export { CompiledExpr, EvalEnv, ExprCode } from "./expr";
 export * from "./factories";

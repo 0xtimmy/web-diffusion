@@ -13,7 +13,8 @@ import {
 
 export class KernelWebGPU extends Kernel {
     private _gpuDevice: GPUDevice;
-    private _bindGroupLayout: GPUBindGroupLayout;
+    private _inputBindGroupLayout: GPUBindGroupLayout;
+    private _outputBindGroupLayout: GPUBindGroupLayout;
     private _computePipeline: GPUComputePipeline;
     private _shaderCode: string;
     private _workgroupSizes: { x: number, y: number, z: number };
@@ -25,10 +26,11 @@ export class KernelWebGPU extends Kernel {
             throw new Error("Cannot create a GPU kernel without a GPU device");
         }
         this._gpuDevice = gpuDevice;
-        let bindGroupLayoutEntries: GPUBindGroupLayoutEntry[] = [];
+        let inputBindGroupLayoutEntries: GPUBindGroupLayoutEntry[] = [];
+        let outputBindGroupLayoutEntries: GPUBindGroupLayoutEntry[] = [];
         let bindingIndex = 0;
         for (let i = 0; i < spec.inputs.length; i++, bindingIndex++) {
-            bindGroupLayoutEntries.push({
+            inputBindGroupLayoutEntries.push({
                 binding: bindingIndex,
                 visibility: GPUShaderStage.COMPUTE,
                 buffer: {
@@ -36,8 +38,16 @@ export class KernelWebGPU extends Kernel {
                 },
             });
         }
+        inputBindGroupLayoutEntries.push({
+            binding: bindingIndex,
+            visibility: GPUShaderStage.COMPUTE,
+            buffer: {
+                type: "read-only-storage" as GPUBufferBindingType,
+            },
+        });
+        bindingIndex = 0;
         for (let i = 0; i < spec.outputs.length; i++, bindingIndex++) {
-            bindGroupLayoutEntries.push({
+            outputBindGroupLayoutEntries.push({
                 binding: bindingIndex,
                 visibility: GPUShaderStage.COMPUTE,
                 buffer: {
@@ -45,16 +55,13 @@ export class KernelWebGPU extends Kernel {
                 },
             });
         }
-        bindGroupLayoutEntries.push({
-            binding: bindingIndex,
-            visibility: GPUShaderStage.COMPUTE,
-            buffer: {
-                type: "read-only-storage" as GPUBufferBindingType,
-            },
+        
+        this._inputBindGroupLayout = gpuDevice.createBindGroupLayout({
+            entries: inputBindGroupLayoutEntries,
         });
-        this._bindGroupLayout = gpuDevice.createBindGroupLayout({
-            entries: bindGroupLayoutEntries,
-        });
+        this._outputBindGroupLayout = gpuDevice.createBindGroupLayout({
+            entries: outputBindGroupLayoutEntries
+        })
 
         //console.log("constructing kernel with params: ", params);
         const workgroupCounts: [number, number, number] = params == null ? [1, 1, 1] : this.getWorkgroupCounts(this.getRunEnv(params));
@@ -63,12 +70,14 @@ export class KernelWebGPU extends Kernel {
         this._shaderCode = workload.code;
         this._workgroupSizes = workload.workgroupSizes;
 
+        //console.log("running shader: \n", this._shaderCode)
+
         const shaderModule = gpuDevice.createShaderModule({
             code: this._shaderCode,
         });
         this._computePipeline = gpuDevice.createComputePipeline({
             layout: gpuDevice.createPipelineLayout({
-                bindGroupLayouts: [this._bindGroupLayout],
+                bindGroupLayouts: [this._inputBindGroupLayout, this._outputBindGroupLayout],
             }),
             compute: {
                 module: shaderModule,
@@ -160,22 +169,12 @@ export class KernelWebGPU extends Kernel {
                     const countX = Math.min(workgroupCountX - i, maxCountPerDim);
                     const countY = Math.min(workgroupCountY - j, maxCountPerDim);
                     const countZ = Math.min(workgroupCountZ - k, maxCountPerDim);
-                    /*                 
-                    console.log(`
-    running: {
-        x: ${countX} workgroups @ size ${this._workgroupSizes.x},
-        y: ${countY} workgroups @ size ${this._workgroupSizes.y},
-        z: ${countZ} workgroups @ size ${this._workgroupSizes.z},
-    }
-    with code:
-    ${this._shaderCode}
-                    `);
-                    */
 
                     // Encode the kernel using pass encoder
                     const passEncoder = commandEncoder.beginComputePass();
                     passEncoder.setPipeline(this._computePipeline);
-                    passEncoder.setBindGroup(0, bindGroup);
+                    passEncoder.setBindGroup(0, bindGroup[0]);
+                    passEncoder.setBindGroup(1, bindGroup[1]);
                     passEncoder.dispatchWorkgroups(
                         Math.ceil(countX / this._workgroupSizes.x),
                         Math.ceil(countY / this._workgroupSizes.y),
@@ -252,36 +251,48 @@ export class KernelWebGPU extends Kernel {
         inputBuffers: GPUBuffer[],
         paramsBuffer: GPUBuffer,
         outputBuffers: GPUBuffer[]
-    ): GPUBindGroup {
-        const entries: GPUBindGroupEntry[] = [];
+    ): [GPUBindGroup, GPUBindGroup] {
+        
+
+        const inputEntries: GPUBindGroupEntry[] = [];
         let bindingIndex = 0;
         for (let i = 0; i < inputBuffers.length; i++, bindingIndex++) {
-            entries.push({
+            //console.log("binding size: ", inputBuffers[i]);
+            inputEntries.push({
                 binding: bindingIndex,
                 resource: {
                     buffer: inputBuffers[i],
                 },
             });
         }
-        for (let i = 0; i < this.spec.outputs.length; i++, bindingIndex++) {
-            const outputBuffer = outputBuffers[i];
-            entries.push({
-                binding: bindingIndex,
-                resource: {
-                    buffer: outputBuffer,
-                },
-            });
-        }
-        entries.push({
+        //console.log("binding size: ", paramsBuffer);
+        inputEntries.push({
             binding: bindingIndex,
             resource: {
                 buffer: paramsBuffer,
             },
         });
-        const bindGroup = this._gpuDevice.createBindGroup({
-            layout: this._bindGroupLayout,
-            entries: entries,
+        const inputBindGroup = this._gpuDevice.createBindGroup({
+            layout: this._inputBindGroupLayout,
+            entries: inputEntries,
         });
-        return bindGroup;
+
+        const outputEntries = [];
+        bindingIndex = 0;
+        for (let i = 0; i < this.spec.outputs.length; i++, bindingIndex++) {
+            //console.log("binding size: ", outputBuffers[i]);
+            outputEntries.push({
+                binding: bindingIndex,
+                resource: {
+                    buffer: outputBuffers[i],
+                },
+            });
+        }
+        const outputBindGroup = this._gpuDevice.createBindGroup({
+            layout: this._outputBindGroupLayout,
+            entries: outputEntries,
+        });
+        
+        return [inputBindGroup, outputBindGroup];
     }
 }

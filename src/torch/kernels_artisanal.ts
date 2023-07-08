@@ -30,6 +30,10 @@ function _defaultKernel({
 }
 
 export const kernels: { [name: string]: KernelSpec } = {
+    exp: _defaultKernel({
+        name: "exp",
+        shader: `output[global_id.x] = exp(input[global_id.x]);`
+    }),
     cumprod: _defaultKernel({
         name: "cumprod",
         parameters: [
@@ -207,6 +211,14 @@ export const kernels: { [name: string]: KernelSpec } = {
         ],
         parameters: [
             {
+                name: "ascale",
+                shaderType: "u32"
+            },
+            {
+                name: "bscale",
+                shaderType: "u32"
+            },
+            {
                 name: "outputSize",
                 shaderType: "u32"
             }
@@ -231,7 +243,7 @@ export const kernels: { [name: string]: KernelSpec } = {
         //workgroupSize: [1, 1, 1],
         workgroupCount: ["parameters.outputSize", '1', '1'],
         shader: `
-            output[global_id.x] = a[global_id.x] + b[global_id.x];
+            output[global_id.x] = a[global_id.x / parameters.ascale] + b[global_id.x / parameters.bscale];
         `
     },
     sub: {
@@ -315,6 +327,14 @@ export const kernels: { [name: string]: KernelSpec } = {
         ],
         parameters: [
             {
+                name: "ascale",
+                shaderType: "u32"
+            },
+            {
+                name: "bscale",
+                shaderType: "u32"
+            },
+            {
                 name: "outputSize",
                 shaderType: "u32"
             }
@@ -339,7 +359,7 @@ export const kernels: { [name: string]: KernelSpec } = {
         //workgroupSize: [1, 1, 1],
         workgroupCount: ["parameters.outputSize", "1", "1"],
         shader: `
-            output[global_id.x] = a[global_id.x] / b[global_id.x];
+            output[global_id.x] = a[global_id.x / parameters.ascale] / b[global_id.x / parameters.bscale];
         `
     },
     find_index: {
@@ -433,7 +453,7 @@ export const kernels: { [name: string]: KernelSpec } = {
             },
             {
                 name: "index",
-                shaderType: "array<u32>"
+                shaderType: "array<f32>"
             }
         ],
         outputs: [
@@ -443,10 +463,9 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "size"
             }
         ],
-        //workgroupSize: [1, 1, 1],
-        workgroupCount: ["parameters.size", 1, 1],
+        workgroupCount: ["parameters.size", "1", "1"],
         shader: `
-            output[global_id.x] = input[index[global_id.x]];
+            output[global_id.x] = input[u32(index[global_id.x])];
         `
     },
     sum: {
@@ -727,6 +746,10 @@ export const kernels: { [name: string]: KernelSpec } = {
             {
                 name: "batch_size",
                 shaderType: "u32"
+            },
+            {
+                name: "stride",
+                shaderType: "u32"
             }
         ],
         inputs: [
@@ -739,18 +762,18 @@ export const kernels: { [name: string]: KernelSpec } = {
             {
                 name: "output",
                 shaderType: "array<f32>",
-                size: "batches * batch_size"
+                size: "batches * batch_size * stride"
             }
         ],
         //workgroupSize: [1, 1, 1],
-        workgroupCount: ["parameters.batches", "parameters.batch_size", 1],
+        workgroupCount: ["parameters.batches", "parameters.batch_size", "parameters.stride"],
         shader: `
             var sum: f32 = 0;
             for(var i: u32 = 0; i < parameters.batch_size; i++) {
-                sum += exp(input[i * parameters.batches + global_id.x]);
+                sum += exp(input[global_id.x * parameters.batch_size + i * parameters.stride + global_id.z]);
             } 
 
-            var idx: u32 = global_id.y * parameters.batches + global_id.x;
+            var idx: u32 = global_id.x * parameters.batch_size * parameters.stride + global_id.y * parameters.stride + global_id.z;
             output[idx] = exp(input[idx]) / sum;
         `
     },
@@ -836,7 +859,7 @@ export const kernels: { [name: string]: KernelSpec } = {
             }
         ],
         //workgroupSize: [1, 2, 1],
-        workgroupCount: ["parameters.outputSize", 1, 1],
+        workgroupCount: ["parameters.outputSize", "2", "1"],
         shader: `
             const pi = 3.1415;
             var u1: f32;
@@ -1386,6 +1409,14 @@ export const kernels: { [name: string]: KernelSpec } = {
                 shaderType: "u32",
             },
             {
+                name: "innerDimOffset",
+                shaderType: "u32"
+            },
+            {
+                name: "trueInnerDim",
+                shaderType: "u32"
+            },
+            {
                 name: "alpha",
                 shaderType: "f32",
             },
@@ -1414,9 +1445,9 @@ export const kernels: { [name: string]: KernelSpec } = {
         workgroupCount: ["parameters.resultRows", "parameters.resultCols", "parameters.batches"],
         shader: `
             var result = 0.0;
-            for (var i = 0u; i < parameters.innerDim; i = i + 1u) {
-                let a = global_id.x * parameters.innerDim + i               + parameters.resultRows * parameters.innerDim * global_id.z;
-                let b = i * parameters.resultCols + global_id.y             + parameters.resultCols * parameters.innerDim * global_id.z;
+            for (var i = parameters.innerDimOffset; i < parameters.innerDim; i = i + 1u) {
+                let a = global_id.x * parameters.trueInnerDim + i               + parameters.resultRows * parameters.trueInnerDim * global_id.z;
+                let b = i * parameters.resultCols + global_id.y             + parameters.resultCols * parameters.trueInnerDim * global_id.z;
                 result = result + firstMatrix[a] * secondMatrix[b];
             }
             let index = global_id.y + global_id.x * parameters.resultCols  + parameters.resultRows * parameters.resultCols * global_id.z;

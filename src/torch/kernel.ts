@@ -244,15 +244,15 @@ export function getKernelShaderCode(
             `@group(0) @binding(${bindingIndex}) var<storage, read> ${input.name}: ${input.shaderType};`
         );
     }
-    for (let i = 0; i < spec.outputs.length; i++, bindingIndex++) {
-        let output = spec.outputs[i];
-        shaderCodeParts.push(
-            `@group(0) @binding(${bindingIndex}) var<storage, read_write> ${output.name}: ${output.shaderType};`
-        );
-    }
     shaderCodeParts.push(
         `@group(0) @binding(${bindingIndex}) var<storage, read> parameters: ${spec.name}Parameters;`
     );
+    for (let i = 0; i < spec.outputs.length; i++) {
+        let output = spec.outputs[i];
+        shaderCodeParts.push(
+            `@group(1) @binding(${i}) var<storage, read_write> ${output.name}: ${output.shaderType};`
+        );
+    }
             
     const workgroupSizes = _getOptimWorkgroupSize(
         workgroupCounts,

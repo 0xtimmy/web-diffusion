@@ -1,5 +1,4 @@
 
-import { Tensor } from "../torch/tensor";
 import * as ops from "../torch/ops";
 import * as nn from  "../torch/nn"
 import * as factories from "../torch/factories";
@@ -123,10 +122,87 @@ const funcs: { [key: string]: (args: any, target: any) => Promise<test_result>} 
     "self_attention": test_self_attention,
     "double_conv": test_double_conv,
     "down": test_down,
-    "up": test_up
+    "up": test_up,
+    "denoise": test_denoise,
+    "permute": test_permute
 }
 
 // Tests
+
+async function test_permute(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  input: Tensor,
+     *  permute: Array<number>
+     * }
+     */
+    const input = ops.tensor(args.input);
+    const target_output = ops.tensor(target);
+
+    const start = Date.now();
+    const actual_output = input.permute(args.permute);
+    const duration = Date.now() - start;
+    const output_data = await actual_output.toArrayAsync();
+
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    const diff = array_eq(output_data.flat(4), target.flat(4));
+    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
+
+    return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` };
+}
+
+async function test_denoise(args, target): Promise<test_result> {
+    /**
+     * args: {
+     *  input: Tensor,
+     *  i: number
+     *  original_noise: Tensor,
+     *  noise: Tensor,
+     *  alpha: Tensor,
+     *  alpha_hat: Tensor,
+     *  beta: Tensor
+     * }
+    **/
+    
+    let x = ops.tensor(args.original_noise);
+    const input = ops.tensor(args.input);
+    
+    let beta = factories.linspace(1e-4, 0.02, 1000);
+    let alpha = ops.sub(factories.ones([1000]), beta);
+    let alpha_hat = ops.cumprod(alpha);
+
+    let noise = ops.tensor(args.noise);
+
+    const t = factories.constant([1], args.i);
+    console.log(await t.toArrayAsync(), await alpha_hat.toArrayAsync());
+
+    alpha = alpha.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
+    alpha_hat = alpha_hat.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
+    beta = beta.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
+
+    const start = Date.now()
+
+    let one_div_sqrt_alpha = ops.div(factories.ones(alpha.shape), ops.sqrt(alpha));
+    let sqrt_one_minus_alpha_hat = ops.sqrt(ops.sub(factories.ones(alpha_hat.shape), alpha_hat));
+    let one_minus_alpha = ops.sub(factories.ones(alpha.shape), alpha);
+    let predicted_noise = ops.mul(input, ops.div(one_minus_alpha, sqrt_one_minus_alpha_hat));
+    x = ops.sub(x, predicted_noise);
+    x = ops.mul(one_div_sqrt_alpha, x);
+    const beta_noise = ops.mul(ops.sqrt(beta), noise);
+    const actual_output = ops.add(x, beta_noise);
+    console.log(await t.toArrayAsync(), await alpha_hat.toArrayAsync());
+    
+    const duration = Date.now() - start;
+
+    const target_output = ops.tensor(target)
+    const output_data = await actual_output.toArrayAsync();
+
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    const diff = array_eq(output_data.flat(4), target.flat(4));
+    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
+
+    return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` };
+}
 
 async function test_down(args, target): Promise<test_result> {
     /**
@@ -332,13 +408,21 @@ async function test_nn_multihead_attention(args, target): Promise<test_result> {
      *  value: Tensor,
      *  embed_dim: number,
      *  num_heads: number,
+     *  state_dict: StateDict
      * }
     **/
    const mha = new nn.MultiheadAttention(args.embed_dim, args.num_heads);
+   mha.loadStateDict(args.state_dict);
+
    const query = ops.tensor(args.query);
    const key = ops.tensor(args.key);
    const value = ops.tensor(args.value);
+
    const target_output = ops.tensor(target);
+
+    const raw = ops.scaled_dot_product_attention(query, key, value);
+    console.log("raw scaled dot product attention", await raw.toArrayAsync());
+
    const start = Date.now();
    const actual_output = mha.forward(query, key, value);
    const duration = Date.now() - start;
@@ -809,7 +893,7 @@ async function test_scaled_dot_product_attention(args, target): Promise<test_res
 
     if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
     const diff = array_eq(output_data.flat(4), [target].flat(4));
-    if(diff > 0.01) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
+    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
 
     return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` };
 }
@@ -913,7 +997,7 @@ async function test_mm(args, target): Promise<test_result> {
     const output_data = await actual_output.toArrayAsync();
     if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
     const diff = array_eq(output_data.flat(4), [target].flat(4));
-    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content` };
+    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
 
     return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` }
 }

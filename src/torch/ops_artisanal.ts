@@ -188,6 +188,7 @@ export function add(a: Tensor, b: Tensor): Tensor {
         })
         ascale = shapeSize(Array.from(b.shape).splice(b.shape.length));
     }
+    
     return a.runKernel(
         "add",
         { dtype: a.dtype },
@@ -219,10 +220,30 @@ export function mul(a: Tensor, b: Tensor): Tensor {
     )[0]
 }
 export function div(a: Tensor, b: Tensor): Tensor {
+    //if(shapeSize(a.shape) != shapeSize(b.shape)) throw new Error("trying to add mismatched shapes");
+
+    let ascale = 1;
+    let bscale = 1;
+    if(a.shape.length < b.shape.length) {
+        a.shape.forEach((dim, i) => {
+            if(dim != b.shape[i]) throw new Error(`Expected shared dimensions to match, instead got: ${a.shape}, and ${b.shape}`);
+        })
+        ascale = shapeSize(Array.from(b.shape).splice(a.shape.length));
+    } else if(a.shape.length > b.shape.length) {
+        b.shape.forEach((dim, i) => {
+            if(dim != a.shape[i]) throw new Error(`Expected shared dimensions to match, instead got: ${a.shape}, and ${b.shape}`);
+        })
+        bscale = shapeSize(Array.from(a.shape).splice(b.shape.length));
+    }
+
     return a.runKernel(
         "div",
         { dtype: a.dtype },
-        { outputSize: shapeSize(a.shape) },
+        { 
+            ascale: ascale,
+            bscale: bscale,
+            outputSize: shapeSize(a.shape) 
+        },
         [a.shape],
         b
     )[0]
@@ -516,19 +537,46 @@ export function sum(
 ): Tensor {
     if(dim < 0 || dim >= input.shape.length) throw new Error(`Expected dim that's within the tensor but input has shape: ${input.shape} and got dim ${dim}`);
     const output_shape = dim == 0 ? [1] : Array.from(input.shape).splice(0, dim);
-    const batches = shapeSize(output_shape);
-    const batch_size = shapeSize(Array.from(input.shape).splice(dim));
 
-    return input.runKernel(
+    let output = input;
+    let batch_size = shapeSize(Array.from(output.shape).splice(dim));
+    while(batch_size % 2 == 0) {
+        const pass_shape = [...output_shape, batch_size / 2];
+        let batches = shapeSize(pass_shape);
+        output = output.runKernel(
+            "sum", 
+            { dtype: input.dtype }, 
+            { 
+                batches: batches,
+                batch_size: 2,
+                size: input.size 
+            }, 
+            [pass_shape]
+        )[0];
+        batch_size = shapeSize(Array.from(output.shape).splice(dim));
+    }
+
+    return output.runKernel(
         "sum", 
         { dtype: input.dtype }, 
         { 
-            batches: batches,
-            batch_size: batch_size,
+            batches: shapeSize(output_shape),
+            batch_size: shapeSize(Array.from(output.shape).splice(dim)),
             size: input.size 
         }, 
         [output_shape]
     )[0];
+}
+
+export function exp(
+    input: Tensor
+): Tensor {
+    return input.runKernel(
+        "exp",
+        { dtype: input.dtype },
+        { outputSize: shapeSize(input.shape) },
+        [input.shape]
+    )[0]
 }
 
 export function softmax(
@@ -537,20 +585,28 @@ export function softmax(
 ): Tensor {
     if(dim < 0 || dim >= input.shape.length) throw new Error(`Expected dim that's within the tensor but input has shape: ${input.shape} and got dim ${dim}`);
 
-    const batches = input.shape.length == 1 ? 1 : shapeSize(Array.from(input.shape).splice(dim+1));
-    const batch_size = dim == 0 ? input.shape[0] : shapeSize(Array.from(input.shape).splice(1, dim));
+    const batches = dim == 0 ? 1 : shapeSize(Array.from(input.shape).splice(0, dim));
+    const batch_size = input.shape[dim];
+    const stride = dim+1 == input.shape.length ? 1 : shapeSize(Array.from(input.shape).splice(dim+1));
 
     const params = {
         batches: batches,
         batch_size: batch_size,
+        stride: stride
     };
 
+    const exps = exp(input).transpose(dim, input.shape.length-1);
+    const sums = sum(exps, input.shape.length-1);
+    return div(exps, sums).transpose(dim, input.shape.length-1);
+
+    /*
     return input.runKernel(
         "softmax",
         { dtype: input.dtype },
         params,
         [input.shape],
-    )[0]
+    )[0];
+    */
 }
 
 export function permute(
@@ -560,13 +616,21 @@ export function permute(
     if(dims.length != input.shape.length) throw new Error("permute need the same number of dimentions as it's input");
     const seen = [];
     dims.forEach((v) => {
-        if(seen.includes(v)) throw new Error(`Permute cannot take duplicate dimentions (${dims})`);
-        if(v < 0 || v >= dims.length) throw new Error(`No dimention ${v} in input shape: ${input.shape}`);
-    })
-    const output_shape = dims.map((v: number) => {
-        return input.shape[v];
+        if(seen.includes(v)) throw new Error(`Permute cannot take duplicated dims: ${dims}`);
+        seen.push(v);
     });
-    return input.view(output_shape);
+    
+    for(let i = 0; i < dims.length; i++) {
+        if(dims[i] < 0 || dims[i] >= dims.length) throw new Error(`No dimention ${dims[i]} in input shape: ${input.shape}`);
+
+        if(i != dims[i]) {
+            input = input.transpose(i, dims[i]);
+            dims[dims.indexOf(i)] = dims[i];
+        }
+        
+    }
+    
+    return input
 }
 
 export function scaled_dot_product_attention(
@@ -584,16 +648,47 @@ export function scaled_dot_product_attention(
     const output_shape = Array.from(query.shape);
     output_shape[output_shape.length-1] = value.shape[value.shape.length-1];
 
-    const dk = shapeSize(Array.from(key.shape).splice(key.shape.length - 2));
+    const sqrt_dk = Math.sqrt(key.shape[key.shape.length-1]);
 
     query = query.view([-1, query.shape[query.shape.length-2], query.shape[query.shape.length-1]]);
     key = key.view([-1, key.shape[key.shape.length-2], key.shape[key.shape.length-1]]);
     value = value.view([-1, value.shape[value.shape.length-2], value.shape[value.shape.length-1]]);
 
-    let out = scalar_div(mm(query, key.transpose(1,2)), Math.sqrt(dk));
+    let out = scalar_div(mm(query, key.transpose(1,2)), sqrt_dk);
     out = softmax(out, 1);
     out = mm(out, value);
     return out.view(output_shape);
+
+    /*
+    // batch the attention calculations
+    const batches = query.shape[0];
+    const query_batches = query.chunk(batches, 0);
+    const key_batches = key.transpose(1,2).chunk(batches, 0);
+    const value_batches = value.chunk(batches);
+
+    //console.log("dot product input shapes: ", query_batches[0].shape, key_batches[0].shape);
+    const dot_products = query_batches.map((q, i) => {
+        return scalar_div(mm(q, key_batches[i]), sqrt_dk);
+    });
+    //console.log("dot product shape: ", dot_products[0].shape);
+
+    const softmaxxes = dot_products.map((dot_product) => {
+        return softmax(dot_product, dot_product.shape.length-1);
+    });
+    //console.log("softmaxxes shape: ", softmaxxes[0].shape);
+
+    
+    let outs = softmaxxes.map((batch, i) => {
+        return mm(batch, value_batches[i]);
+    })
+    //console.log("outs shape: ", outs[0].shape);
+    
+    let out = outs[0];
+    for(let i = 1; i < batches; i++) {
+        out = cat(out, outs[i], 0);
+    }
+    return out.view(output_shape);
+    */
 }
 
 
@@ -634,6 +729,7 @@ export function multihead_attention(
         if(key_padding_mask != null) key_padding_mask = key_padding_mask.unsqueeze(0);
     }
 
+
     const tgt_len = query.shape[0];
     const bsz = query.shape[1];
     const embed_dim = query.shape[2];
@@ -646,7 +742,6 @@ export function multihead_attention(
     let q, k, v;
     if(!use_separate_proj_weight) {
         if(in_proj_weight == null) throw new Error("use_separate_proj_weight is False but in_proj_weight is null")
-
         const unpacked_weights = in_proj_weight.chunk(3);
         q_proj_weight = unpacked_weights[0];
         k_proj_weight = unpacked_weights[1];
@@ -656,7 +751,7 @@ export function multihead_attention(
         if(k_proj_weight == null) throw new Error("use_separate_proj_weight is True but k_proj_weight is null");
         if(v_proj_weight == null) throw new Error("use_separate_proj_weight is True but v_proj_weight is null");
     }
-    
+
     let b_q, b_k, b_v;
     if(in_proj_bias == null) {
         b_q = null;
@@ -669,7 +764,8 @@ export function multihead_attention(
         b_v = chunks[2];
     }
 
-    const proj = _in_projection(query, key, value, q_proj_weight, k_proj_weight, v_proj_weight, b_q, b_k, b_v)
+    const proj = _in_projection(query, key, value, q_proj_weight, k_proj_weight, v_proj_weight, b_q, b_k, b_v);
+    
     q = proj.q;
     k = proj.k;
     v = proj.v;
@@ -693,6 +789,7 @@ export function multihead_attention(
     if (need_weights) {
         console.error("need weights");
     } else {
+        /*
         if(attn_mask != null) {
             if(attn_mask.shape[0] == 1 && attn_mask.dim == 3) {
                 attn_mask = attn_mask.unsqueeze(0);
@@ -700,6 +797,7 @@ export function multihead_attention(
                 attn_mask = attn_mask.view([bsz, num_heads, -1, src_len]);
             }
         }
+        */
 
         q = q.view([bsz, num_heads, tgt_len, head_dim]);
         k = k.view([bsz, num_heads, src_len, head_dim]);
@@ -731,6 +829,7 @@ function _in_projection(
     b_k?: Tensor,
     b_v?: Tensor,
 ): { q: Tensor, k: Tensor, v: Tensor } {
+
     const Eq = q.shape[q.dim-1];
     const Ek = k.shape[k.dim-1];
     const Ev = v.shape[v.dim-1];
@@ -740,7 +839,11 @@ function _in_projection(
     if(b_q && b_q.shape[0] != Eq) throw new Error(`expecting query bias shape of ${[Eq]}, but got ${b_q.shape}`);
     if(b_k && b_k.shape[0] != Eq) throw new Error(`expecting key bias shape of ${[Eq]}, but got ${b_k.shape}`);
     if(b_v && b_v.shape[0] != Eq) throw new Error(`expecting value bias shape of ${[Eq]}, but got ${b_v.shape}`);
-    return { q: linear(q, w_q, b_q), k: linear(k, w_k, b_k), v: linear(v, w_v, b_v)}
+    return { 
+        q: linear(q, w_q, b_q), 
+        k: linear(k, w_k, b_k), 
+        v: linear(v, w_v, b_v)
+    }
 }
 
 export function chunk(
@@ -935,10 +1038,42 @@ export function mm(input: Tensor, other: Tensor): Tensor {
             batches: is_batched ? input.shape[0] : 1,
             resultRows: is_batched ? input.shape[1] : input.shape[0],
             resultCols: is_batched ? other.shape[2] : other.shape[1],
-            innerDim: is_batched ? input.shape[2] : input.shape[1],
+            trueInnerDim: is_batched ? input.shape[2] : input.shape[1],
             alpha: 1.0,
         };
 
+        //console.log("running linear with params: ", params);
+        //console.log("output shape: ", [...(is_batched ? [params.batches] : []), params.resultRows, params.resultCols])
+        const a = input.runKernel(
+            "mm",
+            { resultDtype: input.dtype },
+            { ...params, innerDim: params.trueInnerDim / 4, innerDimOffset: 0 },
+            [[...(is_batched ? [params.batches] : []), params.resultRows, params.resultCols]],
+            other
+        )[0];
+        const b = input.runKernel(
+            "mm",
+            { resultDtype: input.dtype },
+            { ...params, innerDim: params.trueInnerDim * 2 / 4, innerDimOffset: params.trueInnerDim / 4 },
+            [[...(is_batched ? [params.batches] : []), params.resultRows, params.resultCols]],
+            other
+        )[0];
+        const c = input.runKernel(
+            "mm",
+            { resultDtype: input.dtype },
+            { ...params, innerDim: params.trueInnerDim * 3 / 4, innerDimOffset: params.trueInnerDim * 2 / 4 },
+            [[...(is_batched ? [params.batches] : []), params.resultRows, params.resultCols]],
+            other
+        )[0];
+        const d = input.runKernel(
+            "mm",
+            { resultDtype: input.dtype },
+            { ...params, innerDim: params.trueInnerDim, innerDimOffset: params.trueInnerDim * 3 / 4 },
+            [[...(is_batched ? [params.batches] : []), params.resultRows, params.resultCols]],
+            other
+        )[0];
+        return add(add(add(a, b), c), d);
+        /*
         return input.runKernel(
             "mm",
             { resultDtype: input.dtype },
@@ -946,11 +1081,14 @@ export function mm(input: Tensor, other: Tensor): Tensor {
             [[...(is_batched ? [params.batches] : []), params.resultRows, params.resultCols]],
             other
         )[0];
+        */
     }
 }
 
 export function transpose(input: Tensor, dim0=0, dim1=1): Tensor {
-    if(dim1 < dim0) {
+    if(dim1 == dim0) {
+        return input;
+    } else if(dim1 < dim0) {
         const temp = dim0;
         dim0 = dim1;
         dim1 = temp;

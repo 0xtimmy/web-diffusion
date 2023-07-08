@@ -150,6 +150,7 @@ def gen_group_norm(message, input, groups, weight, bias, log="always", log_confi
 def gen_scaled_dot_product_attention(message, query, key, value, log="always", log_config="fail"):
     start = time.time()
     output = F.scaled_dot_product_attention(query, key, value)
+
     duration = time.time() - start
     return {
             "message": message,
