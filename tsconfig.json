@@ -37,7 +37,7 @@
     "src/**/*.vue",
     "tests/**/*.ts",
     "tests/**/*.tsx"
-  ],
+, "src/components/diffuser/ddpm.ts", "public/ddpm copy.ts"  ],
   "exclude": [
     "node_modules",
   ]

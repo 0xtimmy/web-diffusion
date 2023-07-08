@@ -10,7 +10,7 @@
   "dependencies": {
     "@webgpu/types": "^0.1.34",
     "core-js": "^3.6.5",
-    "vue": "^3.0.0",
+    "vue": "^3.2.13",
     "vue-router": "^4.0.0-0",
     "vuex": "^4.0.0-0",
     "webgpu-torch": "^0.3.5"

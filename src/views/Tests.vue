@@ -3,7 +3,6 @@
         <h2>Tests</h2>
         <input type="file" value="" @change="runTestfile">
         <p>open the console -></p>
-        <button @click="runCustomTest">custom test</button>
     </div>
 </template>
 
@@ -28,19 +27,6 @@ export default defineComponent({
             }
             reader.readAsText(event.target.files[0])
         },
-        async runCustomTest() {
-            const res = await fetch("/parameters/pokemon/down2.maxpool_conv.2.double_conv.0.weight");
-            const result = await res.json();
-            const weight_shape = torch.tensor(result).shape;
-            //console.log(result);
-            const typedResult = new Float32Array(result.flat(5));
-            console.log(typedResult)
-            const torch_weights = torch.tensor(Array.from(typedResult)).view(weight_shape);
-            const dummy_input = torch.tensor(input);
-            const dummy_output = torch.conv2d(dummy_input, torch_weights, undefined, undefined, 1);
-            const output = await dummy_output.toArrayAsync();
-            console.log(output);
-        }
     }
 })
 

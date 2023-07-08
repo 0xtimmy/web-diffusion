@@ -654,12 +654,13 @@ export function scaled_dot_product_attention(
     key = key.view([-1, key.shape[key.shape.length-2], key.shape[key.shape.length-1]]);
     value = value.view([-1, value.shape[value.shape.length-2], value.shape[value.shape.length-1]]);
 
+    /*
     let out = scalar_div(mm(query, key.transpose(1,2)), sqrt_dk);
     out = softmax(out, 1);
     out = mm(out, value);
     return out.view(output_shape);
+    */
 
-    /*
     // batch the attention calculations
     const batches = query.shape[0];
     const query_batches = query.chunk(batches, 0);
@@ -688,7 +689,6 @@ export function scaled_dot_product_attention(
         out = cat(out, outs[i], 0);
     }
     return out.view(output_shape);
-    */
 }
 
 
