@@ -494,6 +494,7 @@ async function test_nn_linear(args, target): Promise<test_result> {
      * }
     **/
     const ln = new nn.Linear(args.in_channels, args.out_channels);
+    ln.loadStateDict(args.state_dict);
     const input = ops.tensor(args.input);
     const target_output = ops.tensor(target);
     const start = Date.now();

@@ -23,7 +23,7 @@ export class Diffusion {
         this.img_size = img_size;
         
         this.beta = this.prepare_noise_schedule();
-        this.alpha = torch.sub(torch.ones(this.noise_steps), this.beta);
+        this.alpha = torch.ones(this.noise_steps).sub(this.beta);
         this.alpha_hat = torch.cumprod(this.alpha);
     }
 
@@ -47,7 +47,7 @@ export class Diffusion {
                 let predicted_noise = await model.forward(x, t);
                 //let predicted_noise = x.copy();
                 
-                const alpha = torch.index(this.alpha, t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
+                const alpha = torch.index(this.alpha, t)//.repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
                 const alpha_hat = torch.index(this.alpha_hat, t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
                 const beta = torch.index(this.beta, t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
                 t.destroy();
@@ -59,7 +59,6 @@ export class Diffusion {
                     noise = torch.zeros(x.shape);
                 }
                 
-                /*
                 let one_div_sqrt_alpha = torch.sqrt(alpha).scalar_pow(-1);
                 
                 let sqrt_one_minus_alpha_hat = alpha_hat.scalar_mul(-1).scalar_add(1).sqrt();
@@ -85,16 +84,11 @@ export class Diffusion {
                 if(typeof(handleStep) != 'undefined') {
                     handleStep(torch.scalar_mul(torch.scalar_add(torch.clamp(nx, -1, 1), 1), 255/2), (this.noise_steps-i));
                 }
-
-                alpha.destroy();
-                alpha_hat.destroy();
-                beta.destroy();
                 
                 x = nx;
-                */
         }
         //model.train();
-        return torch.scalar_mul(torch.scalar_add(torch.clamp(x, -1, 1), 1), 255/2);
+        return x.clamp(-1, 1).scalar_add(1).scalar_mul(255/2);
     }
 
 }

@@ -57,8 +57,8 @@ export class DoubleConv extends torch.nn.Module {
             new torch.nn.Conv2d(in_channels, mid_channels, 3, 1, 1, 1, 1, false),
             new torch.nn.GroupNorm(1, mid_channels),
             new torch.nn.GeLU(),
-            //new torch.nn.Conv2d(mid_channels, out_channels, 3, 1, 1, 1, 1, false),
-            //new torch.nn.GroupNorm(1, out_channels)
+            new torch.nn.Conv2d(mid_channels, out_channels, 3, 1, 1, 1, 1, false),
+            new torch.nn.GroupNorm(1, out_channels)
         ])
     }
 
@@ -124,20 +124,13 @@ export class Up extends torch.nn.Module {
     }
 
     forward(x, skip_x, t) {
-        console.log("x.shape", x.shape, "skip_x.shape", skip_x.shape, "t.shape", t.shape);
-        const a = this.up.forward(x);
-        console.log("a.shape", a.shape);
-        const b = torch.cat(skip_x, a, 1);
-        console.log("b.shape: ", b.shape);
-        a.destroy();
-        const c = this.conv.forward(b);
-        console.log("c shape: ", c.shape);
-        b.destroy();
+        x = this.up.forward(x);
+        console.log("x shape, skip_x shape: ", x.shape, skip_x.shape);
+        x = torch.cat(skip_x, x, 1);
+        x = this.conv.forward(x);
         t = this.emb_layer.forward(t);
-        let emb = torch.repeat(t, [1, 1, c.shape[c.shape.length-2], c.shape[c.shape.length-1]]);
-        t.destroy();
-        console.log("c.shape: ", c.shape, "emb.shape: ", emb.shape);
-        return c.add(emb);
+        let emb = torch.repeat(t, [1, 1, x.shape[x.shape.length-2], x.shape[x.shape.length-1]]);
+        return torch.add(x, emb);
     }
 }
 
@@ -205,23 +198,16 @@ export class UNet extends torch.nn.Module {
     async forward(x: torch.Tensor, t: torch.Tensor): Promise<torch.Tensor> {
         t = torch.unsqueeze(t, -1);
         const pos_enc = this.pos_encoding(t, this.time_dim);
-        t.destroy();
         
         let x1 = this.inc.forward(x);
         
         const _x2 = this.down1.forward(x1, pos_enc);
-        //const x1_unmap = await x1.toArrayAsync();
-        //x1.destroy();
         let x2 =  this.sa1.forward(_x2);
         _x2.destroy();
         const _x3 =  this.down2.forward(x2, pos_enc);
-        //const x2_unmap = await x2.toArrayAsync();
-        //x2.destroy();
         let x3 =  this.sa2.forward(_x3);
         _x3.destroy();
         const _x4 =  this.down3.forward(x3, pos_enc);
-        //const x3_unmap = await x3.toArrayAsync();
-        //x3.destroy();
         const x4 =  this.sa3.forward(_x4);
         _x4.destroy();
         console.log("finished down");
@@ -234,21 +220,18 @@ export class UNet extends torch.nn.Module {
         bot2.destroy();
         console.log("finished bot")
 
-        //x3 = torch.tensor(x3_unmap);
         const _x5 = this.up1.forward(bot3, x3, pos_enc);
         bot3.destroy();
         x3.destroy();
         const x5 =  this.sa4.forward(_x5);
         _x5.destroy();
         console.log("finished x5");
-        //x2 = torch.tensor(x2_unmap);
         const _x6 =  this.up2.forward(x5, x2, pos_enc);
         x5.destroy();
         x2.destroy();
         const x6 =  this.sa5.forward(_x6);
         _x6.destroy();
         console.log("finished x6")
-        //x1 = torch.tensor(x1_unmap);
         const _x7 = this.up3.forward(x6, x1, pos_enc);
         x6.destroy();
         x1.destroy();

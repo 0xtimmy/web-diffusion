@@ -69,7 +69,8 @@ tests = [
 
     #ft.gen_upsample("Upsample test 1", torch.randn([1, 1, 2, 2]), scale_factor=[2, 2], mode="nearest"),
     #ft.gen_upsample("Upsample test 1", torch.randn([1, 1, 3, 3]), scale_factor=[4, 4], mode="bilinear"),
-    #ft.gen_upsample("Upsample performance 1", torch.randn([1, 1, 256, 256]), scale_factor=[2, 2], mode="bilinear"),
+    ft.gen_upsample("Upsample performance 1", torch.randn([1, 1, 64, 64]), scale_factor=[20, 20], mode="bilinear"),
+    ft.gen_upsample("Upsample performance 2", torch.randn([1, 256, 8, 8]), scale_factor=[20, 20], mode="bilinear"),
 
     #ft.gen_softmax("Softmax basic test", torch.randn(10) * 10, 0),
     #ft.gen_softmax("Softmax basic test", torch.randn([2, 5]) * 10, 0),
@@ -131,7 +132,7 @@ tests = [
 
     #mt.gen_nn_groupnorm("GroupNorm test 1", torch.randn([20, 6, 10, 10]), 3, 6),
 
-    #mt.gen_nn_linear("Linear test 1", torch.randn([128,16]), 16, 8),
+    mt.gen_nn_linear("Linear test 1", torch.randn([128,16]), 16, 8),
 
     #mt.gen_nn_conv2d("Conv2d test 1", torch.randn([20, 16, 50, 100]), 16, 32, 3),
 

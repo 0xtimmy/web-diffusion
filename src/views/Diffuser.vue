@@ -51,7 +51,7 @@ export default defineComponent({
                 });
                 console.log(res);
                 this.active = false;
-                //this.renderResult(res, "final");
+                this.renderResult(res, "final");
             }
         },
         renderResult: function(result: torch.Tensor, caption: string) {

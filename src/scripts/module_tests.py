@@ -73,7 +73,8 @@ def gen_nn_linear(message, input, in_channels, out_channels, log="always", log_c
         "args": {
             "in_channels": in_channels,
             "out_channels": out_channels,
-            "input": input.numpy().tolist()
+            "input": input.numpy().tolist(),
+            "state_dict": gen_state_dict(ln)
         },
         "target": output.detach().numpy().tolist(),
         "duration": duration * 1000,

@@ -311,22 +311,25 @@ export function cat(a: Tensor, b: Tensor, dim: 0|1|2|3): Tensor {
 }
 
 export function repeat(input: Tensor, shape: Shape): Tensor {
-    let t0 = input
+    let t0 = input.copy();
     for(let x = 1; x < shape[0]; x++) {
-        t0 = cat(t0, input, 0);
+        t0 = t0.cat(input, 0);
     }
-    let t1 = t0
+    let t1 = t0.copy();
     for(let y = 1; shape[1] && y < shape[1]; y++) {
-        t1 = cat(t1, t0, 1);
+        t1 = t1.cat(t0, 1);
     }
-    let t2 = t1;
+    t0.destroy();
+    let t2 = t1.copy();
     for(let z = 1; shape[2] && z < shape[2]; z++) {
-        t2 = cat(t2, t1, 2);
+        t2 = t2.cat(t1, 2);
     }
-    let t3 = t2;
+    t1.destroy();
+    let t3 = t2.copy();
     for(let w = 1; shape[3] && w < shape[3]; w++) {
-        t3 = cat(t3, t2, 3);
+        t3 = t3.cat(t2, 3);
     }
+    t2.destroy();
     return t3;
 }
 
@@ -464,6 +467,7 @@ export function upsample(
         d_out: output_shape[4] ? output_shape[4] : 1,
         outputSize: shapeSize(output_shape)
     }
+    console.log("upsample parameters: ", params);
     return input.runKernel(
         "upsample",
         { dtype: input.dtype},

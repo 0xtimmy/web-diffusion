@@ -616,6 +616,11 @@ export class Tensor extends TensorBase {
         };
         return this.runKernelInplace("acosh_", { dtype: this.dtype }, params);
     }
+    clamp(low: number, high: number): Tensor {
+        const output = aops.clamp(this, low, high);
+        this.destroy();
+        return output;
+    }
     /**
     * Calculates:
     * ```js
