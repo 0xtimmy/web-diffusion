@@ -1022,7 +1022,7 @@ export const kernels: { [name: string]: KernelSpec } = {
                     } else if(x_oob && !y_oob) {
                         var p1Idx: u32;
                         var p2Idx: u32;
-                        if(f32(global_id.x % parameters.w_out) < xscale_factor) {
+                        if(f32(global_id.x % parameters.w_out) < xscale_factor || f32(global_id.x) < xoffset) {
                             p1Idx = x2_map*parameters.h_in + y1_map;
                             p2Idx = x2_map*parameters.h_in + y2_map;
                         } else {
@@ -1030,12 +1030,12 @@ export const kernels: { [name: string]: KernelSpec } = {
                             p2Idx = x1_map*parameters.h_in + y2_map;
                         }
                         var diff = (input[p2Idx] - input[p1Idx]) / yscale_factor;
-                        output[output_idx] = input[p1Idx] + diff * (2.0*(f32(global_id.y) - yoffset)) % (2.0*yscale_factor) / 2.0;
+                        output[output_idx] = input[p1Idx] + diff * ((2.0*(f32(global_id.y) - yoffset)) % (2.0*yscale_factor)) / 2.0;
                         return;
                     } else if(!x_oob && y_oob) {
                         var p1Idx: u32;
                         var p2Idx: u32;
-                        if(f32(global_id.y) < yscale_factor) {
+                        if(f32(global_id.y % parameters.h_out) < yscale_factor || f32(global_id.y) < yoffset) {
                             p1Idx = x1_map*parameters.h_in + y2_map;
                             p2Idx = x2_map*parameters.h_in + y2_map;
                         } else {
@@ -1043,7 +1043,7 @@ export const kernels: { [name: string]: KernelSpec } = {
                             p2Idx = x2_map*parameters.h_in + y1_map;
                         }
                         var diff: f32 = (input[p2Idx] - input[p1Idx]) / xscale_factor;
-                        output[output_idx] = input[p1Idx] + diff * (2.0*(f32(global_id.x) - xoffset)) % (2.0*xscale_factor) / 2.0;
+                        output[output_idx] = input[p1Idx] + diff * ((2.0*(f32(global_id.x) - xoffset)) % (2.0*xscale_factor)) / 2.0;
                         return;
                     }
 
@@ -1374,11 +1374,9 @@ export const kernels: { [name: string]: KernelSpec } = {
 
             for(var batch: u32 = 0; batch < parameters.batchSize; batch++) {
                 var input_batch_idx: u32 = batch * parameters.inputChannels * parameters.inputHeight * parameters.inputWidth;
-                var weight_batch_idx: u32 = batch * parameters.outputChannels * parameters.inputChannels * parameters.kernelHeight * parameters.kernelWidth;
                 var output_batch_idx: u32 = batch * parameters.outputChannels * parameters.outputHeight * parameters.outputWidth;
                 
-                
-                var weight_out_channel_idx: u32 = weight_batch_idx + global_id.x * parameters.inputChannels * parameters.kernelHeight * parameters.kernelWidth;
+                var weight_out_channel_idx: u32 = global_id.x * parameters.inputChannels * parameters.kernelHeight * parameters.kernelWidth;
 
                 var output_channel_idx: u32 = output_batch_idx + global_id.x * parameters.outputHeight * parameters.outputWidth;
                 var output_idx: u32 = output_channel_idx + global_id.y * parameters.outputWidth + global_id.z;
@@ -1396,7 +1394,7 @@ export const kernels: { [name: string]: KernelSpec } = {
                         }
                     }
                 }
-                var bias_idx: u32 = batch * parameters.outputChannels + global_id.x;
+                var bias_idx: u32 = global_id.x;
                 output[output_idx] = result + bias[bias_idx];
             }
         `

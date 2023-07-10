@@ -44,38 +44,38 @@ export default defineComponent({
             if(!this.active) {
                 const model = new UNet();
                 this.active = true;
-                const diffuser = new Diffusion({ noise_steps: 1, img_size: 64 });
-                const res = await diffuser.sample(model, (res: torch.Tensor, step_num: number) => { 
-                    //this.renderResult(res, `Iteration ${step_num}`);
-                    //(torch.devices["webgpu"] as any).logBuffers();
+                const diffuser = new Diffusion({ noise_steps: 1000, img_size: 64 });
+                const res = await diffuser.sample(model, async (res: torch.Tensor, step_num: number) => { 
+                    await this.renderResult(res, `Iteration ${step_num}`);
+                    return;
                 });
                 console.log(res);
                 this.active = false;
                 this.renderResult(res, "final");
             }
         },
-        renderResult: function(result: torch.Tensor, caption: string) {
+        renderResult: async function(result: torch.Tensor, caption: string) {
             result = result.cat(torch.constant([1, 1, ...Array.from(result.shape).splice(2)], 255), 1);
             result = result.transpose(1, 2).transpose(2, 3);
-            result.toArrayAsync().then((data) => {
-                if(!this.active) console.log("Result: ", data);
-                const img_data = new Uint8ClampedArray(data.flat(4) as any);
-                const box = document.createElement("div");
-                box.className = "result-box";
+            const data = await result.toArrayAsync();
+            if(!this.active) console.log("Result: ", data);
+            const img_data = new Uint8ClampedArray(data.flat(4) as any);
+            const box = document.createElement("div");
+            box.className = "result-box";
 
-                const canvas = document.createElement("canvas");
-                canvas.setAttribute("width", "64px");
-                canvas.setAttribute("height", "64px");
-                const context = canvas.getContext("2d");
-                context.putImageData(
-                    new ImageData(img_data, 64, 64), 
-                    0, 0);
-                box.appendChild(canvas);
-                const cap = document.createElement("div");
-                cap.innerHTML = caption;
-                box.appendChild(cap);
-                this.$refs["cycle-list"].appendChild(box);
-            });
+            const canvas = document.createElement("canvas");
+            canvas.setAttribute("width", "64px");
+            canvas.setAttribute("height", "64px");
+            const context = canvas.getContext("2d");
+            context.putImageData(
+                new ImageData(img_data, 64, 64), 
+                0, 0);
+            box.appendChild(canvas);
+            const cap = document.createElement("div");
+            cap.innerHTML = caption;
+            box.appendChild(cap);
+            this.$refs["cycle-list"].appendChild(box);
+            return;
         }
     }
 })

@@ -111,9 +111,9 @@ export class Up extends torch.nn.Module {
     constructor(in_channels: number, out_channels: number, emb_dim=256) {
         super();
 
-        this.up = new torch.nn.UpSample(null, 20, "bilinear");
+        this.up = new torch.nn.UpSample(null, 2, "bilinear");
         this.conv = new torch.nn.Sequential([
-            new DoubleConv(in_channels, in_channels, undefined, true),
+            new DoubleConv(in_channels, in_channels, in_channels, true),
             new DoubleConv(in_channels, out_channels, Math.floor(in_channels / 2)),
         ])
 
@@ -125,7 +125,6 @@ export class Up extends torch.nn.Module {
 
     forward(x, skip_x, t) {
         x = this.up.forward(x);
-        console.log("x shape, skip_x shape: ", x.shape, skip_x.shape);
         x = torch.cat(skip_x, x, 1);
         x = this.conv.forward(x);
         t = this.emb_layer.forward(t);
@@ -195,7 +194,7 @@ export class UNet extends torch.nn.Module {
         return pos_enc;
     }
 
-    async forward(x: torch.Tensor, t: torch.Tensor): Promise<torch.Tensor> {
+    forward(x: torch.Tensor, t: torch.Tensor): torch.Tensor {
         t = torch.unsqueeze(t, -1);
         const pos_enc = this.pos_encoding(t, this.time_dim);
         
@@ -210,7 +209,6 @@ export class UNet extends torch.nn.Module {
         const _x4 =  this.down3.forward(x3, pos_enc);
         const x4 =  this.sa3.forward(_x4);
         _x4.destroy();
-        console.log("finished down");
 
         const bot1 =  this.bot1.forward(x4);
         x4.destroy();
@@ -218,30 +216,25 @@ export class UNet extends torch.nn.Module {
         bot1.destroy();
         const bot3 =  this.bot3.forward(bot2);
         bot2.destroy();
-        console.log("finished bot")
 
         const _x5 = this.up1.forward(bot3, x3, pos_enc);
         bot3.destroy();
         x3.destroy();
         const x5 =  this.sa4.forward(_x5);
         _x5.destroy();
-        console.log("finished x5");
         const _x6 =  this.up2.forward(x5, x2, pos_enc);
         x5.destroy();
         x2.destroy();
         const x6 =  this.sa5.forward(_x6);
         _x6.destroy();
-        console.log("finished x6")
         const _x7 = this.up3.forward(x6, x1, pos_enc);
         x6.destroy();
         x1.destroy();
         const x7 =  this.sa6.forward(_x7);
         _x7.destroy();
-        console.log("finished x7")
         
         const x8 = this.outc.forward(x7);
         x7.destroy()
-        console.log("finished x8")
         return x8;
     }
 }

@@ -44,7 +44,7 @@ export class Diffusion {
             console.log(`Starting pass #${this.noise_steps-i}`)
             //try {
                 const t = torch.constant([n], i);
-                let predicted_noise = await model.forward(x, t);
+                let predicted_noise = model.forward(x, t);
                 //let predicted_noise = x.copy();
                 
                 const alpha = torch.index(this.alpha, t)//.repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
@@ -81,11 +81,10 @@ export class Diffusion {
                 
                 console.log(`${(this.noise_steps-i)/this.noise_steps*100}% - ${Date.now() - sampleStart}ms`);
 
-                if(typeof(handleStep) != 'undefined') {
-                    handleStep(torch.scalar_mul(torch.scalar_add(torch.clamp(nx, -1, 1), 1), 255/2), (this.noise_steps-i));
-                }
-                
                 x = nx;
+                if(typeof(handleStep) != 'undefined') {
+                    await handleStep(x.copy().clamp(-1, 1).scalar_add(1).scalar_mul(255/2), this.noise_steps-i);
+                }
         }
         //model.train();
         return x.clamp(-1, 1).scalar_add(1).scalar_mul(255/2);

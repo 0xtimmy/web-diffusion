@@ -11,7 +11,6 @@ import * as aops from "./ops_artisanal";
 
 export class GeLU extends Module {
     forward(input: Tensor): Tensor {
-        //(async () => { console.log("forwarding GeLU with input: ", await input.toArrayAsync()); })();
         return aops.gelu(input);
     }
 }

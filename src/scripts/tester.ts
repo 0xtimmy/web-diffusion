@@ -517,9 +517,11 @@ async function test_nn_conv2d(args, target): Promise<test_result> {
      *  in_channels: number,
      *  out_channels: number,
      *  kernel_size: number
+     *  state_dict: StateDict
      * }
     **/
     const conv = new nn.Conv2d(args.in_channels, args.out_channels, args.kernel_size);
+    conv.loadStateDict(args.state_dict);
     const input = ops.tensor(args.input);
     const target_output = ops.tensor(target);
     const start = Date.now();

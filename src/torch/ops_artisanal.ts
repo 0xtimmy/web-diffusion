@@ -467,7 +467,6 @@ export function upsample(
         d_out: output_shape[4] ? output_shape[4] : 1,
         outputSize: shapeSize(output_shape)
     }
-    console.log("upsample parameters: ", params);
     return input.runKernel(
         "upsample",
         { dtype: input.dtype},
@@ -780,7 +779,7 @@ export function multihead_attention(
     let q, k, v;
     if(!use_separate_proj_weight) {
         if(in_proj_weight == null) throw new Error("use_separate_proj_weight is False but in_proj_weight is null")
-        const unpacked_weights = in_proj_weight.chunk(3);
+        const unpacked_weights = chunk(in_proj_weight, 3);
         q_proj_weight = unpacked_weights[0];
         k_proj_weight = unpacked_weights[1];
         v_proj_weight = unpacked_weights[2];
@@ -796,7 +795,7 @@ export function multihead_attention(
         b_k = null;
         b_v = null;
     } else {
-        const chunks = in_proj_bias.chunk(3);
+        const chunks = chunk(in_proj_bias, 3);
         b_q = chunks[0];
         b_k = chunks[1];
         b_v = chunks[2];
@@ -853,8 +852,6 @@ export function multihead_attention(
         attn_output = attn_output.permute([2, 0, 1, 3]).view([bsz * tgt_len, embed_dim]);
 
         attn_output = attn_output.linear(out_proj_weight, out_proj_bias);
-        out_proj_weight.destroy();
-        out_proj_bias.destroy();
         attn_output = attn_output.view([tgt_len, bsz, attn_output.shape[1]]);
         if(!is_batched) {
             attn_output = attn_output.squeeze(1);
@@ -1068,7 +1065,7 @@ export function conv2d(input: Tensor, weight: Tensor, bias?: Tensor, stride: num
         outputHeight: input.shape[2] - weight.shape[2] + 1,
         outputWidth: input.shape[3] - weight.shape[3] + 1,
     };
-    
+
     const output = input.runKernel(
         "conv2d",
         { dtype: input.dtype },

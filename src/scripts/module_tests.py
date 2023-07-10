@@ -55,6 +55,7 @@ def gen_nn_groupnorm(message, input, num_groups, num_channels, log="always", log
             "input": input.numpy().tolist(),
             "num_groups": num_groups,
             "num_channels": num_channels,
+            "state_dict": gen_state_dict(gn)
         },
         "target": output.detach().numpy().tolist(),
         "duration": duration * 1000,
@@ -94,7 +95,8 @@ def gen_nn_conv2d(message, input, in_channels, out_channels, kernel_size, log="a
             "input": input.numpy().tolist(),
             "in_channels": in_channels,
             "out_channels": out_channels,
-            "kernel_size": kernel_size
+            "kernel_size": kernel_size,
+            "state_dict": gen_state_dict(conv)
         },
         "target": output.detach().numpy().tolist(),
         "duration": duration * 1000,
