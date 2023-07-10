@@ -66,7 +66,7 @@ export const kernels: { [name: string]: KernelSpec } = {
             { name: "a", shaderType: "array<f32>" },
             { name: "b", shaderType: "array<f32>" }
         ],
-        shader: `output[global_id.x] = pow(a[global_id.x], b[global_id.y]);`
+        shader: `output[global_id.x] = pow(a[global_id.x], b[global_id.x]);`
     }),
     scalar_pow: _defaultKernel({
         name: "pow",
@@ -599,9 +599,12 @@ export const kernels: { [name: string]: KernelSpec } = {
             mean = mean / f32(parameters.groupSize);
             var variance: f32 = (mean_sqrd / f32(parameters.groupSize)) - (mean * mean) + parameters.eps;
             
-            var channel: u32 = (global_id.x * parameters.groups + global_id.y / (parameters.groupSize / parameters.groups)) % parameters.channels;
+            var channel_size: u32 = parameters.groupSize * parameters.groups / parameters.channels;
+
             for(var i: u32 = 0; i < parameters.groupSize; i++) {
+                var channel: u32 = ((group_start + i) % (parameters.groupSize * parameters.groups)) / channel_size;
                 output[group_start + i] = ((input[group_start + i] - mean) / sqrt(abs(variance))) * weight[channel] + bias[channel];
+                //output[group_start + i] = f32(channel);
             }
             
 

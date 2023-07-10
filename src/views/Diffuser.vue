@@ -44,7 +44,7 @@ export default defineComponent({
             if(!this.active) {
                 const model = new UNet();
                 this.active = true;
-                const diffuser = new Diffusion({ noise_steps: 1000, img_size: 64 });
+                const diffuser = new Diffusion({ noise_steps: 100, img_size: 64 });
                 const res = await diffuser.sample(model, async (res: torch.Tensor, step_num: number) => { 
                     await this.renderResult(res, `Iteration ${step_num}`);
                     return;

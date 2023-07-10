@@ -83,9 +83,9 @@ def gen_nn_linear(message, input, in_channels, out_channels, log="always", log_c
         "log_config": log_config
     }
 
-def gen_nn_conv2d(message, input, in_channels, out_channels, kernel_size, log="always", log_config="fail"):
+def gen_nn_conv2d(message, input, in_channels, out_channels, kernel_size, padding, log="always", log_config="fail"):
     start = time.time()
-    conv = torch.nn.Conv2d(in_channels, out_channels, kernel_size)
+    conv = torch.nn.Conv2d(in_channels, out_channels, kernel_size, padding=padding)
     output = conv(input)
     duration = time.time() - start
     return {
@@ -96,6 +96,7 @@ def gen_nn_conv2d(message, input, in_channels, out_channels, kernel_size, log="a
             "in_channels": in_channels,
             "out_channels": out_channels,
             "kernel_size": kernel_size,
+            "padding": padding,
             "state_dict": gen_state_dict(conv)
         },
         "target": output.detach().numpy().tolist(),

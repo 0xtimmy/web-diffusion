@@ -24,10 +24,10 @@ export class SelfAttention extends torch.nn.Module {
     }
 
     forward(x: torch.Tensor): torch.Tensor {
-        x = x.view([-1, this.channels, this.size * this.size]).transpose(1, 2);
+        x = torch.transpose(x.view([-1, this.channels, this.size * this.size]), 1, 2);
         let q = this.ln.forward(x);
         let k = q.copy();
-        let v= q.copy();
+        let v = q.copy();
         let attention_value = this.mha.forward(q, k, v).output;
         q.destroy();
         k.destroy();
@@ -182,16 +182,11 @@ export class UNet extends torch.nn.Module {
     }
 
     pos_encoding(t: torch.Tensor, channels: number) {
-        const range = torch.arange(0, channels, 2).scalar_div(channels).scalar_mul(-1);
-        const inv_freq = torch.constant(range.shape, 10000).pow(range).unsqueeze(0);
-        range.destroy();
+        const range = torch.arange(0, channels, 2).scalar_div(channels);
+        const inv_freq = torch.constant(range.shape, 10000).pow(range).scalar_pow(-1);
         const pos_enc_a = torch.repeat(t, [1, Math.floor(channels / 2)]).mul(inv_freq).sin();
         const pos_enc_b = torch.repeat(t, [1, Math.floor(channels / 2)]).mul(inv_freq).cos();
-        inv_freq.destroy();
-        const pos_enc = torch.cat(pos_enc_a, pos_enc_b, 1);
-        pos_enc_a.destroy();
-        pos_enc_b.destroy();
-        return pos_enc;
+        return torch.cat(pos_enc_a, pos_enc_b, 1)
     }
 
     forward(x: torch.Tensor, t: torch.Tensor): torch.Tensor {

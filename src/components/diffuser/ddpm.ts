@@ -40,14 +40,14 @@ export class Diffusion {
         const sampleStart = Date.now();
         //model.eval();
         let x = torch.normal([n, 3, this.img_size, this.img_size]);
-        for(let i = this.noise_steps -1; i >= 0; i--) {
-            console.log(`Starting pass #${this.noise_steps-i}`)
+        for(let i = this.noise_steps-1; i > 0; i--) {
+            console.log(`Starting pass #${i}`)
             //try {
                 const t = torch.constant([n], i);
                 let predicted_noise = model.forward(x, t);
                 //let predicted_noise = x.copy();
                 
-                const alpha = torch.index(this.alpha, t)//.repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
+                const alpha = torch.index(this.alpha, t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
                 const alpha_hat = torch.index(this.alpha_hat, t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
                 const beta = torch.index(this.beta, t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
                 t.destroy();
@@ -57,8 +57,7 @@ export class Diffusion {
                     noise = torch.randn(x.shape);
                 } else {
                     noise = torch.zeros(x.shape);
-                }
-                
+                }                
                 let one_div_sqrt_alpha = torch.sqrt(alpha).scalar_pow(-1);
                 
                 let sqrt_one_minus_alpha_hat = alpha_hat.scalar_mul(-1).scalar_add(1).sqrt();

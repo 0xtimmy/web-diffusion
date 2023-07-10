@@ -432,6 +432,7 @@ export class Module {
             const completeName = prefix + name;
             const state = await (await fetch(`${dirname}/${completeName}`)).json();
             const parameter = new Parameter(tensor(state as any));
+            console.log("loading parameters: ", completeName);
             
             if(old.shape.length != parameter.shape.length || parameter.shape.reduce((acc, v, i) => {
                 return acc || v != old.shape[i];

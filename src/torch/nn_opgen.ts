@@ -108,7 +108,7 @@ export class MultiheadAttention extends Module {
         this.dropout = dropout;
         this.batch_first = batch_first;
         this.head_dim = Math.floor(embed_dim / num_heads);
-        if(this.head_dim * num_heads != this.embed_dim) throw new Error("embed_dim must be divisible by num_heads");
+        if(this.head_dim * num_heads != this.embed_dim) throw new Error(`embed_dim must be divisible by num_heads, instead got embed_dim: ${this.embed_dim} and num_heads: ${num_heads}`);
 
         if(!this._qkv_same_embed_dim) {
             this.q_proj_weight = new Parameter(empty([this.embed_dim, this.embed_dim]));

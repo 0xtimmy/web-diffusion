@@ -188,6 +188,7 @@ export class Tensor extends TensorBase {
         this._destroyed = true;
     }
     async toArrayAsync(): Promise<TensorArrayData> {
+        if(this._destroyed) throw new Error("Can't retrieve a tensor that's been destroyed");
         await this.storage.mapReadAsync();
         const data = this.storage.getTypedArray(this.dtype);
         const shape = this.shape;

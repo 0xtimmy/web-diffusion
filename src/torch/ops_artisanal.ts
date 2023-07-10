@@ -151,7 +151,7 @@ export function pow(a: Tensor, b: Tensor): Tensor {
     return a.runKernel(
         "pow",
         { dtype: a.dtype },
-        { outputSize :shapeSize(a.shape) },
+        { outputSize: shapeSize(a.shape) },
         [a.shape],
         b
     )[0]
@@ -598,7 +598,7 @@ export function sum(
         { 
             batches: shapeSize(output_shape),
             batch_size: shapeSize(Array.from(output.shape).splice(dim)),
-            size: input.size 
+            size: output.size 
         }, 
         [output_shape]
     )[0];
@@ -695,9 +695,9 @@ export function scaled_dot_product_attention(
 
     // batch the attention calculations
     const batches = query.shape[0];
-    const query_batches = query.chunk(batches, 0);
-    const key_batches = key.transpose(1,2).chunk(batches, 0);
-    const value_batches = value.chunk(batches);
+    const query_batches = chunk(query, batches, 0);
+    const key_batches = transpose(key, 1,2).chunk(batches, 0);
+    const value_batches = chunk(value, batches);
 
     //console.log("dot product input shapes: ", query_batches[0].shape, key_batches[0].shape);
     const dot_products = query_batches.map((q, i) => {
