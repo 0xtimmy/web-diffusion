@@ -12,7 +12,7 @@ import * as aops from "./ops_artisanal";
 export class GeLU extends Module {
     forward(input: Tensor): Tensor {
         //(async () => { console.log("forwarding GeLU with input: ", await input.toArrayAsync()); })();
-        return input.gelu();
+        return aops.gelu(input);
     }
 }
 
@@ -37,7 +37,7 @@ export class MaxPool2d extends Module {
     }
 
     forward(input: Tensor): Tensor {
-        return input.maxpool2d(this.kernel_size, this.stride, this.padding, this.dilation);
+        return aops.maxpool2d(input, this.kernel_size, this.stride, this.padding, this.dilation);
     }
 }
 
@@ -65,7 +65,7 @@ export class UpSample extends Module {
     }
 
     forward(input: Tensor): Tensor {
-        return input.upsample(this.size, this.scale_factor, this.mode, this.align_corners, this.recompute_scale_factor);
+        return aops.upsample(input, this.size, this.scale_factor, this.mode, this.align_corners, this.recompute_scale_factor);
     }
 }
 
@@ -207,9 +207,9 @@ export class MultiheadAttention extends Module {
 
         if (this.batch_first && is_batched) {
             if(this.self_attention) {
-                query = query.transpose(0, 1);
-                key = key.transpose(0, 1);
-                value = value.transpose(0, 1);
+                query = aops.transpose(query, 0, 1);
+                key = aops.transpose(key, 0, 1);
+                value = aops.transpose(value, 0, 1);
             }
                 
         }
@@ -261,6 +261,9 @@ export class MultiheadAttention extends Module {
                 */
             )
         }
+        query.destroy();
+        key.destroy();
+        value.destroy();
         if(this.batch_first && is_batched) {
             return { output: res.output.transpose(0, 1), weights: res.weights };
         }
@@ -308,6 +311,6 @@ export class ReLU extends Module {
 */
 export class SiLU extends Module {
     forward(input: Tensor): Tensor {
-        return input.silu();
+        return aops.silu(input);
     }
 }

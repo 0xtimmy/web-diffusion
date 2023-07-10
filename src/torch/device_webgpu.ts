@@ -25,7 +25,8 @@ export class DeviceWebGPU extends Device {
             console.error("Uncaptured error emited from GPU: ", error);
         })
         this._device.onuncapturederror = (error: any) => {
-            console.error("Uncaptured error emited from GPU: ", error);
+            console.error(error);
+            throw new Error("Uncaptured error emited from GPU")
         };
         this._device.lost.then((lostInfo: GPUDeviceLostInfo) => {
             console.warn("lost gpu info:", lostInfo);
@@ -78,16 +79,17 @@ export class DeviceWebGPU extends Device {
             size: size,
             usage: usage
         });
-        this._alloced_buffers[buf.label] = buf;
+        //this._alloced_buffers[buf.label] = buf;
         this._buffer_counter++;
         return buf;
     }
     destroyBuffer(buffer: GPUBuffer) {
-        const label = buffer.label;
+        //const label = buffer.label;
         buffer.destroy();
-        delete this._alloced_buffers[label];
+        //delete this._alloced_buffers[label];
+        this._buffer_counter--;
     }
     logBuffers() {
-        console.log("allocated buffers", this._alloced_buffers);
+        console.log("allocated buffers", this._buffer_counter);
     }
 }

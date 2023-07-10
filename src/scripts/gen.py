@@ -31,7 +31,7 @@ tests = [
     #dt.gen_down("Down test 2", 128, 256, torch.randn([1, 128, 32, 32]), torch.randn([1, 256])),
     #dt.gen_down("Down test 3", 256, 256, torch.randn([1, 256, 16, 16]), torch.randn([1, 256])),
 
-    #dt.gen_up("Up test 1", 512, 128, torch.randn([1, 256, 8, 8]), torch.randn([1, 256, 16, 16]), torch.randn([1, 256])),
+    dt.gen_up("Up test 1", 512, 128, torch.randn([1, 256, 8, 8]), torch.randn([1, 256, 16, 16]), torch.randn([1, 256])),
     #dt.gen_up("Up test 2", 256, 64, torch.randn([1, 128, 16, 16]), torch.randn([1, 128, 32, 32]), torch.randn([1, 256])),
     #dt.gen_up("Up test 3", 128, 64, torch.randn([1, 64, 32, 32]), torch.randn([1, 64, 64, 64]), torch.randn([1, 256])),
 
@@ -48,7 +48,7 @@ tests = [
     #at.gen_scalar_div("Scalar performance basic test", torch.ones(256, 256), 2),
     #at.gen_scalar_div("Scalar limits test", torch.ones(4096, 4096), 2),
 
-    #t.gen_mm("mm test 1 - 2 x 2", torch.randint(1, 5, [2, 2]), torch.randint(1, 5, [2, 2])),
+    #at.gen_mm("mm test 1 - 2 x 2", torch.randint(1, 5, [2, 2]), torch.randint(1, 5, [2, 2])),
     #t.gen_mm("mm test 1 - 3 x 3", torch.randint(1, 5, [3, 3]), torch.randint(1, 5, [3, 3])),
     #t.gen_mm("mm test 1 - 2 x 3", torch.randint(1, 5, [2, 3]), torch.randint(1, 5, [3, 2])),
     #t.gen_mm("mm test 1 - 2 x 3", torch.randint(1, 5, [1, 3]), torch.randint(1, 5, [3, 2])),
@@ -58,8 +58,8 @@ tests = [
 
     #at.gen_mm("mm limits test 3 - 2048 x 2048", torch.randn([2048, 2048]), torch.randn([2048, 2048])),
 
-    at.gen_sum("Sum test small", torch.ones(2, 2)),
-    at.gen_sum("Sum test 100x100", torch.ones(100, 100)),
+    #at.gen_sum("Sum test small", torch.ones(2, 2)),
+    #at.gen_sum("Sum test 100x100", torch.ones(100, 100)),
     #t.gen_sum("Sum test 1000x1000", torch.ones(1000, 1000)),
 
 
@@ -125,7 +125,7 @@ tests = [
 
     # Module Tests ------------------------------------------------------------
 
-    mt.gen_nn_multihead_attention("Multihead Attention test 1", torch.randn([32, 8, 64]), torch.randn([32, 8, 64]), torch.randn([32, 8, 64]), 64, 8),
+    #mt.gen_nn_multihead_attention("Multihead Attention test 1", torch.randn([32, 8, 64]), torch.randn([32, 8, 64]), torch.randn([32, 8, 64]), 64, 8),
 
     #mt.gen_nn_layernorm("LayerNorm test 1", torch.randn([20, 5, 10]), [10]),
 

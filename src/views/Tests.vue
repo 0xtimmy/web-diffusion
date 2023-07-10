@@ -3,6 +3,8 @@
         <h2>Tests</h2>
         <input type="file" value="" @change="runTestfile">
         <p>open the console -></p>
+        <button @click="breakMe">break me 😈</button>
+        <button @click="dontBreakMe">dont break me 😇</button>
     </div>
 </template>
 
@@ -27,6 +29,25 @@ export default defineComponent({
             }
             reader.readAsText(event.target.files[0])
         },
+        async breakMe() {
+            const tensors = [torch.ones([4096, 4096])];
+            const t = torch.ones([4096, 4096]);
+            for(let i = 1; i < 300; i++) {
+                tensors.push(torch.add(tensors[i-1], t));
+                console.log(i);
+            }
+            console.log("done");
+        },
+        async dontBreakMe() {
+            const tensors = [torch.ones([4096, 4096])];
+            const t = torch.ones([4096, 4096]);
+            for(let i = 1; i < 300; i++) {
+                tensors.push(tensors[i-1].add(t));
+                console.log(i);
+            }
+
+            console.log("done: ", await tensors[tensors.length-1].toArrayAsync());
+        }
     }
 })
 

@@ -420,8 +420,8 @@ async function test_nn_multihead_attention(args, target): Promise<test_result> {
 
    const target_output = ops.tensor(target);
 
-    const raw = ops.scaled_dot_product_attention(query, key, value);
-    console.log("raw scaled dot product attention", await raw.toArrayAsync());
+    //const raw = ops.scaled_dot_product_attention(query, key, value);
+    //console.log("raw scaled dot product attention", await raw.toArrayAsync());
 
    const start = Date.now();
    const actual_output = mha.forward(query, key, value);
@@ -779,7 +779,7 @@ async function test_scalar_add(args, target): Promise<test_result> {
     const input = ops.tensor(args.input);
     const target_output = ops.tensor(target);
     const start = Date.now();
-    const actual_output = ops.scalar_add(input, args.alpha);
+    const actual_output = input.scalar_add(args.alpha);
     const duration = Date.now() - start;
     const output_data = await actual_output.toArrayAsync();
 
@@ -800,7 +800,7 @@ async function test_scalar_sub(args, target): Promise<test_result> {
     const input = ops.tensor(args.input);
     const target_output = ops.tensor(target);
     const start = Date.now();
-    const actual_output = ops.scalar_sub(input, args.alpha);
+    const actual_output = input.scalar_sub(args.alpha);
     const duration = Date.now() - start;
     const output_data = await actual_output.toArrayAsync();
 
@@ -821,7 +821,7 @@ async function test_scalar_mul(args, target): Promise<test_result> {
     const input = ops.tensor(args.input);
     const target_output = ops.tensor(target);
     const start = Date.now();
-    const actual_output = ops.scalar_mul(input, args.alpha);
+    const actual_output = input.scalar_mul(args.alpha);
     const duration = Date.now() - start;
     const output_data = await actual_output.toArrayAsync();
 
@@ -842,7 +842,7 @@ async function test_scalar_div(args, target): Promise<test_result> {
     const input = ops.tensor(args.input);
     const target_output = ops.tensor(target);
     const start = Date.now();
-    const actual_output = ops.scalar_div(input, args.alpha);
+    const actual_output = input.scalar_div(args.alpha);
     const duration = Date.now() - start;
     const output_data = await actual_output.toArrayAsync();
 
@@ -1012,7 +1012,7 @@ async function test_linear(args, target): Promise<test_result> {
     **/
     const input = ops.tensor(args.input);
     const weight = ops.tensor(args.weight);
-    const bias =  args.bias != null ? ops.tensor(args.bias) : null;
+    const bias =  args.bias != null ? ops.tensor(args.bias) : undefined;
     const target_output = ops.tensor(target);
     const start = Date.now();
     const actual_output = ops.linear(input, weight, bias);

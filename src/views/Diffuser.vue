@@ -24,7 +24,7 @@ export default defineComponent({
             modelReady: true,
             active: false,
             weightsSelected: false,
-            model: null,
+            //model: null,
         }
     },
     mounted: async function() {
@@ -40,20 +40,18 @@ export default defineComponent({
             this.modelReady = true;
             this.generate();
         },
-        generate: function() {
-            const worker = new Worker("../../worker.js", { type: "module" });
-            worker.onmessage = (e: any) => {
-                console.log("received message from worker");
-            }
+        generate: async function() {
             if(!this.active) {
+                const model = new UNet();
                 this.active = true;
-                const diffuser = new Diffusion({ noise_steps: 5, img_size: 64 });
-                const res = diffuser.sample(this.model, (res: torch.Tensor, step_num: number) => { 
+                const diffuser = new Diffusion({ noise_steps: 1, img_size: 64 });
+                const res = await diffuser.sample(model, (res: torch.Tensor, step_num: number) => { 
                     //this.renderResult(res, `Iteration ${step_num}`);
-                    (torch.devices["webgpu"] as any).logBuffers();
+                    //(torch.devices["webgpu"] as any).logBuffers();
                 });
+                console.log(res);
                 this.active = false;
-                this.renderResult(res, "final");
+                //this.renderResult(res, "final");
             }
         },
         renderResult: function(result: torch.Tensor, caption: string) {

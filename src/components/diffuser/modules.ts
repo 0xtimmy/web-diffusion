@@ -25,12 +25,20 @@ export class SelfAttention extends torch.nn.Module {
 
     forward(x: torch.Tensor): torch.Tensor {
         x = x.view([-1, this.channels, this.size * this.size]).transpose(1, 2);
-        let x_ln = this.ln.forward(x);
-        let attention_value = this.mha.forward(x_ln, x_ln, x_ln).output;
-        attention_value = torch.add(attention_value, x);
+        let q = this.ln.forward(x);
+        let k = q.copy();
+        let v= q.copy();
+        let attention_value = this.mha.forward(q, k, v).output;
+        q.destroy();
+        k.destroy();
+        v.destroy();
+
+        attention_value = attention_value.add(x);
         const ff = this.ff_self.forward(attention_value);
-        attention_value = torch.add(ff, attention_value);
-        return attention_value.transpose(2, 1).view([-1, this.channels, this.size, this.size]);
+        const output = ff.add(attention_value).transpose(2, 1).view([-1, this.channels, this.size, this.size]);
+        attention_value.destroy();
+
+        return output;
     }
 }
 
@@ -49,14 +57,14 @@ export class DoubleConv extends torch.nn.Module {
             new torch.nn.Conv2d(in_channels, mid_channels, 3, 1, 1, 1, 1, false),
             new torch.nn.GroupNorm(1, mid_channels),
             new torch.nn.GeLU(),
-            new torch.nn.Conv2d(mid_channels, out_channels, 3, 1, 1, 1, 1, false),
-            new torch.nn.GroupNorm(1, out_channels)
+            //new torch.nn.Conv2d(mid_channels, out_channels, 3, 1, 1, 1, 1, false),
+            //new torch.nn.GroupNorm(1, out_channels)
         ])
     }
 
     forward(x) {
         if (this.residual) {
-            return torch.gelu(torch.add(x, this.double_conv.forward(x)));
+            return this.double_conv.forward(x).add(x).gelu();
         } else {
             return this.double_conv.forward(x);
         }
@@ -90,7 +98,7 @@ export class Down extends torch.nn.Module {
         x = this.maxpool_conv.forward(x);
         t = this.emb_layer.forward(t);
         const emb = torch.repeat(t, [1, 1, x.shape[x.shape.length-2], x.shape[x.shape.length-1]]);
-        return torch.add(x, emb);
+        return emb.add(x);
     }
 }
 
@@ -116,12 +124,20 @@ export class Up extends torch.nn.Module {
     }
 
     forward(x, skip_x, t) {
-        x = this.up.forward(x);
-        x = torch.cat(skip_x, x, 1);
-        x = this.conv.forward(x);
+        console.log("x.shape", x.shape, "skip_x.shape", skip_x.shape, "t.shape", t.shape);
+        const a = this.up.forward(x);
+        console.log("a.shape", a.shape);
+        const b = torch.cat(skip_x, a, 1);
+        console.log("b.shape: ", b.shape);
+        a.destroy();
+        const c = this.conv.forward(b);
+        console.log("c shape: ", c.shape);
+        b.destroy();
         t = this.emb_layer.forward(t);
-        let emb = torch.repeat(t, [1, 1, x.shape[x.shape.length-2], x.shape[x.shape.length-1]]);
-        return torch.add(x, emb);
+        let emb = torch.repeat(t, [1, 1, c.shape[c.shape.length-2], c.shape[c.shape.length-1]]);
+        t.destroy();
+        console.log("c.shape: ", c.shape, "emb.shape: ", emb.shape);
+        return c.add(emb);
     }
 }
 
@@ -174,42 +190,75 @@ export class UNet extends torch.nn.Module {
     }
 
     pos_encoding(t: torch.Tensor, channels: number) {
-        const range = torch.scalar_div(torch.arange(0, channels, 2), channels);
-        const inv_freq = torch.div(torch.ones(range.shape), torch.pow(torch.constant(range.shape, 10000), range)).unsqueeze(0);
-        const pos_enc_a = torch.sin(torch.mul(torch.repeat(t, [1, Math.floor(channels / 2)]), inv_freq));
-        const pos_enc_b = torch.cos(torch.mul(torch.repeat(t, [1, Math.floor(channels / 2)]), inv_freq));
+        const range = torch.arange(0, channels, 2).scalar_div(channels).scalar_mul(-1);
+        const inv_freq = torch.constant(range.shape, 10000).pow(range).unsqueeze(0);
+        range.destroy();
+        const pos_enc_a = torch.repeat(t, [1, Math.floor(channels / 2)]).mul(inv_freq).sin();
+        const pos_enc_b = torch.repeat(t, [1, Math.floor(channels / 2)]).mul(inv_freq).cos();
+        inv_freq.destroy();
         const pos_enc = torch.cat(pos_enc_a, pos_enc_b, 1);
+        pos_enc_a.destroy();
+        pos_enc_b.destroy();
         return pos_enc;
     }
 
-    forward(x: torch.Tensor, t: torch.Tensor): torch.Tensor {
+    async forward(x: torch.Tensor, t: torch.Tensor): Promise<torch.Tensor> {
         t = torch.unsqueeze(t, -1);
-        t = this.pos_encoding(t, this.time_dim);
+        const pos_enc = this.pos_encoding(t, this.time_dim);
+        t.destroy();
         
         let x1 = this.inc.forward(x);
         
-        let x2 = this.down1.forward(x1, t);
-        x2 =  this.sa1.forward(x2);
-        let x3 =  this.down2.forward(x2, t);
-        x3 =  this.sa2.forward(x3);
-        let x4 =  this.down3.forward(x3, t);
-        x4 =  this.sa3.forward(x4);
+        const _x2 = this.down1.forward(x1, pos_enc);
+        //const x1_unmap = await x1.toArrayAsync();
+        //x1.destroy();
+        let x2 =  this.sa1.forward(_x2);
+        _x2.destroy();
+        const _x3 =  this.down2.forward(x2, pos_enc);
+        //const x2_unmap = await x2.toArrayAsync();
+        //x2.destroy();
+        let x3 =  this.sa2.forward(_x3);
+        _x3.destroy();
+        const _x4 =  this.down3.forward(x3, pos_enc);
+        //const x3_unmap = await x3.toArrayAsync();
+        //x3.destroy();
+        const x4 =  this.sa3.forward(_x4);
+        _x4.destroy();
+        console.log("finished down");
 
-        x4 =  this.bot1.forward(x4);
-        x4 =  this.bot2.forward(x4);
-        x4 =  this.bot3.forward(x4);
+        const bot1 =  this.bot1.forward(x4);
+        x4.destroy();
+        const bot2 =  this.bot2.forward(bot1);
+        bot1.destroy();
+        const bot3 =  this.bot3.forward(bot2);
+        bot2.destroy();
+        console.log("finished bot")
 
-        x = this.up1.forward(x4, x3, t);
-        x =  this.sa4.forward(x);
-        x =  this.up2.forward(x, x2, t);
-        x =  this.sa5.forward(x);
-        x = this.up3.forward(x, x1, t);
-        (async () => { console.log("up3: ", await x.toArrayAsync()); } )();
-        x =  this.sa6.forward(x);
-        (async () => { console.log("sa6: ", await x.toArrayAsync()); } )();
+        //x3 = torch.tensor(x3_unmap);
+        const _x5 = this.up1.forward(bot3, x3, pos_enc);
+        bot3.destroy();
+        x3.destroy();
+        const x5 =  this.sa4.forward(_x5);
+        _x5.destroy();
+        console.log("finished x5");
+        //x2 = torch.tensor(x2_unmap);
+        const _x6 =  this.up2.forward(x5, x2, pos_enc);
+        x5.destroy();
+        x2.destroy();
+        const x6 =  this.sa5.forward(_x6);
+        _x6.destroy();
+        console.log("finished x6")
+        //x1 = torch.tensor(x1_unmap);
+        const _x7 = this.up3.forward(x6, x1, pos_enc);
+        x6.destroy();
+        x1.destroy();
+        const x7 =  this.sa6.forward(_x7);
+        _x7.destroy();
+        console.log("finished x7")
         
-        const output = this.outc.forward(x);
-        (async () => { console.log("output: ", await output.toArrayAsync()); } )();
-        return output;
+        const x8 = this.outc.forward(x7);
+        x7.destroy()
+        console.log("finished x8")
+        return x8;
     }
 }

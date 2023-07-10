@@ -30,6 +30,10 @@ function _defaultKernel({
 }
 
 export const kernels: { [name: string]: KernelSpec } = {
+    copy: _defaultKernel({
+        name: "copy",
+        shader: `output[global_id.x] = input[global_id.x];`
+    }),
     exp: _defaultKernel({
         name: "exp",
         shader: `output[global_id.x] = exp(input[global_id.x]);`
@@ -63,6 +67,20 @@ export const kernels: { [name: string]: KernelSpec } = {
             { name: "b", shaderType: "array<f32>" }
         ],
         shader: `output[global_id.x] = pow(a[global_id.x], b[global_id.y]);`
+    }),
+    scalar_pow: _defaultKernel({
+        name: "pow",
+        parameters: [
+            {
+                name: "alpha",
+                shaderType: "f32"
+            },
+            {
+                name: "outputSize",
+                shaderType: "u32"
+            }
+        ],
+        shader: `output[global_id.x] = pow(input[global_id.x], parameters.alpha);`
     }),
     cosh: _defaultKernel({
         name: "cosh",
