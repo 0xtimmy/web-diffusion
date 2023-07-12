@@ -11,10 +11,10 @@
 
 .navbar {
   display: flex;
+  gap: 8px;
 }
 
 .nav-item {
-  padding: 5px 8px;
   cursor: pointer;
 }
 
