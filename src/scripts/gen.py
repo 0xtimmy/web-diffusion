@@ -14,9 +14,15 @@ tests = [
 
     # Diffuser Tests ----------------------------------------------------------
 
+    #dt.gen_ddpm("ddpm test 1", 100),
+
+    #dt.gen_unet("UNet test 1", torch.randn([1, 3, 64, 64]), torch.tensor([12])),
+
     #dt.gen_denoise("denoise test 1", torch.randn([1, 3, 64, 64]), 13),
+    #dt.gen_pos_enc("pos_enc test 1", torch.tensor([12]), 256),
 
     #dt.gen_double_conv("DoubleConv test 1", 3, 64, 64, False, torch.randn([1, 3, 64, 64])),
+    #dt.gen_double_conv("DoubleConv test 1", 64, 64, 64, True, torch.randn([1, 64, 64, 64])),
     #dt.gen_double_conv("DoubleConv test 2", 256, 512, 512, False, torch.randn(1, 256, 8, 8)),
     #dt.gen_double_conv("DoubleConv test 3", 512, 256, 512, False, torch.randn(1, 512, 8, 8)),
 
@@ -48,7 +54,7 @@ tests = [
     #at.gen_scalar_div("Scalar performance basic test", torch.ones(256, 256), 2),
     #at.gen_scalar_div("Scalar limits test", torch.ones(4096, 4096), 2),
 
-    #t.gen_mm("mm test 1 - 2 x 2", torch.randint(1, 5, [2, 2]), torch.randint(1, 5, [2, 2])),
+    #at.gen_mm("mm test 1 - 2 x 2", torch.randint(1, 5, [2, 2]), torch.randint(1, 5, [2, 2])),
     #t.gen_mm("mm test 1 - 3 x 3", torch.randint(1, 5, [3, 3]), torch.randint(1, 5, [3, 3])),
     #t.gen_mm("mm test 1 - 2 x 3", torch.randint(1, 5, [2, 3]), torch.randint(1, 5, [3, 2])),
     #t.gen_mm("mm test 1 - 2 x 3", torch.randint(1, 5, [1, 3]), torch.randint(1, 5, [3, 2])),
@@ -58,8 +64,8 @@ tests = [
 
     #at.gen_mm("mm limits test 3 - 2048 x 2048", torch.randn([2048, 2048]), torch.randn([2048, 2048])),
 
-    at.gen_sum("Sum test small", torch.ones(2, 2)),
-    at.gen_sum("Sum test 100x100", torch.ones(100, 100)),
+    #at.gen_sum("Sum test small", torch.ones(2, 2)),
+    #at.gen_sum("Sum test 100x100", torch.ones(100, 100)),
     #t.gen_sum("Sum test 1000x1000", torch.ones(1000, 1000)),
 
 
@@ -68,8 +74,9 @@ tests = [
     #ft.cumprod("Cumprod test 1", torch.randn(10, 10)),
 
     #ft.gen_upsample("Upsample test 1", torch.randn([1, 1, 2, 2]), scale_factor=[2, 2], mode="nearest"),
-    #ft.gen_upsample("Upsample test 1", torch.randn([1, 1, 3, 3]), scale_factor=[4, 4], mode="bilinear"),
-    #ft.gen_upsample("Upsample performance 1", torch.randn([1, 1, 256, 256]), scale_factor=[2, 2], mode="bilinear"),
+    #ft.gen_upsample("Upsample test 1", torch.randn([1, 1, 4, 4]), scale_factor=[2, 2], mode="bilinear"),
+    #ft.gen_upsample("Upsample performance 1", torch.randn([1, 1, 64, 64]), scale_factor=[20, 20], mode="bilinear"),
+    #ft.gen_upsample("Upsample performance 2", torch.randn([1, 256, 8, 8]), scale_factor=[20, 20], mode="bilinear"),
 
     #ft.gen_softmax("Softmax basic test", torch.randn(10) * 10, 0),
     #ft.gen_softmax("Softmax basic test", torch.randn([2, 5]) * 10, 0),
@@ -102,12 +109,12 @@ tests = [
 
     #ft.gen_group_norm("group_norm basic test", torch.randn(20, 6, 10, 10), 2, torch.ones(6), torch.zeros(6)),
     #ft.gen_group_norm("group_norm basic test", torch.randn(1, 6, 128, 128), 1, torch.ones(6), torch.zeros(6)),
-    #ft.gen_group_norm("group_norm performance test", torch.randn(1, 6, 128, 128), 1, torch.ones(6), torch.zeros(6)),
+    #ft.gen_group_norm("group_norm performance test", torch.randn(1, 6, 128, 128), 1, torch.normal(0, 1, [6]), torch.ones(6)),
 
     #ft.gen_conv2d("Conv2d test 1", torch.randn(1, 1, 6, 1), torch.randn(2, 1, 3, 1), None),
     #ft.gen_conv2d("Conv2d test 1", torch.tensor([[[[1.0], [1.0], [1.0], [0.0], [0.0], [0.0]]]]), torch.tensor([[[[1.0], [1.0], [1.0]]], [[[0.5], [0.5], [0.5]]]]), None),
     #ft.gen_conv2d("Conv2d test 1", torch.randn(1, 4, 6, 6), torch.randn(8, 4, 3, 3), None),
-    #ft.gen_conv2d("Conv2d test 2", torch.randn(1, 4, 5, 5), torch.randn(8, 4, 5, 5), None),
+    #ft.gen_conv2d("Conv2d test 2", torch.randn(2, 4, 5, 5), torch.randn(8, 4, 5, 5), None),
     #ft.gen_conv2d("Conv2d test 3 - image dimensions", torch.randn(1, 3, 64, 64), torch.randn(3, 3, 64, 64), None),
 
     #ft.gen_max_pool2d("MaxPool2D test 1", torch.randn([4, 16, 16]), 2),
@@ -125,15 +132,18 @@ tests = [
 
     # Module Tests ------------------------------------------------------------
 
-    mt.gen_nn_multihead_attention("Multihead Attention test 1", torch.randn([32, 8, 64]), torch.randn([32, 8, 64]), torch.randn([32, 8, 64]), 64, 8),
+    #mt.gen_nn_multihead_attention("Multihead Attention test 1", torch.randn([32, 8, 64]), torch.randn([32, 8, 64]), torch.randn([32, 8, 64]), 64, 8),
 
     #mt.gen_nn_layernorm("LayerNorm test 1", torch.randn([20, 5, 10]), [10]),
 
     #mt.gen_nn_groupnorm("GroupNorm test 1", torch.randn([20, 6, 10, 10]), 3, 6),
+    #mt.gen_nn_groupnorm("GroupNorm test 2", torch.randn([20, 6, 10, 10]), 1, 6),
+    #mt.gen_nn_groupnorm("GroupNorm test 3", torch.randn([1, 64, 64, 64]), 1, 64),
 
     #mt.gen_nn_linear("Linear test 1", torch.randn([128,16]), 16, 8),
 
-    #mt.gen_nn_conv2d("Conv2d test 1", torch.randn([20, 16, 50, 100]), 16, 32, 3),
+    #mt.gen_nn_conv2d("Conv2d test 1", torch.randn([20, 16, 50, 100]), 16, 32, 3, 0),
+    #mt.gen_nn_conv2d("Conv2d test 2", torch.randn([20, 16, 50, 100]), 16, 32, 3, 1),
 
     #mt.gen_nn_maxpool2d("Maxpool2d test 1", torch.randn([20, 16, 50 ,32]), 3)
 
@@ -170,9 +180,14 @@ tests = [
 
     # Factory Tests -----------------------------------------------------------
 
-    #t.gen_linspace("Linspace test 1", 1, 10, 10),
-    #t.gen_linspace("Linspace test 2", 1, 10, 100),
-    #t.gen_linspace("Linspace test 3", 0, 1, 50),
+    #fact.gen_linspace("Linspace test 1", 1, 10, 10),
+    #fact.gen_linspace("Linspace test 2", 1, 10, 100),
+    #fact.gen_linspace("Linspace test 3", 0, 1, 50),
+    fact.gen_randn("Randn test 1", 64*64*64),
+    fact.gen_randn("Randn test 2", 64*64*64),
+    fact.gen_randn("Randn test 3", 64*64*64),
+    fact.gen_randn("Randn test 4", 64*64*64),
+    #fact.gen_uniform("Uniform test 1", 1000),
 
     # Parameter IO Tests ------------------------------------------------------
 

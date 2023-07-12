@@ -23,7 +23,7 @@ export class Diffusion {
         this.img_size = img_size;
         
         this.beta = this.prepare_noise_schedule();
-        this.alpha = torch.sub(torch.ones(this.noise_steps), this.beta);
+        this.alpha = torch.scalar_mul(this.beta, -1).scalar_add(1);
         this.alpha_hat = torch.cumprod(this.alpha);
     }
 
@@ -35,64 +35,165 @@ export class Diffusion {
         return torch.randint(1, this.noise_steps, [n]);
     }
 
-    sample(model, handleStep?: (img: torch.Tensor, step_num: number) => void, n=1): torch.Tensor {
+    async sample(model, handleStep?: (img: torch.Tensor, step_num: number) => void, n=1): Promise<torch.Tensor> {
         console.log(`Sampling ${n} new images...`);
         const sampleStart = Date.now();
         //model.eval();
-        let x = torch.normal([n, 3, this.img_size, this.img_size]);
-        for(let i = this.noise_steps -1; i >= 0; i--) {
-            console.log(`Starting pass #${this.noise_steps-i}`)
-            //try {
-                const t = torch.constant([n], i);
-                let predicted_noise = model.forward(x, t);
-                
-                const alpha = this.alpha.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
-                const alpha_hat = this.alpha_hat.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
-                const beta = this.beta.index(t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
-                
-                let noise;
-                if(i > 1) {
-                    noise = torch.randn(x.shape);
-                } else {
-                    noise = torch.zeros(x.shape);
-                }
-                
-                let one_div_sqrt_alpha = torch.div(torch.ones(alpha.shape), torch.sqrt(alpha));
-                
-                let sqrt_one_minus_alpha_hat = torch.sqrt(torch.sub(torch.ones(alpha_hat.shape), alpha_hat));
-                let one_minus_alpha = torch.sub(torch.ones(alpha.shape), alpha);
-                predicted_noise = torch.mul(predicted_noise, torch.div(one_minus_alpha, sqrt_one_minus_alpha_hat));
-                let nx = torch.sub(x, predicted_noise);
-                nx = torch.mul(one_div_sqrt_alpha, nx);
-                
-                const beta_noise = torch.mul(torch.sqrt(beta), noise);
-                nx = torch.add(nx, beta_noise);
-                
-                console.log(`${(this.noise_steps-i)/this.noise_steps*100}% - ${Date.now() - sampleStart}ms`);
+        let x = torch.randn([n, 3, this.img_size, this.img_size]);
+        for(let i = this.noise_steps-1; i > 0; i--) {
+            const t = torch.constant([n], i);
+            let predicted_noise = model.forward(x, t);
+            
+            const alpha = torch.index(this.alpha, t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
+            const alpha_hat = torch.index(this.alpha_hat, t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
+            const beta = torch.index(this.beta, t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
 
-                /*
-                const dev = torch.devices["webgpu"] as any;
-                const err = await dev.gpuDevice.popErrorScope();
-                console.log("error? ", err);
-                */
+            let noise;
+            if(i > 1) {
+                noise = torch.randn(x.shape);
+            } else {
+                noise = torch.zeros(x.shape);
+            }       
 
-                if(typeof(handleStep) != 'undefined') {
-                    handleStep(torch.scalar_mul(torch.scalar_add(torch.clamp(nx, -1, 1), 1), 255/2), (this.noise_steps-i));
-                }
-                
-                x = nx;
-                
-                /*
-            } catch(e: any) {
-                console.log("caught error while sampling, retrying ", e);
-                if(e == "DOMException: Device is lost") console.log("we got em");
-                await torch.initWebGPUAsync();
-                i++;
+            let one_div_sqrt_alpha = torch.sqrt(alpha).scalar_pow(-1);
+            let sqrt_one_minus_alpha_hat = alpha_hat.scalar_mul(-1).scalar_add(1).sqrt();
+            let one_minus_alpha = alpha.scalar_mul(-1).scalar_add(1);
+            const alpha_div_alpha_hat = torch.div(one_minus_alpha, sqrt_one_minus_alpha_hat);
+            one_minus_alpha.destroy();
+            sqrt_one_minus_alpha_hat.destroy();
+            predicted_noise = predicted_noise.mul(alpha_div_alpha_hat);
+            alpha_div_alpha_hat.destroy();
+            let nx = torch.sub(x, predicted_noise);
+            
+            nx = nx.mul(one_div_sqrt_alpha);
+            one_div_sqrt_alpha.destroy();
+            
+            const beta_noise = beta.sqrt().mul(noise);
+            noise.destroy();
+            
+            nx = nx.add(beta_noise);
+            beta_noise.destroy();
+            
+            console.log(`${(this.noise_steps-i)/this.noise_steps*100}% - ${Date.now() - sampleStart}ms`);
+
+            //console.log("x and nx diff: ", array_eq((await x.toArrayAsync()).flat(4), (await nx.toArrayAsync()).flat(4)));
+
+            x = nx;
+            
+            if(typeof(handleStep) != 'undefined') {
+                let step = torch.clamp(x, -1, 1).scalar_add(1).scalar_div(2)
+                step = step.cat(torch.ones([1, 1, ...Array.from(x.shape).splice(2)]), 1);
+                step = step.scalar_mul(255)
+                await handleStep(step, i);
             }
-            */
         }
         //model.train();
-        return torch.scalar_mul(torch.scalar_add(torch.clamp(x, -1, 1), 1), 255/2);
+        return x.clamp(-1, 1).scalar_add(1).scalar_div(2).cat(torch.ones([1, 1, ...Array.from(x.shape).splice(2)]), 1).scalar_mul(255);
     }
 
+    async _sample(model, x: torch.Tensor, noises: Array<any>, results: Array<any>, handleStep: (img: torch.Tensor) => void, n=1): Promise<torch.Tensor> {
+        console.log(`Sampling ${n} new images...`);
+        const sampleStart = Date.now();
+        //model.eval();
+        //x = torch.randn([n, 3, this.img_size, this.img_size]).scalar_add(0.2);
+        for(let i = this.noise_steps-1; i > 0; i--) {
+            const t = torch.constant([n], i);
+            let predicted_noise = model.forward(x, t);
+            //let predicted_noise = x.copy();
+            
+            const alpha = torch.index(this.alpha, t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
+            const alpha_hat = torch.index(this.alpha_hat, t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
+            const beta = torch.index(this.beta, t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
+
+            let noise;
+            //if(i > 1) {
+            //    noise = torch.randn(x.shape);
+            //} else {
+            //    noise = torch.zeros(x.shape);
+            //}          
+            //await comp_stats(noise, torch.tensor(noises[i]));
+            noise = torch.tensor(noises[i]);    
+            let one_div_sqrt_alpha = torch.sqrt(alpha).scalar_pow(-1);
+            
+            let sqrt_one_minus_alpha_hat = alpha_hat.scalar_mul(-1).scalar_add(1).sqrt();
+            let one_minus_alpha = alpha.scalar_mul(-1).scalar_add(1);
+            const alpha_div_alpha_hat = torch.div(one_minus_alpha, sqrt_one_minus_alpha_hat);
+            one_minus_alpha.destroy();
+            sqrt_one_minus_alpha_hat.destroy();
+            predicted_noise = predicted_noise.mul(alpha_div_alpha_hat);
+            alpha_div_alpha_hat.destroy();
+            let nx = torch.sub(x, predicted_noise);
+            
+            nx = nx.mul(one_div_sqrt_alpha);
+            one_div_sqrt_alpha.destroy();
+            
+            const beta_noise = beta.sqrt().mul(noise);
+            noise.destroy();
+            
+            nx = nx.add(beta_noise);
+            beta_noise.destroy();
+            
+            console.log(`${(this.noise_steps-i)/this.noise_steps*100}% - ${Date.now() - sampleStart}ms`);
+
+            console.log("x and nx diff: ", array_eq((await x.toArrayAsync()).flat(4), (await nx.toArrayAsync()).flat(4)));
+
+            x = nx;
+            
+            let result = torch.clamp(x, -1, 1).scalar_add(1).scalar_div(2)
+            result = torch.cat(result, torch.ones([1, 1, ...Array.from(x.shape).splice(2)]), 1);
+            result = result.scalar_mul(255)
+            await handleStep(result.copy());
+            result = result.squeeze(0).transpose(0, 1).transpose(1, 2);
+            const actual_output = result;
+            const output_data = await actual_output.toArrayAsync();
+            const target = results[i];
+            const target_output = torch.tensor(target);
+            if(array_eq(actual_output.shape, target_output.shape) > 0) console.warn(`‼️ - ${i}`, { res: false, output: output_data, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` });
+            const diff = array_eq(output_data.flat(4), target.flat(4));
+            if(diff > 0.00001) console.warn(`‼️ - ${i}`, { res: false, output: output_data, msg: `mismatched tensor content, average diff: ${diff}` });
+            else console.log(`✅ - ${i}`);
+        }
+        //model.train();
+        return x.clamp(-1, 1).scalar_add(1).scalar_mul(255/2);
+    }
+}
+
+function array_eq(a: Array<any>, b: Array<any>): number {
+    if(a.length != b.length) return Infinity;
+    const diff = (a.reduce((acc, v, i) => {
+        return acc + Math.abs(v - b[i]);
+    }, 0) / a.length);
+    if(isNaN(diff)) return Infinity;
+    return diff;
+}
+
+async function comp_stats(a: torch.Tensor, b: torch.Tensor) {
+    let output_data = await a.toArrayAsync();
+    output_data = output_data.flat(4)
+
+    let target = await b.toArrayAsync();
+    target = target.flat();
+
+    const actual_mean = (output_data as Array<number>).reduce((acc, v) => {
+        return acc + v / output_data.length;
+    }, 0)
+    const actual_variance = (output_data as Array<number>).reduce((acc, v) => {
+        return acc + Math.pow((v - actual_mean), 2) / output_data.length;
+    })
+    const actual_std = Math.sqrt(Math.abs(actual_variance));
+
+    const target_mean = (target as Array<number>).reduce((acc, v) => {
+        return acc + v / target.length;
+    }, 0)
+    const target_variance = (target as Array<number>).reduce((acc, v) => {
+        return acc + Math.pow((v - target_mean), 2) / target.length;
+    })
+    const target_std = Math.sqrt(Math.abs(target_variance));
+
+    if(
+        Math.abs(actual_mean - target_mean) > 0.1 ||
+        Math.abs(actual_variance - target_variance) > 0.1 ||
+        Math.abs(actual_std - target_std) > 0.1
+    ) console.warn(`mismatched stats, target mean=${target_mean}, target var=${target_variance}, target std=${target_std}; actual mean=${actual_mean}, actual var=${actual_variance}, actual std=${actual_std}`);
+    else console.log("✅ noises similair");
 }

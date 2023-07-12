@@ -167,7 +167,6 @@ export class Linear extends Module {
 
         this.weight = new Parameter(factories.empty([outChannels, inChannels]));
         if(bias) this.bias = new Parameter(factories.empty(outChannels));
-        else this.registerParameter("bias", null);
 
         this.reset_parameters();
     }

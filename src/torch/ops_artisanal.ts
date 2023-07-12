@@ -4,7 +4,7 @@ import { Tensor } from "./tensor";
 import { shouldCreateGradient } from "./autograd";
 import type { TensorData, TensorSpec } from "./tensor";
 import { Shape, defaultStrides, shapeSize , shapesEq} from "./shape";
-import { ones, zeros } from "./factories";
+import * as factories from "./factories";
 //import * as ops from "./ops_opgen";
 
 // ------------------------------------
@@ -151,9 +151,18 @@ export function pow(a: Tensor, b: Tensor): Tensor {
     return a.runKernel(
         "pow",
         { dtype: a.dtype },
-        { outputSize :shapeSize(a.shape) },
+        { outputSize: shapeSize(a.shape) },
         [a.shape],
         b
+    )[0]
+}
+
+export function scalar_pow(a: Tensor, alpha: number): Tensor {
+    return a.runKernel(
+        "scalar_pow",
+        { dtype: a.dtype },
+        { alpha: alpha, outputSize :shapeSize(a.shape) },
+        [a.shape],
     )[0]
 }
 
@@ -302,22 +311,25 @@ export function cat(a: Tensor, b: Tensor, dim: 0|1|2|3): Tensor {
 }
 
 export function repeat(input: Tensor, shape: Shape): Tensor {
-    let t0 = input
+    let t0 = input.copy();
     for(let x = 1; x < shape[0]; x++) {
-        t0 = cat(t0, input, 0);
+        t0 = t0.cat(input, 0);
     }
-    let t1 = t0
+    let t1 = t0.copy();
     for(let y = 1; shape[1] && y < shape[1]; y++) {
-        t1 = cat(t1, t0, 1);
+        t1 = t1.cat(t0, 1);
     }
-    let t2 = t1;
+    t0.destroy();
+    let t2 = t1.copy();
     for(let z = 1; shape[2] && z < shape[2]; z++) {
-        t2 = cat(t2, t1, 2);
+        t2 = t2.cat(t1, 2);
     }
-    let t3 = t2;
+    t1.destroy();
+    let t3 = t2.copy();
     for(let w = 1; shape[3] && w < shape[3]; w++) {
-        t3 = cat(t3, t2, 3);
+        t3 = t3.cat(t2, 3);
     }
+    t2.destroy();
     return t3;
 }
 
@@ -333,10 +345,18 @@ export function layernorm(input: Tensor, normalized_shape: Shape, weight?: Tenso
         return acc || v != input.shape[i + (input.shape.length - normalized_shape.length)];
     }, false)) throw new Error(`Layer norm "normalized_shape" must match the 1-n dimensions of the input, instead got input shape: ${input.shape} and normalized_shape: ${normalized_shape}`);
 
-    if(typeof(weight) == 'undefined') weight = ones(normalized_shape);
-    if(typeof(bias) == 'undefined') bias = zeros(normalized_shape);
+    let needtofreeWeight = false;
+    if(typeof(weight) == 'undefined') {
+        weight = factories.ones(normalized_shape);
+        needtofreeWeight = true;
+    }
+    let needtofreeBias = false;
+    if(typeof(bias) == 'undefined') {
+        bias = factories.zeros(normalized_shape);
+        needtofreeBias = true;
+    }
 
-    return input.runKernel(
+    const output = input.runKernel(
         "layernorm",
         { dtype: input.dtype },
         params,
@@ -344,6 +364,11 @@ export function layernorm(input: Tensor, normalized_shape: Shape, weight?: Tenso
         weight,
         bias
     )[0];
+
+    if(needtofreeWeight) weight.destroy();
+    if(needtofreeBias) bias.destroy();
+
+    return output;
 }
 
 export function maxpool2d(input: Tensor, kernel_size: [number, number], stride?:[number,number], padding=[0,0], dilation=[1,1], ceil_mode=false): Tensor {
@@ -364,12 +389,16 @@ export function maxpool2d(input: Tensor, kernel_size: [number, number], stride?:
     if(padding[0] != 0) {
         let zero_shape = Array.from(input.shape);
         zero_shape[shape_len-1] = padding[0];
-        input = cat(cat(scalar_mul(ones(zero_shape), -256), input, 3), scalar_mul(ones(zero_shape), -256), 3);
+        const pad = factories.constant(zero_shape, -256)
+        input = cat(cat(pad, input, 3), pad, 3);
+        pad.destroy();
     }
     if(padding[1] != 0) {
         let zero_shape = Array.from(input.shape);
         zero_shape[shape_len-2] = padding[1];
-        input = cat(cat(scalar_mul(ones(zero_shape), -256), input, 2), scalar_mul(ones(zero_shape), -256), 2);
+        const pad = factories.constant(zero_shape, -256)
+        input = cat(cat(pad, input, 2), pad, 2);
+        pad.destroy();
     }
 
     const output_shape = [...Array.from(input.shape).splice(0, input.shape.length-2), h_out, w_out]
@@ -471,14 +500,35 @@ export function box_muller(
     mean: number,
     std: number
 ): Tensor {
-    const output_shape = input.shape;
     const params = {
         mean: mean,
         sdev: std,
-        outputSize: input.size
+        outputSize: shapeSize(input.shape) / 2
     }
+    const output_shape = input.shape.splice(1);
     return input.runKernel(
         "box_muller",
+        { dtype: input.dtype },
+        params,
+        [output_shape],
+    )[0];
+}
+
+export function clt(
+    input: Tensor,
+    sample_size: number,
+    mean: number,
+    std: number
+): Tensor {
+    const output_shape = input.shape.splice(0,input.shape.length-1);
+    const params = {
+        sample_size: sample_size,
+        mean: mean,
+        sdev: std,
+        outputSize: shapeSize(output_shape)
+    }
+    return input.runKernel(
+        "clt",
         { dtype: input.dtype },
         params,
         [output_shape],
@@ -519,15 +569,22 @@ export function linear(
     const output_shape = Array.from(input.shape);
     const feature_dim = input.shape.length - 1;
 
-    if(!bias) bias = zeros(weight.shape[0]);
+    if(typeof(bias) == 'undefined') {
+        bias = factories.zeros(weight.shape[0]);
+    } else {
+        bias = bias.copy();
+    }
+
 
     if(weight.shape[1] != input.shape[feature_dim]) throw new Error(`Expected last dimention of input and last dimention of weight to match, instead got input.shape = ${input.shape} & weight.shape = ${weight.shape}`);
     if(bias && bias.shape[0] != weight.shape[0]) throw new Error(`Expected bias to be 1D and match the first dimention of weight, instead got bias.shape = ${bias.shape} and weight.shape = ${weight.shape}`);
     
     output_shape[feature_dim] = weight.shape[0];
-    let output = mm(input.view([-1, input.shape[feature_dim]]), weight.t());
-    if(bias) output = add(output, repeat(bias.unsqueeze(0), [output.shape[0], 1]));
+    let output = mm(input.view([-1, input.shape[feature_dim]]), transpose(weight, 0, 1));
+    output = output.add(repeat(bias.unsqueeze(0), [output.shape[0], 1]));
     output = output.view(output_shape)
+
+    bias.destroy();
     return output;
 }
 
@@ -562,7 +619,7 @@ export function sum(
         { 
             batches: shapeSize(output_shape),
             batch_size: shapeSize(Array.from(output.shape).splice(dim)),
-            size: input.size 
+            size: output.size 
         }, 
         [output_shape]
     )[0];
@@ -597,28 +654,24 @@ export function softmax(
 
     const exps = exp(input).transpose(dim, input.shape.length-1);
     const sums = sum(exps, input.shape.length-1);
-    return div(exps, sums).transpose(dim, input.shape.length-1);
-
-    /*
-    return input.runKernel(
-        "softmax",
-        { dtype: input.dtype },
-        params,
-        [input.shape],
-    )[0];
-    */
+    const output = div(exps, sums).transpose(dim, input.shape.length-1);
+    exps.destroy();
+    sums.destroy();
+    return output;
 }
 
 export function permute(
     input: Tensor,
     dims: Array<number>,
 ): Tensor {
-    if(dims.length != input.shape.length) throw new Error("permute need the same number of dimentions as it's input");
+    if(dims.length != input.shape.length) throw new Error(`permute need the same number of dimentions as it's input, got: ${dims} but expected: ${input.shape} dimensions`);
     const seen = [];
     dims.forEach((v) => {
         if(seen.includes(v)) throw new Error(`Permute cannot take duplicated dims: ${dims}`);
         seen.push(v);
     });
+
+    input = input.copy();
     
     for(let i = 0; i < dims.length; i++) {
         if(dims[i] < 0 || dims[i] >= dims.length) throw new Error(`No dimention ${dims[i]} in input shape: ${input.shape}`);
@@ -663,30 +716,35 @@ export function scaled_dot_product_attention(
 
     // batch the attention calculations
     const batches = query.shape[0];
-    const query_batches = query.chunk(batches, 0);
-    const key_batches = key.transpose(1,2).chunk(batches, 0);
-    const value_batches = value.chunk(batches);
+    const query_batches = chunk(query, batches, 0);
+    const key_batches = transpose(key, 1,2).chunk(batches, 0);
+    const value_batches = chunk(value, batches);
 
     //console.log("dot product input shapes: ", query_batches[0].shape, key_batches[0].shape);
     const dot_products = query_batches.map((q, i) => {
-        return scalar_div(mm(q, key_batches[i]), sqrt_dk);
+        const out = q.mm(key_batches[i]).scalar_div(sqrt_dk);
+        key_batches[i].destroy();
+        return out;
     });
     //console.log("dot product shape: ", dot_products[0].shape);
 
     const softmaxxes = dot_products.map((dot_product) => {
-        return softmax(dot_product, dot_product.shape.length-1);
+        return dot_product.softmax(dot_product.shape.length-1);
     });
     //console.log("softmaxxes shape: ", softmaxxes[0].shape);
 
     
     let outs = softmaxxes.map((batch, i) => {
-        return mm(batch, value_batches[i]);
+        const out = batch.mm(value_batches[i]);
+        value_batches[i].destroy();
+        return out;
     })
     //console.log("outs shape: ", outs[0].shape);
     
     let out = outs[0];
     for(let i = 1; i < batches; i++) {
-        out = cat(out, outs[i], 0);
+        out = out.cat(outs[i], 0);
+        outs[i].destroy();
     }
     return out.view(output_shape);
 }
@@ -742,7 +800,7 @@ export function multihead_attention(
     let q, k, v;
     if(!use_separate_proj_weight) {
         if(in_proj_weight == null) throw new Error("use_separate_proj_weight is False but in_proj_weight is null")
-        const unpacked_weights = in_proj_weight.chunk(3);
+        const unpacked_weights = chunk(in_proj_weight, 3);
         q_proj_weight = unpacked_weights[0];
         k_proj_weight = unpacked_weights[1];
         v_proj_weight = unpacked_weights[2];
@@ -758,7 +816,7 @@ export function multihead_attention(
         b_k = null;
         b_v = null;
     } else {
-        const chunks = in_proj_bias.chunk(3);
+        const chunks = chunk(in_proj_bias, 3);
         b_q = chunks[0];
         b_k = chunks[1];
         b_v = chunks[2];
@@ -766,6 +824,13 @@ export function multihead_attention(
 
     const proj = _in_projection(query, key, value, q_proj_weight, k_proj_weight, v_proj_weight, b_q, b_k, b_v);
     
+    q_proj_weight.destroy();
+    k_proj_weight.destroy();
+    v_proj_weight.destroy();
+    b_q.destroy();
+    b_k.destroy();
+    b_v.destroy();
+
     q = proj.q;
     k = proj.k;
     v = proj.v;
@@ -807,15 +872,13 @@ export function multihead_attention(
         let attn_output = scaled_dot_product_attention(q, k, v, attn_mask, dropout_p, is_causal);
         attn_output = attn_output.permute([2, 0, 1, 3]).view([bsz * tgt_len, embed_dim]);
 
-        attn_output = linear(attn_output, out_proj_weight, out_proj_bias);
+        attn_output = attn_output.linear(out_proj_weight, out_proj_bias);
         attn_output = attn_output.view([tgt_len, bsz, attn_output.shape[1]]);
         if(!is_batched) {
             attn_output = attn_output.squeeze(1);
         }
         return { output: attn_output, weights: null };
     }
-    
-   return { output: query, weights: null };
 }
 
 function _in_projection(
@@ -927,17 +990,30 @@ export function group_norm(input: Tensor, groups: number, weight?: Tensor, bias?
         outputSize: shapeSize(input.shape)
     }
 
-    if(!weight) weight = ones([input.shape[1]]);
-    if(!bias) bias = zeros([input.shape[1]]);
+    let needtofreeWeight = false;
+    if(!weight) {
+        weight = factories.ones([input.shape[1]]);
+        needtofreeWeight = true;
+    }
+    let needtofreeBias = false;
+    if(!bias) {
+        bias = factories.zeros([input.shape[1]]);
+        needtofreeBias = true;
+    }
 
-    return input.runKernel(
+    const output = input.runKernel(
         "group_norm",
         { dtype: input.dtype },
         params,
         [input.shape],
         weight,
         bias
-    )[0]
+    )[0];
+
+    if(needtofreeWeight) weight.destroy();
+    if(needtofreeBias) bias.destroy();
+
+    return output;
 }
 
 // ------------------------------------
@@ -977,7 +1053,11 @@ export function conv2d(input: Tensor, weight: Tensor, bias?: Tensor, stride: num
         );
     }
 
-    if(!bias) bias = zeros(weight.shape[0]);
+    let needtofreeBias = false;
+    if(!bias) {
+        bias = factories.zeros(weight.shape[0]);
+        needtofreeBias = true;
+    }
 
     if(weight.shape[1] != input.shape[1] / groups) throw new Error(`Expected weight to match shape [out_channels, in_channels / groups, kH, kW] but got input: ${input.shape} and weight: ${weight.shape}`)
 
@@ -986,12 +1066,12 @@ export function conv2d(input: Tensor, weight: Tensor, bias?: Tensor, stride: num
         if(padding[0] != 0) {
             const zero_shape = Array.from(input.shape);
             zero_shape[input.shape.length-1] = padding[0] as any;
-            input = cat(cat(zeros(zero_shape), input, 3), zeros(zero_shape), 3);
+            input = cat(cat(factories.zeros(zero_shape), input, 3), factories.zeros(zero_shape), 3);
         }
         if(padding[1] != 0) {
             const zero_shape = Array.from(input.shape);
             zero_shape[input.shape.length-2] = padding[1] as any;
-            input = cat(cat(zeros(zero_shape), input, 2), zeros(zero_shape), 2);
+            input = cat(cat(factories.zeros(zero_shape), input, 2), factories.zeros(zero_shape), 2);
         }
     }
     
@@ -1006,8 +1086,8 @@ export function conv2d(input: Tensor, weight: Tensor, bias?: Tensor, stride: num
         outputHeight: input.shape[2] - weight.shape[2] + 1,
         outputWidth: input.shape[3] - weight.shape[3] + 1,
     };
-    
-    return input.runKernel(
+
+    const output = input.runKernel(
         "conv2d",
         { dtype: input.dtype },
         params,
@@ -1015,6 +1095,9 @@ export function conv2d(input: Tensor, weight: Tensor, bias?: Tensor, stride: num
         weight,
         bias
     )[0];
+
+    if(needtofreeBias) bias.destroy();
+    return output;
 }
 
 export function mm(input: Tensor, other: Tensor): Tensor {
@@ -1040,10 +1123,13 @@ export function mm(input: Tensor, other: Tensor): Tensor {
             resultCols: is_batched ? other.shape[2] : other.shape[1],
             trueInnerDim: is_batched ? input.shape[2] : input.shape[1],
             alpha: 1.0,
+            innerDim: is_batched ? input.shape[2] : input.shape[1],
+            innerDimOffset: 0
         };
 
         //console.log("running linear with params: ", params);
         //console.log("output shape: ", [...(is_batched ? [params.batches] : []), params.resultRows, params.resultCols])
+        /*
         const a = input.runKernel(
             "mm",
             { resultDtype: input.dtype },
@@ -1073,7 +1159,7 @@ export function mm(input: Tensor, other: Tensor): Tensor {
             other
         )[0];
         return add(add(add(a, b), c), d);
-        /*
+        */
         return input.runKernel(
             "mm",
             { resultDtype: input.dtype },
@@ -1081,13 +1167,12 @@ export function mm(input: Tensor, other: Tensor): Tensor {
             [[...(is_batched ? [params.batches] : []), params.resultRows, params.resultCols]],
             other
         )[0];
-        */
     }
 }
 
 export function transpose(input: Tensor, dim0=0, dim1=1): Tensor {
     if(dim1 == dim0) {
-        return input;
+        return input.copy();
     } else if(dim1 < dim0) {
         const temp = dim0;
         dim0 = dim1;
@@ -1115,6 +1200,15 @@ export function transpose(input: Tensor, dim0=0, dim1=1): Tensor {
         params,
         [newShape]
     )[0];
+}
+
+export function copy(input: Tensor): Tensor {
+    return input.runKernel(
+        "copy",
+        { dtype: input.dtype },
+        { outputSize: shapeSize(input.shape)},
+        [input.shape]
+    )[0]
 }
 
 

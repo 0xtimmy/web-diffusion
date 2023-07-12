@@ -432,6 +432,7 @@ export class Module {
             const completeName = prefix + name;
             const state = await (await fetch(`${dirname}/${completeName}`)).json();
             const parameter = new Parameter(tensor(state as any));
+            console.log("loading parameters: ", completeName);
             
             if(old.shape.length != parameter.shape.length || parameter.shape.reduce((acc, v, i) => {
                 return acc || v != old.shape[i];
@@ -508,9 +509,15 @@ export class Sequential extends Container {
         }
     }
     forward(input: Tensor): Tensor {
-        for (const module of this.children) {
-            input = (module as any).forward(input);
+        if(this.children.length == 0) return input;
+        
+        input = (this.children[0] as any).forward(input);
+        for(let i = 1; i < this.children.length; i++) {
+            const next = (this.children[i] as any).forward(input);
+            input.destroy();
+            input = next; 
         }
+
         return input;
     }
 }

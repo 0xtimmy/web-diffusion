@@ -30,6 +30,10 @@ function _defaultKernel({
 }
 
 export const kernels: { [name: string]: KernelSpec } = {
+    copy: _defaultKernel({
+        name: "copy",
+        shader: `output[global_id.x] = input[global_id.x];`
+    }),
     exp: _defaultKernel({
         name: "exp",
         shader: `output[global_id.x] = exp(input[global_id.x]);`
@@ -62,7 +66,21 @@ export const kernels: { [name: string]: KernelSpec } = {
             { name: "a", shaderType: "array<f32>" },
             { name: "b", shaderType: "array<f32>" }
         ],
-        shader: `output[global_id.x] = pow(a[global_id.x], b[global_id.y]);`
+        shader: `output[global_id.x] = pow(a[global_id.x], b[global_id.x]);`
+    }),
+    scalar_pow: _defaultKernel({
+        name: "pow",
+        parameters: [
+            {
+                name: "alpha",
+                shaderType: "f32"
+            },
+            {
+                name: "outputSize",
+                shaderType: "u32"
+            }
+        ],
+        shader: `output[global_id.x] = pow(input[global_id.x], parameters.alpha);`
     }),
     cosh: _defaultKernel({
         name: "cosh",
@@ -581,9 +599,12 @@ export const kernels: { [name: string]: KernelSpec } = {
             mean = mean / f32(parameters.groupSize);
             var variance: f32 = (mean_sqrd / f32(parameters.groupSize)) - (mean * mean) + parameters.eps;
             
-            var channel: u32 = (global_id.x * parameters.groups + global_id.y / (parameters.groupSize / parameters.groups)) % parameters.channels;
+            var channel_size: u32 = parameters.groupSize * parameters.groups / parameters.channels;
+
             for(var i: u32 = 0; i < parameters.groupSize; i++) {
+                var channel: u32 = ((group_start + i) % (parameters.groupSize * parameters.groups)) / channel_size;
                 output[group_start + i] = ((input[group_start + i] - mean) / sqrt(abs(variance))) * weight[channel] + bias[channel];
+                //output[group_start + i] = f32(channel);
             }
             
 
@@ -666,8 +687,16 @@ export const kernels: { [name: string]: KernelSpec } = {
         //workgroupSize: [1, 1, 1],
         workgroupCount: ["parameters.outputSize", 1, 1],
         shader: `
+            if(global_id.x == 0) {
+                output[global_id.x] = parameters.start;
+                return;
+            }
+            if(global_id.x == parameters.outputSize-1) {
+                output[global_id.x] = parameters.end;
+                return;
+            }
             var diff = parameters.end - parameters.start;
-            output[global_id.x] = diff * f32(global_id.x) / f32(parameters.outputSize + 1) + parameters.start;
+            output[global_id.x] = diff * f32(global_id.x) / f32(parameters.outputSize - 1) + parameters.start;
         `  
     },
     transpose: {
@@ -824,6 +853,53 @@ export const kernels: { [name: string]: KernelSpec } = {
             output[output_idx] = input[input_idx];
         `
     },
+    clt: {
+        name: "clt",
+        config: [
+            {
+                name: "dtype"
+            }
+        ],
+        parameters: [
+            {
+                name: "sample_size",
+                shaderType: "u32"
+            },
+            {
+                name: "outputSize",
+                shaderType: "u32"
+            },
+            {
+                name: "mean",
+                shaderType: "f32"
+            },
+            {
+                name: "sdev",
+                shaderType: "f32"
+            }
+        ],
+        inputs: [
+            {
+                name: "input",
+                shaderType: "array<f32>"
+            }
+        ],
+        outputs: [
+            {
+                name: "output",
+                shaderType: "array<f32>",
+                size: "outputSize"
+            }
+        ],
+        workgroupCount: ["parameters.outputSize", "1", "1"],
+        shader: `
+            var sum: f32 = 0;
+            for(var i: u32 = 0; i < parameters.sample_size; i++) {
+                sum += input[global_id.x * parameters.sample_size + i];
+            }
+            output[global_id.x] = sum / f32(parameters.sample_size);
+        `
+    },
     box_muller: {
         name: "box_muller",
         config: [
@@ -858,23 +934,15 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        //workgroupSize: [1, 2, 1],
-        workgroupCount: ["parameters.outputSize", "2", "1"],
+        workgroupCount: ["parameters.outputSize", "1", "1"],
         shader: `
             const pi = 3.1415;
-            var u1: f32;
-            var u2: f32;
-            var idx: u32;
-            if(global_id.y == 0) {
-                u1 = input[global_id.x];
-                u2 = input[global_id.x + (parameters.outputSize / 2)];
-                idx = global_id.x;
-            } else {
-                u1 = input[global_id.x + (parameters.outputSize / 2)];
-                u2 = input[global_id.x];
-                idx = global_id.x + (parameters.outputSize / 2);
-            }
-            output[idx] = sqrt(abs(-2 * log(u1))) * cos(2 * pi * u2) * parameters.sdev + parameters.mean;
+            var u1: f32 = input[global_id.x];
+            var u2: f32 = 1 - input[(global_id.x + parameters.outputSize)];
+            var idx: u32 = global_id.x;
+            output[idx] = sqrt(-2 * log(u1)) * cos(2 * pi * u2) * parameters.sdev + parameters.mean;
+
+            
         `
     },
     upsample: {
@@ -932,7 +1000,7 @@ export const kernels: { [name: string]: KernelSpec } = {
             }
         ],
         //workgroupSize: [1, 1, 1],
-        workgroupCount: ["parameters.outputSize / parameters.h_out", "parameters.h_out", "parameters.d_out"],
+        workgroupCount: ["parameters.outputSize / parameters.d_out / parameters.w_out", "parameters.h_out", "parameters.d_out"],
         shader: `
             var output_idx = global_id.x * parameters.h_out * parameters.d_out + global_id.y * parameters.d_out + global_id.z;
 
@@ -964,32 +1032,27 @@ export const kernels: { [name: string]: KernelSpec } = {
                     break;
                 }
                 case 2: { // bilinear
-                    var xscale_factor = parameters.w_out / parameters.w_in;
-                    var xoffset = (xscale_factor - 1) / 2;
-                    var yscale_factor = parameters.h_out / parameters.h_in;
-                    var yoffset = (yscale_factor - 1) / 2;
+                    var xscale_factor: f32 = f32(parameters.w_out) / f32(parameters.w_in);
+                    var xoffset: f32 = (xscale_factor - 1.0) / 2.0;
+                    var yscale_factor: f32 = f32(parameters.h_out) / f32(parameters.h_in);
+                    var yoffset: f32 = (yscale_factor - 1.0) / 2.0;
 
-                    var x1_map = (global_id.x - xoffset) / xscale_factor;
-                    var x2_map = x1_map + 1;
-                    var y1_map = (global_id.y - yoffset) / yscale_factor;
-                    var y2_map = y1_map + 1;
-
-                    /*
-                    if(x_r % parameters.w_in < abs(x_l) % parameters.w_in) {
-                        if(global_id.x % parameters.w_out < scale_factor) {
-                            output[output_idx] = input[x_r];
-                        } else {
-                            output[output_idx] = input[x_l];
-                        }
-                        return;
+                    var x1_map: u32 = u32(floor((f32(global_id.x) - xoffset) / xscale_factor));
+                    var x2_map: u32 = x1_map + 1;
+                    if(f32(global_id.x) < xoffset) {
+                        x2_map = 0;
                     }
-                    */
+                    var y1_map: u32 = u32(floor((f32(global_id.y) - yoffset) / yscale_factor));
+                    var y2_map: u32 = y1_map + 1;
+                    if(f32(global_id.y) < yoffset) {
+                        y2_map = 0;
+                    }
 
-                    var x_oob = x2_map % parameters.w_in < abs(x1_map) % parameters.w_in;
-                    var y_oob = y2_map % parameters.w_in < abs(y1_map);
+                    var x_oob: bool = (x2_map % parameters.w_in) < (abs(x1_map) % parameters.w_in) || f32(global_id.x) < xoffset;
+                    var y_oob: bool = (y2_map % parameters.h_in) < (abs(y1_map) % parameters.h_in) || f32(global_id.y) < yoffset;
                     if(x_oob && y_oob) {
-                        if(global_id.x % parameters.w_out < xscale_factor) {
-                            if(global_id.y < yscale_factor) {
+                        if(f32(global_id.x % parameters.w_out) < xscale_factor) {
+                            if(f32(global_id.y) < yscale_factor) {
                                 var idx: u32 = x2_map*parameters.h_in + y2_map;
                                 output[output_idx] = input[idx];
                             } else {
@@ -997,7 +1060,7 @@ export const kernels: { [name: string]: KernelSpec } = {
                                 output[output_idx] = input[idx];
                             }
                         } else {
-                            if(global_id.y < yscale_factor) {
+                            if(f32(global_id.y) < yscale_factor) {
                                 var idx: u32 = x1_map*parameters.h_in + y2_map;
                                 output[output_idx] = input[idx];
                             } else {
@@ -1005,51 +1068,51 @@ export const kernels: { [name: string]: KernelSpec } = {
                                 output[output_idx] = input[idx];
                             }
                         }
-                        //return;
+                        return;
                     } else if(x_oob && !y_oob) {
                         var p1Idx: u32;
                         var p2Idx: u32;
-                        if(global_id.x % parameters.w_out < xscale_factor) {
+                        if(f32(global_id.x % parameters.w_out) < xscale_factor || f32(global_id.x) < xoffset) {
                             p1Idx = x2_map*parameters.h_in + y1_map;
                             p2Idx = x2_map*parameters.h_in + y2_map;
                         } else {
                             p1Idx = x1_map*parameters.h_in + y1_map;
                             p2Idx = x1_map*parameters.h_in + y2_map;
                         }
-                        var diff = (input[p2Idx] - input[p1Idx]) / f32(yscale_factor);
-                        output[output_idx] = input[p1Idx] + diff * f32((2*(global_id.y - yoffset)) % (2*yscale_factor)) / 2.0;
-                        //return;
+                        var diff = (input[p2Idx] - input[p1Idx]) / yscale_factor;
+                        output[output_idx] = input[p1Idx] + diff * ((2.0*(f32(global_id.y) - yoffset)) % (2.0*yscale_factor)) / 2.0;
+                        return;
                     } else if(!x_oob && y_oob) {
                         var p1Idx: u32;
                         var p2Idx: u32;
-                        if(global_id.y < yscale_factor) {
+                        if(f32(global_id.y % parameters.h_out) < yscale_factor || f32(global_id.y) < yoffset) {
                             p1Idx = x1_map*parameters.h_in + y2_map;
                             p2Idx = x2_map*parameters.h_in + y2_map;
                         } else {
                             p1Idx = x1_map*parameters.h_in + y1_map;
                             p2Idx = x2_map*parameters.h_in + y1_map;
                         }
-                        var diff = (input[p2Idx] - input[p1Idx]) / f32(xscale_factor);
-                        output[output_idx] = input[p1Idx] + diff * f32((2*(global_id.x - xoffset)) % (2*xscale_factor)) / 2.0;
-                        //return;
+                        var diff: f32 = (input[p2Idx] - input[p1Idx]) / xscale_factor;
+                        output[output_idx] = input[p1Idx] + diff * ((2.0*(f32(global_id.x) - xoffset)) % (2.0*xscale_factor)) / 2.0;
+                        return;
                     }
 
                     // [ ... p1, x, ..., x, p2 ... ]
                     // [ ...        ...        ... ]
                     // [ ... p3, x, ..., x, p4 ... ]
 
-                    var p1Idx = x1_map*parameters.h_in*parameters.d_in + y1_map*parameters.d_in;
-                    var p2Idx = x1_map*parameters.h_in*parameters.d_in + y2_map*parameters.d_in;
-                    var p3Idx = x2_map*parameters.h_in*parameters.d_in + y1_map*parameters.d_in;
-                    var p4Idx = x2_map*parameters.h_in*parameters.d_in + y2_map*parameters.d_in;
-                    var diff1 = (input[p2Idx] - input[p1Idx]) / f32(yscale_factor);
-                    var diff2 = (input[p4Idx] - input[p3Idx]) / f32(yscale_factor);
-                    var p5    = input[p1Idx] + diff1 * f32((2*(global_id.y - yoffset)) % (2*yscale_factor)) / 2.0;
-                    var p6    = input[p3Idx] + diff2 * f32((2*(global_id.y - yoffset)) % (2*yscale_factor)) / 2.0;
-                    var diff = (p6 - p5) / f32(xscale_factor);
+                    var p1Idx: u32 = x1_map*parameters.h_in*parameters.d_in + y1_map*parameters.d_in;
+                    var p2Idx: u32 = x1_map*parameters.h_in*parameters.d_in + y2_map*parameters.d_in;
+                    var p3Idx: u32 = x2_map*parameters.h_in*parameters.d_in + y1_map*parameters.d_in;
+                    var p4Idx: u32 = x2_map*parameters.h_in*parameters.d_in + y2_map*parameters.d_in;
+                    var diff1: f32 = (input[p2Idx] - input[p1Idx]) / yscale_factor;
+                    var diff2: f32 = (input[p4Idx] - input[p3Idx]) / yscale_factor;
+                    var p5: f32    = input[p1Idx] + diff1 * ((2.0*(f32(global_id.y) - yoffset)) % (2.0*yscale_factor)) / 2.0;
+                    var p6: f32    = input[p3Idx] + diff2 * ((2.0*(f32(global_id.y) - yoffset)) % (2.0*yscale_factor)) / 2.0;
+                    var diff: f32 = (p6 - p5) / xscale_factor;
                     
-                    output[output_idx] = p5 + diff * f32((2*(global_id.x - xoffset)) % (2*xscale_factor)) / 2.0;
-                    break;
+                    output[output_idx] = p5 + diff * ((2.0*(f32(global_id.x) - xoffset)) % (2*xscale_factor)) / 2.0;
+                    return;
                 }
                 case 3: { //bicubic
                     output[global_id.x] = 3;
@@ -1361,11 +1424,9 @@ export const kernels: { [name: string]: KernelSpec } = {
 
             for(var batch: u32 = 0; batch < parameters.batchSize; batch++) {
                 var input_batch_idx: u32 = batch * parameters.inputChannels * parameters.inputHeight * parameters.inputWidth;
-                var weight_batch_idx: u32 = batch * parameters.outputChannels * parameters.inputChannels * parameters.kernelHeight * parameters.kernelWidth;
                 var output_batch_idx: u32 = batch * parameters.outputChannels * parameters.outputHeight * parameters.outputWidth;
                 
-                
-                var weight_out_channel_idx: u32 = weight_batch_idx + global_id.x * parameters.inputChannels * parameters.kernelHeight * parameters.kernelWidth;
+                var weight_out_channel_idx: u32 = global_id.x * parameters.inputChannels * parameters.kernelHeight * parameters.kernelWidth;
 
                 var output_channel_idx: u32 = output_batch_idx + global_id.x * parameters.outputHeight * parameters.outputWidth;
                 var output_idx: u32 = output_channel_idx + global_id.y * parameters.outputWidth + global_id.z;
@@ -1383,7 +1444,7 @@ export const kernels: { [name: string]: KernelSpec } = {
                         }
                     }
                 }
-                var bias_idx: u32 = batch * parameters.outputChannels + global_id.x;
+                var bias_idx: u32 = global_id.x;
                 output[output_idx] = result + bias[bias_idx];
             }
         `

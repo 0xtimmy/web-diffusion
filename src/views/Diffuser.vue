@@ -1,8 +1,7 @@
 <template>
     <div>
         <h2>Web Diffusion</h2>
-        Select Weights: <button @click="loadPokemon" :disabled="weightsSelected">Pokemon</button> <br>
-        <button @click="generate" :disabled="active || !modelReady">go !!</button> <br />
+        Select Weights: <button @click="genPokemon" :disabled="active">Pokemon</button> <br>
 
         <div ref="cycle-list" class="cycle-list">
 
@@ -21,10 +20,7 @@ export default defineComponent({
     name: "Diffuser",
     data() {
         return {
-            modelReady: true,
             active: false,
-            weightsSelected: false,
-            model: null,
         }
     },
     mounted: async function() {
@@ -32,52 +28,45 @@ export default defineComponent({
         this.model = new UNet();
     },
     methods: {
-        loadPokemon: async function(event) {
-            this.weightsSelected = true;
-            console.log("loading weights...");
-            await this.model.loadStateDictFromURL("../../parameters/pokemon");
-            console.log("✅ done loading weights");
-            this.modelReady = true;
-            this.generate();
-        },
-        generate: function() {
-            const worker = new Worker("../../worker.js", { type: "module" });
-            worker.onmessage = (e: any) => {
-                console.log("received message from worker");
-            }
+        genPokemon: async function(event) {
             if(!this.active) {
+                this.weightsSelected = true;
+                console.log("loading weights...");
                 this.active = true;
-                const diffuser = new Diffusion({ noise_steps: 5, img_size: 64 });
-                const res = diffuser.sample(this.model, (res: torch.Tensor, step_num: number) => { 
-                    //this.renderResult(res, `Iteration ${step_num}`);
-                    (torch.devices["webgpu"] as any).logBuffers();
+                const model = new UNet();
+                await model.loadStateDictFromURL("../../parameters/pokemon");
+                console.log("✅ done loading weights");
+                const diffuser = new Diffusion({ noise_steps: 1000, img_size: 64 });
+                const res = await diffuser.sample(model, async (res: torch.Tensor, step_num: number) => { 
+                    await this.renderResult(res, `Iteration ${step_num}`);
+                    return;
                 });
                 this.active = false;
                 this.renderResult(res, "final");
             }
         },
-        renderResult: function(result: torch.Tensor, caption: string) {
-            result = result.cat(torch.constant([1, 1, ...Array.from(result.shape).splice(2)], 255), 1);
-            result = result.transpose(1, 2).transpose(2, 3);
-            result.toArrayAsync().then((data) => {
-                if(!this.active) console.log("Result: ", data);
-                const img_data = new Uint8ClampedArray(data.flat(4) as any);
-                const box = document.createElement("div");
-                box.className = "result-box";
+        renderResult: async function(result: torch.Tensor, caption: string) {
+            result = result.squeeze(0).transpose(0, 1).transpose(1, 2);
+            console.log("result shape: ", result.shape);
+            const data = await result.toArrayAsync();
+            if(!this.active) console.log("Result: ", data);
+            const img_data = new Uint8ClampedArray(data.flat(4) as any);
+            const box = document.createElement("div");
+            box.className = "result-box";
 
-                const canvas = document.createElement("canvas");
-                canvas.setAttribute("width", "64px");
-                canvas.setAttribute("height", "64px");
-                const context = canvas.getContext("2d");
-                context.putImageData(
-                    new ImageData(img_data, 64, 64), 
-                    0, 0);
-                box.appendChild(canvas);
-                const cap = document.createElement("div");
-                cap.innerHTML = caption;
-                box.appendChild(cap);
-                this.$refs["cycle-list"].appendChild(box);
-            });
+            const canvas = document.createElement("canvas");
+            canvas.setAttribute("width", "64px");
+            canvas.setAttribute("height", "64px");
+            const context = canvas.getContext("2d");
+            context.putImageData(
+                new ImageData(img_data, 64, 64), 
+                0, 0);
+            box.appendChild(canvas);
+            const cap = document.createElement("div");
+            cap.innerHTML = caption;
+            box.appendChild(cap);
+            this.$refs["cycle-list"].appendChild(box);
+            return;
         }
     }
 })

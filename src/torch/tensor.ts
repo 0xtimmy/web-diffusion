@@ -4,10 +4,12 @@ import { Shape, Strides, defaultStrides, shapeSize } from "./shape";
 import { ones, uniform, normal } from "./factories";
 import { ATypedArray, Dtype, getDtype } from "./dtype";
 import {
+    GPUBufferStorage,
     TensorArrayData,
     UntypedStorage,
     newTypedArrayFromArray,
 } from "./storage";
+import { DeviceWebGPU } from "./device_webgpu";
 import type { GradientFunction, GradientContext } from "./autograd";
 import type { KernelConfigInput, KernelParamsInput } from "./kernel";
 import * as ops from "./ops_opgen";
@@ -27,6 +29,7 @@ export type TensorSpec = {
 
 export class Tensor extends TensorBase {
     private _device: Device;
+    private _destroyed: boolean;
 
     private _storage: UntypedStorage;
     private _dtype: Dtype;
@@ -58,6 +61,9 @@ export class Tensor extends TensorBase {
     }
     get device(): Device {
         return this._device;
+    }
+    get destroyed(): boolean {
+        return this._destroyed;
     }
     get isContiguous(): boolean {
         let strides = this.strides;
@@ -137,6 +143,7 @@ export class Tensor extends TensorBase {
             );
         }
         this._device = d;
+        this._destroyed = false;
         this._requiresGrad = requiresGrad || false;
         this._gradFunc = null;
         this._gradCtx = null;
@@ -175,7 +182,13 @@ export class Tensor extends TensorBase {
         }
         return `tensor([${this.shape}], ${this.dtype}${rg})`;
     }
+    destroy() {
+        if(this._destroyed) throw new Error("Can't destroy a tensor that's alread been destroyed lol");
+        (this.device as DeviceWebGPU).destroyBuffer((this.storage as GPUBufferStorage).gpuBuffer);
+        this._destroyed = true;
+    }
     async toArrayAsync(): Promise<TensorArrayData> {
+        if(this._destroyed) throw new Error("Can't retrieve a tensor that's been destroyed");
         await this.storage.mapReadAsync();
         const data = this.storage.getTypedArray(this.dtype);
         const shape = this.shape;
@@ -240,6 +253,10 @@ export class Tensor extends TensorBase {
         ...additionalInputs: Tensor[]
     ): Tensor[] {
         //console.log("running kernel: ", name);
+        if(this._destroyed) throw new Error("Cannot run a kernel on a destroyed tensor");
+        additionalInputs.forEach((t) => {
+            if(t.destroyed) throw new Error("Cannot run a kernel with a destroyed tensor");
+        })
 
         outputShapes.forEach((shape) => {
             if (shapeSize(shape) == 0) throw new Error(`Output shapes cannot have a 0 dimention, got: ${outputShapes}`);
@@ -365,13 +382,30 @@ export class Tensor extends TensorBase {
         return this.withShape(newShape, newStrides);
     }
     mm(other: Tensor): Tensor {
-        return aops.mm(this, other);
+        const output = aops.mm(this, other);
+        this.destroy();
+        return output;
+    }
+    linear(weight: Tensor, bias?: Tensor): Tensor {
+        const output = aops.linear(this, weight, bias);
+        this.destroy();
+        return output;
+    }
+    softmax(dim?: number): Tensor {
+        const output = aops.softmax(this, dim);
+        this.destroy();
+        return output;
     }
     t(): Tensor {
         return this.transpose(0, 1);
     }
     transpose(dim0: number, dim1: number): Tensor {
-        return aops.transpose(this, dim0, dim1);
+        const output = aops.transpose(this, dim0, dim1);
+        this.destroy();
+        return output;
+    }
+    copy(): Tensor {
+        return aops.copy(this);
     }
     zero_(): Tensor {
         throw new Error("Tensor zero_ is not implemented");
@@ -385,16 +419,24 @@ export class Tensor extends TensorBase {
         return aops.unsqueeze(this, dim);
     }
     chunk(chunks: number, dim?: number): Array<Tensor> {
-        return aops.chunk(this, chunks, dim);
+        const output = aops.chunk(this, chunks, dim);
+        this.destroy();
+        return output;
     }
     index(index: Tensor): Tensor {
-        return aops.index(this, index);
+        const output = aops.index(this, index);
+        this.destroy();
+        return output;
     }
     repeat(shape: Shape): Tensor {
-        return aops.repeat(this, shape);
+        const output = aops.repeat(this, shape);
+        this.destroy();
+        return output;
     }
     cat(t: Tensor, dim: 0 | 1 | 2 | 3 = 0): Tensor {
-        return aops.cat(this, t, dim);
+        const output = aops.cat(this, t, dim);
+        this.destroy();
+        return output;
     }
 
     // Codegen marker
@@ -575,6 +617,11 @@ export class Tensor extends TensorBase {
         };
         return this.runKernelInplace("acosh_", { dtype: this.dtype }, params);
     }
+    clamp(low: number, high: number): Tensor {
+        const output = aops.clamp(this, low, high);
+        this.destroy();
+        return output;
+    }
     /**
     * Calculates:
     * ```js
@@ -591,7 +638,14 @@ export class Tensor extends TensorBase {
     * @returns the output tensor
     */
     add(other: Tensor, alpha?: number): Tensor {
-        return aops.add(this, other);
+        const output = aops.add(this, other);
+        this.destroy();
+        return output
+    }
+    scalar_add(alpha: number): Tensor {
+        const output = aops.scalar_add(this, alpha);
+        this.destroy();
+        return output
     }
     /**
     * Calculates:
@@ -1056,8 +1110,15 @@ export class Tensor extends TensorBase {
     * @param alpha the alpha value to multiply `other` with
     * @returns the output tensor
     */
-    div(other: Tensor, alpha?: number): Tensor {
-        return aops.div(this, other);
+    div(other: Tensor): Tensor {
+        const output = aops.div(this, other);
+        this.destroy();
+        return output;
+    }
+    scalar_div(alpha: number): Tensor {
+        const output = aops.scalar_div(this, alpha);
+        this.destroy();
+        return output;
     }
     /**
     * Alias for `div`.
@@ -1388,7 +1449,9 @@ export class Tensor extends TensorBase {
     * @returns the output tensor
     */
     log(): Tensor {
-        return ops.log(this);
+        const output = ops.log(this);
+        this.destroy();
+        return output;
     }
     /**
     * ![Plot of log and its gradient](/plots/log.svg)
@@ -1617,8 +1680,15 @@ export class Tensor extends TensorBase {
     * @param alpha the alpha value to multiply `other` with
     * @returns the output tensor
     */
-    mul(other: Tensor, alpha?: number): Tensor {
-        return aops.mul(this, other);
+    mul(other: Tensor): Tensor {
+        const output = aops.mul(this, other);
+        this.destroy();
+        return output;
+    }
+    scalar_mul(alpha: number): Tensor {
+        const output = aops.scalar_mul(this, alpha);
+        this.destroy();
+        return output;
     }
     /**
     * Alias for `mul`.
@@ -1775,7 +1845,14 @@ export class Tensor extends TensorBase {
     * @returns the output tensor
     */
     pow(other: Tensor): Tensor {
-        return ops.pow(this, other);
+        const output = aops.pow(this, other);
+        this.destroy();
+        return output;
+    }
+    scalar_pow(alpha: number): Tensor {
+        const output = aops.scalar_pow(this, alpha);
+        this.destroy();
+        return output;
     }
     /**
     * Calculates:
@@ -1880,19 +1957,32 @@ export class Tensor extends TensorBase {
     // ------------------------------------
 
     gelu(): Tensor {
-        return aops.gelu(this);
+        const output = aops.gelu(this);
+        this.destroy();
+        return output;
     }
 
     layernorm(normalized_shape: Shape, weight?: Tensor, bias?: Tensor, eps=1e-5): Tensor {
-        return aops.layernorm(this, normalized_shape, weight, bias, eps);
+        const output = aops.layernorm(this, normalized_shape, weight, bias, eps);
+        this.destroy();
+        return output;
     }
 
     box_muller(mean: number, std: number): Tensor {
-        return aops.box_muller(this, mean, std);
+        const output = aops.box_muller(this, mean, std);
+        this.destroy();
+        return output;
+    }
+    clt(sample_size: number, mean=0, std=1) {
+        const output = aops.clt(this, sample_size, mean, std);
+        this.destroy();
+        return output;
     }
 
     maxpool2d(kernel_size: [number, number], stride: [number, number], padding: [number, number], dilation: [number, number]): Tensor {
-        return aops.maxpool2d(this, kernel_size, stride, padding, dilation);
+        const output = aops.maxpool2d(this, kernel_size, stride, padding, dilation);
+        this.destroy();
+        return output
     }
 
     upsample(
@@ -1902,27 +1992,35 @@ export class Tensor extends TensorBase {
         align_corners: boolean,
         recompute_scale_factor: boolean
     ): Tensor {
-        return aops.upsample(this, size, scale_factor, mode, align_corners, recompute_scale_factor);
+        const output = aops.upsample(this, size, scale_factor, mode, align_corners, recompute_scale_factor);
+        this.destroy();
+        return output;
     }
 
     uniform(
         a: number,
         b: number
     ): Tensor {
-        return uniform(this.shape, a, b, this.dtype, this.device);
+        const output = uniform(this.shape, a, b, this.dtype, this.device);
+        this.destroy();
+        return output;
     }
 
     normal(
         mean: number,
         std: number
     ): Tensor {
-        return normal(this.shape, mean, std, this.dtype, this.device)
+        const output = normal(this.shape, mean, std, this.dtype, this.device);
+        this.destroy();
+        return output;
     }
 
     permute(
         dims: Array<number>
     ): Tensor {
-        return aops.permute(this, dims);
+        const output = aops.permute(this, dims);
+        this.destroy();
+        return output;
     }
 
     // ------------------------------------
@@ -2295,7 +2393,9 @@ export class Tensor extends TensorBase {
     * @returns the output tensor
     */
     sqrt(): Tensor {
-        return aops.sqrt(this);
+        const output = aops.sqrt(this);
+        this.destroy();
+        return output;
     }
     /**
     * ![Plot of sqrt and its gradient](/plots/sqrt.svg)
@@ -2372,8 +2472,15 @@ export class Tensor extends TensorBase {
     * @param alpha the alpha value to multiply `other` with
     * @returns the output tensor
     */
-    sub(other: Tensor, alpha?: number): Tensor {
-        return aops.sub(this, other);
+    sub(other: Tensor): Tensor {
+        const output = aops.sub(this, other);
+        this.destroy();
+        return output;
+    }
+    scalar_sub(alpha: number): Tensor {
+        const output = aops.scalar_sub(this, alpha);
+        this.destroy();
+        return output;
     }
     /**
     * Alias for `sub`.
