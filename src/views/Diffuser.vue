@@ -1,8 +1,7 @@
 <template>
     <div>
         <h2>Web Diffusion</h2>
-        Select Weights: <button @click="loadPokemon" :disabled="weightsSelected">Pokemon</button> <br>
-        <button @click="generate" :disabled="active || !modelReady">go !!</button> <br />
+        Select Weights: <button @click="genPokemon" :disabled="active">Pokemon</button> <br>
 
         <div ref="cycle-list" class="cycle-list">
 
@@ -21,10 +20,7 @@ export default defineComponent({
     name: "Diffuser",
     data() {
         return {
-            modelReady: true,
             active: false,
-            weightsSelected: false,
-            //model: null,
         }
     },
     mounted: async function() {
@@ -32,31 +28,26 @@ export default defineComponent({
         this.model = new UNet();
     },
     methods: {
-        loadPokemon: async function(event) {
-            this.weightsSelected = true;
-            console.log("loading weights...");
-            await this.model.loadStateDictFromURL("../../parameters/pokemon");
-            console.log("✅ done loading weights");
-            this.modelReady = true;
-            this.generate();
-        },
-        generate: async function() {
+        genPokemon: async function(event) {
             if(!this.active) {
-                const model = new UNet();
+                this.weightsSelected = true;
+                console.log("loading weights...");
                 this.active = true;
+                const model = new UNet();
+                await model.loadStateDictFromURL("../../parameters/pokemon");
+                console.log("✅ done loading weights");
                 const diffuser = new Diffusion({ noise_steps: 1000, img_size: 64 });
                 const res = await diffuser.sample(model, async (res: torch.Tensor, step_num: number) => { 
                     await this.renderResult(res, `Iteration ${step_num}`);
                     return;
                 });
-                console.log(res);
                 this.active = false;
                 this.renderResult(res, "final");
             }
         },
         renderResult: async function(result: torch.Tensor, caption: string) {
-            result = result.cat(torch.constant([1, 1, ...Array.from(result.shape).splice(2)], 255), 1);
-            result = result.transpose(1, 2).transpose(2, 3);
+            result = result.squeeze(0).transpose(0, 1).transpose(1, 2);
+            console.log("result shape: ", result.shape);
             const data = await result.toArrayAsync();
             if(!this.active) console.log("Result: ", data);
             const img_data = new Uint8ClampedArray(data.flat(4) as any);

@@ -175,53 +175,65 @@ class UNet(nn.Module):
         return output
 
 
-def gen_ddpm(message, log="always", log_config="fail"):
+def gen_ddpm(message, noise_steps, log="always", log_config="fail"):
     model = UNet()
     ckpt = torch.load("./src/scripts/pokemon/ckpt0.pt", map_location=torch.device('cpu'))
     model.load_state_dict(ckpt)
 
-    _beta = torch.linspace(1e-4, 0.02, 3)
+    _beta = torch.linspace(1e-4, 0.02, noise_steps)
     _alpha = 1. - _beta
     _alpha_hat = torch.cumprod(_alpha, dim=0)
 
-    start = time.time()
-
-    t = torch.tensor([2])
-    x = torch.randn((1, 3, 64, 64))
-    predicted_noise = model(x, t)
-
-    alpha = _alpha[t][:, None, None, None]
-    alpha_hat = _alpha_hat[t][:, None, None, None]
-    beta = _beta[t][:, None, None, None]
-
-    noise = torch.randn_like(x)
-
-    output = 1 / torch.sqrt(alpha) * (x - ((1 - alpha) / torch.sqrt(1 - alpha_hat)) * predicted_noise) + torch.sqrt(beta) * noise
-
-    t = torch.tensor([1])
-    predicted_noise = model(x, t)
-
-    alpha = _alpha[t][:, None, None, None]
-    alpha_hat = _alpha_hat[t][:, None, None, None]
-    beta = _beta[t][:, None, None, None]
-
-    noise = torch.zeros_like(x)
-
-    output = 1 / torch.sqrt(alpha) * (output - ((1 - alpha) / torch.sqrt(1 - alpha_hat)) * predicted_noise) + torch.sqrt(beta) * noise
-    output = (output.clamp(-1, 1) + 1) / 2
-    output = (output * 255).type(torch.uint8)
+    input = None
+    noises = []
+    results = []
     
-    duration = time.time() - start
+    for i in range(noise_steps):
+        noises.append(None)
+        results.append(None)
+
+    model.eval()
+    with torch.no_grad():
+        x = torch.randn((1, 3, 64, 64))
+        input = x.detach().numpy().tolist()
+        for i in reversed(range(1, noise_steps)):
+            t = (torch.ones(1) * i).long()
+            
+            predicted_noise = model(x, t)
+            
+            alpha = _alpha[t][:, None, None, None]
+            alpha_hat = _alpha_hat[t][:, None, None, None]
+            beta = _beta[t][:, None, None, None]
+
+            if i > 1:
+                noise = torch.randn_like(x)
+            else:
+                noise = torch.zeros_like(x)
+            noises[i] = noise.detach().numpy().tolist()
+            
+            x = 1 / torch.sqrt(alpha) * (x - ((1 - alpha) / torch.sqrt(1 - alpha_hat)) * predicted_noise) + torch.sqrt(beta) * noise
+            result = (x.clamp(-1, 1) + 1) / 2
+            result = torch.cat([result, torch.ones(1, 1, x.shape[-2], x.shape[-1])], 1)
+            result = (result * 255).type(torch.uint8)
+            result = torch.cat([
+                torch.cat([i for i in result.cpu()], dim=-1),
+            ], dim=-2).permute(1, 2, 0)
+            results[i] = result.detach().numpy().tolist()
+            
+    model.train()
+    x = (x.clamp(-1, 1) + 1) / 2
+    x = (x * 255).type(torch.uint8)
 
     return {
         "message": message,
         "func": "ddpm",
         "args": {
-            "input": x.detach().numpy().tolist(),
-            "live_noise": noise.numpy().tolist(),
+            "input": input,
+            "noise_steps": noise_steps,
+            "noises": noises,
+            "results": results
         },
-        "target": output.detach().numpy().tolist(),
-        "duration": duration * 1000,
+        "target": x.detach().numpy().tolist(),
         "log": log,
         "log_config": log_config
     }

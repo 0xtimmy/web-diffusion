@@ -500,14 +500,35 @@ export function box_muller(
     mean: number,
     std: number
 ): Tensor {
-    const output_shape = input.shape;
     const params = {
         mean: mean,
         sdev: std,
-        outputSize: input.size
+        outputSize: shapeSize(input.shape) / 2
     }
+    const output_shape = input.shape.splice(1);
     return input.runKernel(
         "box_muller",
+        { dtype: input.dtype },
+        params,
+        [output_shape],
+    )[0];
+}
+
+export function clt(
+    input: Tensor,
+    sample_size: number,
+    mean: number,
+    std: number
+): Tensor {
+    const output_shape = input.shape.splice(0,input.shape.length-1);
+    const params = {
+        sample_size: sample_size,
+        mean: mean,
+        sdev: std,
+        outputSize: shapeSize(output_shape)
+    }
+    return input.runKernel(
+        "clt",
         { dtype: input.dtype },
         params,
         [output_shape],
@@ -643,7 +664,7 @@ export function permute(
     input: Tensor,
     dims: Array<number>,
 ): Tensor {
-    if(dims.length != input.shape.length) throw new Error("permute need the same number of dimentions as it's input");
+    if(dims.length != input.shape.length) throw new Error(`permute need the same number of dimentions as it's input, got: ${dims} but expected: ${input.shape} dimensions`);
     const seen = [];
     dims.forEach((v) => {
         if(seen.includes(v)) throw new Error(`Permute cannot take duplicated dims: ${dims}`);

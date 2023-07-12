@@ -14,7 +14,7 @@ tests = [
 
     # Diffuser Tests ----------------------------------------------------------
 
-    dt.gen_ddpm("ddpm test 1"),
+    #dt.gen_ddpm("ddpm test 1", 100),
 
     #dt.gen_unet("UNet test 1", torch.randn([1, 3, 64, 64]), torch.tensor([12])),
 
@@ -132,7 +132,7 @@ tests = [
 
     # Module Tests ------------------------------------------------------------
 
-    mt.gen_nn_multihead_attention("Multihead Attention test 1", torch.randn([32, 8, 64]), torch.randn([32, 8, 64]), torch.randn([32, 8, 64]), 64, 8),
+    #mt.gen_nn_multihead_attention("Multihead Attention test 1", torch.randn([32, 8, 64]), torch.randn([32, 8, 64]), torch.randn([32, 8, 64]), 64, 8),
 
     #mt.gen_nn_layernorm("LayerNorm test 1", torch.randn([20, 5, 10]), [10]),
 
@@ -140,7 +140,7 @@ tests = [
     #mt.gen_nn_groupnorm("GroupNorm test 2", torch.randn([20, 6, 10, 10]), 1, 6),
     #mt.gen_nn_groupnorm("GroupNorm test 3", torch.randn([1, 64, 64, 64]), 1, 64),
 
-    mt.gen_nn_linear("Linear test 1", torch.randn([128,16]), 16, 8),
+    #mt.gen_nn_linear("Linear test 1", torch.randn([128,16]), 16, 8),
 
     #mt.gen_nn_conv2d("Conv2d test 1", torch.randn([20, 16, 50, 100]), 16, 32, 3, 0),
     #mt.gen_nn_conv2d("Conv2d test 2", torch.randn([20, 16, 50, 100]), 16, 32, 3, 1),
@@ -180,9 +180,14 @@ tests = [
 
     # Factory Tests -----------------------------------------------------------
 
-    #t.gen_linspace("Linspace test 1", 1, 10, 10),
-    #t.gen_linspace("Linspace test 2", 1, 10, 100),
-    #t.gen_linspace("Linspace test 3", 0, 1, 50),
+    #fact.gen_linspace("Linspace test 1", 1, 10, 10),
+    #fact.gen_linspace("Linspace test 2", 1, 10, 100),
+    #fact.gen_linspace("Linspace test 3", 0, 1, 50),
+    fact.gen_randn("Randn test 1", 64*64*64),
+    fact.gen_randn("Randn test 2", 64*64*64),
+    fact.gen_randn("Randn test 3", 64*64*64),
+    fact.gen_randn("Randn test 4", 64*64*64),
+    #fact.gen_uniform("Uniform test 1", 1000),
 
     # Parameter IO Tests ------------------------------------------------------
 

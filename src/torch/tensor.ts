@@ -1973,6 +1973,11 @@ export class Tensor extends TensorBase {
         this.destroy();
         return output;
     }
+    clt(sample_size: number, mean=0, std=1) {
+        const output = aops.clt(this, sample_size, mean, std);
+        this.destroy();
+        return output;
+    }
 
     maxpool2d(kernel_size: [number, number], stride: [number, number], padding: [number, number], dilation: [number, number]): Tensor {
         const output = aops.maxpool2d(this, kernel_size, stride, padding, dilation);

@@ -37,8 +37,8 @@ const express_duration_func = (ts: number, torch: number): string => {
 
 let test_num;
 
-async function run_test(func: string, args: any, target: any, control_duration: number, message?: string, log: logconfig="always", log_args: logconfig="never"): Promise<Array<test_result>> {
-    let results = await funcs[func](args, target);
+async function run_test(func: string, args: any, target: any, control_duration: number, message?: string, log: logconfig="always", log_args: logconfig="never", handleStep?: any): Promise<Array<test_result>> {
+    let results = await funcs[func](args, target, handleStep);
     if(typeof((results as any).length) == 'undefined') results = [results as any];
     return (results as Array<test_result>).map((result: test_result) => {
         let { res, output, duration, msg } = result;
@@ -60,7 +60,7 @@ async function run_test(func: string, args: any, target: any, control_duration: 
     
 }
 
-export async function run_tests(tests: Array<test>) {
+export async function run_tests(tests: Array<test>, handleStep: any) {
 
     const results = [];
     let avg_percent_diff = 0; // ts / python
@@ -73,6 +73,7 @@ export async function run_tests(tests: Array<test>) {
             tests[test_num].message,
             tests[test_num].log,
             tests[test_num].log_config,
+            handleStep,
         )).forEach((result, i) => {
             results.push({
                 test: `${tests[test_num]}.${i}`,
@@ -96,7 +97,7 @@ function array_eq(a: Array<any>, b: Array<any>): number {
 }
 
 //
-const funcs: { [key: string]: (args: any, target: any) => Promise<test_result | Array<test_result>> } = {
+const funcs: { [key: string]: (args: any, target: any, handleStep?: any) => Promise<test_result | Array<test_result>> } = {
     "unsqueeze": test_unsqueeze,
     "squeeze": test_squeeze,
     "linear": test_linear,
@@ -137,23 +138,76 @@ const funcs: { [key: string]: (args: any, target: any) => Promise<test_result | 
     "permute": test_permute,
     "unet": test_unet,
     "pos_enc": test_pos_enc,
-    "ddpm": test_ddpm
+    "ddpm": test_ddpm,
+    "randn": test_randn,
+    "uniform": test_uniform
 }
 
 // Tests
 
-async function test_ddpm(args, target): Promise<test_result> {
-    throw new Error("Not implemented");
-    /*
+async function test_randn(args, target): Promise<test_result> {
+    const start = Date.now();
+    const actual_output = factories.randn([args.size]);
+    const duration = Date.now() - start;
+
+    const output_data = (await actual_output.toArrayAsync()).flat(4);
+    target = target.flat(4);
+
+    console.log("randn: ", output_data);
+    const actual_mean = (output_data as Array<number>).reduce((acc, v) => {
+        return acc + v / output_data.length;
+    }, 0)
+    const actual_variance = (output_data as Array<number>).reduce((acc, v) => {
+        return acc + Math.pow((v - actual_mean), 2) / output_data.length;
+    })
+    const actual_std = Math.sqrt(Math.abs(actual_variance));
+
+    const target_mean = (target as Array<number>).reduce((acc, v) => {
+        return acc + v / target.length;
+    }, 0)
+    const target_variance = (target as Array<number>).reduce((acc, v) => {
+        return acc + Math.pow((v - target_mean), 2) / target.length;
+    })
+    const target_std = Math.sqrt(Math.abs(target_variance));
+
+    if(
+        Math.abs(actual_mean - target_mean) > 0.1 ||
+        Math.abs(actual_variance - target_variance) > 0.1 ||
+        Math.abs(actual_std - target_std) > 0.1
+    ) return { res: false, output: output_data, duration: duration, msg: `mismatched stats, target mean=${target_mean}, target var=${target_variance}, target std=${target_std}; actual mean=${actual_mean}, actual var=${actual_variance}, actual std=${actual_std}` };
+    
+    return { res: true, output: output_data, duration: duration, msg: `target mean=${target_mean}, target var=${target_variance}, target std=${target_std}; actual mean=${actual_mean}, actual var=${actual_variance}, actual std=${actual_std}` };
+}
+
+async function test_uniform(args, target): Promise<test_result> {
+    const start = Date.now();
+    const actual_output = factories.uniform([args.size], 0, 1);
+    const duration = Date.now() - start;
+
+    const output_data = await actual_output.toArrayAsync();
+    const target_output = ops.tensor(target);
+
+    console.log("uniform: ", output_data);
+
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    const diff = array_eq(output_data.flat(4), target.flat(4));
+    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
+    
+    return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` };
+
+}
+
+async function test_ddpm(args, target, handleStep?: any): Promise<test_result> {
+
     const input = ops.tensor(args.input);
-    const live_noise = ops.tensor(args.live_noise);
 
     const model = new UNet();
     await model.loadStateDictFromURL("../../parameters/pokemon");
-    const diffuser = new Diffusion({ noise_steps: 2, img_size: 64 });
+    const diffuser = new Diffusion({ noise_steps: args.noise_steps, img_size: 64 });
 
+    
     const start = Date.now();
-    const actual_output = await diffuser.sample(model, input, [live_noise, live_noise]);
+    const actual_output = await diffuser._sample(model, input, args.noises, args.results, handleStep);
     const duration = Date.now() - start;
 
     const target_output = ops.tensor(target);
@@ -165,7 +219,6 @@ async function test_ddpm(args, target): Promise<test_result> {
     if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
     
     return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` };
-    */
 }
 
 async function test_pos_enc(args, target): Promise<test_result> {
@@ -1106,7 +1159,7 @@ async function test_linspace(args, target): Promise<test_result> {
     const output_data = await actual_output.toArrayAsync();
     if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
     const diff = array_eq(output_data.flat(4), [target].flat(4));
-    if(diff > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content` };
+    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
 
     return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` };
 }

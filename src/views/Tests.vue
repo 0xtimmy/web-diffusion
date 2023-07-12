@@ -5,6 +5,7 @@
         <p>open the console -></p>
         <button @click="breakMe">break me 😈</button>
         <button @click="dontBreakMe">dont break me 😇</button>
+        <div ref="cycle-list"></div>
     </div>
 </template>
 
@@ -25,7 +26,10 @@ export default defineComponent({
             const reader = new FileReader();
             reader.onload = (event) => {
                 const json = JSON.parse(event.target.result as string);
-                tester(json);
+                tester(json, async (img) => {
+                    await this.renderResult(img, "");
+                    return;
+                });
             }
             reader.readAsText(event.target.files[0])
         },
@@ -47,6 +51,29 @@ export default defineComponent({
             }
 
             console.log("done: ", await tensors[tensors.length-1].toArrayAsync());
+        },
+        renderResult: async function(result: torch.Tensor, caption: string) {
+            result = result.squeeze(0).transpose(0, 1).transpose(1, 2);
+            console.log("result shape: ", result.shape);
+            const data = await result.toArrayAsync();
+            if(!this.active) console.log("Result: ", data);
+            const img_data = new Uint8ClampedArray(data.flat(4) as any);
+            const box = document.createElement("div");
+            box.className = "result-box";
+
+            const canvas = document.createElement("canvas");
+            canvas.setAttribute("width", "64px");
+            canvas.setAttribute("height", "64px");
+            const context = canvas.getContext("2d");
+            context.putImageData(
+                new ImageData(img_data, 64, 64), 
+                0, 0);
+            box.appendChild(canvas);
+            const cap = document.createElement("div");
+            cap.innerHTML = caption;
+            box.appendChild(cap);
+            this.$refs["cycle-list"].appendChild(box);
+            return;
         }
     }
 })

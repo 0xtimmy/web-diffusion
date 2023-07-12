@@ -687,8 +687,16 @@ export const kernels: { [name: string]: KernelSpec } = {
         //workgroupSize: [1, 1, 1],
         workgroupCount: ["parameters.outputSize", 1, 1],
         shader: `
+            if(global_id.x == 0) {
+                output[global_id.x] = parameters.start;
+                return;
+            }
+            if(global_id.x == parameters.outputSize-1) {
+                output[global_id.x] = parameters.end;
+                return;
+            }
             var diff = parameters.end - parameters.start;
-            output[global_id.x] = diff * f32(global_id.x) / f32(parameters.outputSize + 1) + parameters.start;
+            output[global_id.x] = diff * f32(global_id.x) / f32(parameters.outputSize - 1) + parameters.start;
         `  
     },
     transpose: {
@@ -845,6 +853,53 @@ export const kernels: { [name: string]: KernelSpec } = {
             output[output_idx] = input[input_idx];
         `
     },
+    clt: {
+        name: "clt",
+        config: [
+            {
+                name: "dtype"
+            }
+        ],
+        parameters: [
+            {
+                name: "sample_size",
+                shaderType: "u32"
+            },
+            {
+                name: "outputSize",
+                shaderType: "u32"
+            },
+            {
+                name: "mean",
+                shaderType: "f32"
+            },
+            {
+                name: "sdev",
+                shaderType: "f32"
+            }
+        ],
+        inputs: [
+            {
+                name: "input",
+                shaderType: "array<f32>"
+            }
+        ],
+        outputs: [
+            {
+                name: "output",
+                shaderType: "array<f32>",
+                size: "outputSize"
+            }
+        ],
+        workgroupCount: ["parameters.outputSize", "1", "1"],
+        shader: `
+            var sum: f32 = 0;
+            for(var i: u32 = 0; i < parameters.sample_size; i++) {
+                sum += input[global_id.x * parameters.sample_size + i];
+            }
+            output[global_id.x] = sum / f32(parameters.sample_size);
+        `
+    },
     box_muller: {
         name: "box_muller",
         config: [
@@ -879,23 +934,15 @@ export const kernels: { [name: string]: KernelSpec } = {
                 size: "outputSize"
             }
         ],
-        //workgroupSize: [1, 2, 1],
-        workgroupCount: ["parameters.outputSize", "2", "1"],
+        workgroupCount: ["parameters.outputSize", "1", "1"],
         shader: `
             const pi = 3.1415;
-            var u1: f32;
-            var u2: f32;
-            var idx: u32;
-            if(global_id.y == 0) {
-                u1 = input[global_id.x];
-                u2 = input[global_id.x + (parameters.outputSize / 2)];
-                idx = global_id.x;
-            } else {
-                u1 = input[global_id.x + (parameters.outputSize / 2)];
-                u2 = input[global_id.x];
-                idx = global_id.x + (parameters.outputSize / 2);
-            }
-            output[idx] = sqrt(abs(-2 * log(u1))) * cos(2 * pi * u2) * parameters.sdev + parameters.mean;
+            var u1: f32 = input[global_id.x];
+            var u2: f32 = 1 - input[(global_id.x + parameters.outputSize)];
+            var idx: u32 = global_id.x;
+            output[idx] = sqrt(-2 * log(u1)) * cos(2 * pi * u2) * parameters.sdev + parameters.mean;
+
+            
         `
     },
     upsample: {

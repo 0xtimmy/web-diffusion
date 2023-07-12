@@ -92,7 +92,7 @@ export function normal(
     dtype?: Dtype,
     device?: Deviceish 
 ): Tensor {
-    return uniform(shape, 0, 1, dtype, device).box_muller(mean, std);
+    return uniform([2, ...getShape(shape)], 0, 1, dtype, device).box_muller(mean, std);
 }
 
 export function randn(
