@@ -36,7 +36,7 @@ export default defineComponent({
                 console.log("loading weights...");
                 this.active = true;
                 const model = new UNet();
-                await model.loadStateDictFromURL("../../parameters/pokemon");
+                await model.loadStateDictFromURL("https://web-diffusion-worker.0xtimmy.workers.dev/parameters/pokemon");
                 console.log("✅ done loading weights");
                 const diffuser = new Diffusion({ noise_steps: this.noiseSteps, img_size: 64 });
                 const res = await diffuser.sample(model, async (res: torch.Tensor, step_num: number) => { 

@@ -18,10 +18,9 @@ WebDiffuser is typescript implementation of a bare bones image diffuser intended
 
 ---
 
-## Lampshading
+## Support
 - WebGPU is not yet standard across all browsers. This was tested in Google Chrome and Brave
-- A GPU is required. This was tested on AMD graphics but should work on NVIDIA as well
-- I spent my time coding and not training so the model itself is a little mid
+- This was tested on AMD graphics but should work on NVIDIA as well. If you do not have a GPU things will break
 
 ## Get Started
 
@@ -42,5 +41,9 @@ Select the model you want to run; open dev tools (ctrl-shift-i) if you want to t
 ---
 ## Acknoledgements
 
-a fork of [webgpu-torch](https://github.com/praeclarum/webgpu-torch) by [praeclarum](https://twitter.com/praeclarum)
-based on [this implementation](https://github.com/dome272/Diffusion-Models-pytorch)
+The torch library I use is a fork of [webgpu-torch](https://github.com/praeclarum/webgpu-torch) by [praeclarum](https://twitter.com/praeclarum)
+The model is based on [this implementation](https://github.com/dome272/Diffusion-Models-pytorch)
+The pytorch [source code](https://github.com/pytorch/pytorch)
+By boy shiv for his Data Science Textbook
+
+I didn't know anything about AI when I started this project so huge thanks to everyone who helped along the way :)

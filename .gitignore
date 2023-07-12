@@ -5,6 +5,7 @@ tests.json
 public/parameters/**
 src/scripts/pokemon
 package-lock.json
+src/scripts/upload_parameters.ts
 
 # local env files
 .env.local

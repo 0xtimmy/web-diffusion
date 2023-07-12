@@ -1,7 +1,7 @@
 <template>
   <div class="navbar">
-    <router-link to="/" class="nav-item">Tests</router-link>
-    <router-link to="/diffuser" class="nav-item">Diffuser</router-link>
+    <router-link to="/tests" class="nav-item">Tests</router-link>
+    <router-link to="/" class="nav-item">Diffuser</router-link>
   </div>
   <router-view />
 </template>
