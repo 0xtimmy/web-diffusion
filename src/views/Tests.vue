@@ -13,7 +13,7 @@ import { defineComponent } from "vue"
 import { init_device } from "@/components/device";
 import tester from "@/scripts/tester";
 import * as torch from "@/torch"
-import { upload_params, get_params } from "@/scripts/upload_parameters"
+//import { upload_params, get_params } from "@/scripts/upload_parameters"
 
 export default defineComponent({
     name: "Diffuser",
