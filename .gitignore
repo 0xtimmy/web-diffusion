@@ -4,6 +4,7 @@ node_modules
 tests.json
 public/parameters/**
 src/scripts/pokemon
+package-lock.json
 
 # local env files
 .env.local
