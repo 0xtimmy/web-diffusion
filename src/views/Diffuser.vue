@@ -1,6 +1,7 @@
 <template>
     <div>
         <h2>Web Diffusion</h2>
+        Noise Steps: <input type="number" v-model="noiseSteps" /> <br>
         Select Weights: <button @click="genPokemon" :disabled="active">Pokemon</button> <br>
 
         <div ref="cycle-list" class="cycle-list">
@@ -21,6 +22,7 @@ export default defineComponent({
     data() {
         return {
             active: false,
+            noiseSteps: 1000,
         }
     },
     mounted: async function() {
@@ -36,7 +38,7 @@ export default defineComponent({
                 const model = new UNet();
                 await model.loadStateDictFromURL("../../parameters/pokemon");
                 console.log("✅ done loading weights");
-                const diffuser = new Diffusion({ noise_steps: 1000, img_size: 64 });
+                const diffuser = new Diffusion({ noise_steps: this.noiseSteps, img_size: 64 });
                 const res = await diffuser.sample(model, async (res: torch.Tensor, step_num: number) => { 
                     await this.renderResult(res, `Iteration ${step_num}`);
                     return;

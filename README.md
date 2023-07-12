@@ -1,14 +1,14 @@
-# Web DIffusion
+# Web Diffusion - a bare-bones image diffsuer built with WebGPU.
 
-a fork of [webgpu-torch](https://github.com/praeclarum/webgpu-torch) by [praeclarum](https://twitter.com/praeclarum)
+Consumer hardware had long outgrown its demand to the point where, aside for gamers, there was really no reason to use technology beyond the intel i5. AI changed that: now consumers are running software that *requires* compute not normally met by personal computers. Chipmakers are already pushing out new products to make client side AI a possibility for developers, but for now you can make do with just a Ryzen 7 and some sort of GPU.
+
+The launch of WebGPU gave hardware-accelerated applications access to the most powerful distribution tool in history: the internet. And any casual web surfer can run AI software locally, via google search.
+
+WebDiffuser is typescript implementation of a bare bones image diffuser intended as an experiment in client side ML. It contains a small torch-like library of gpu-kernels and a very basic workload optimizer.
 
 ---
 
-A basic image diffuser based on [this implementation](https://github.com/dome272/Diffusion-Models-pytorch) built with WebGPU.
-
----
-
-# Roadmap
+## Roadmap
 - [X] WebGPU torch implementation
 - [X] Diffusions Modules
 - [X] [Pokemon Model](https://huggingface.co/datasets/huggan/pokemon)
@@ -17,6 +17,11 @@ A basic image diffuser based on [this implementation](https://github.com/dome272
 - [ ] Support for Stable Diffusion Models
 
 ---
+
+## Lampshading
+- WebGPU is not yet standard across all browsers. This was tested in Google Chrome and Brave
+- A GPU is required. This was tested on AMD graphics but should work on NVIDIA as well
+- I spent my time coding and not training so the model itself is a little mid
 
 ## Get Started
 
@@ -32,13 +37,10 @@ Then run the following to start a dev build
 npm run serve
 ```
 
-At which point you will be prompted for a test file. These can be generated using `@/scripts/gen.py`
-Tests are handled in `@/scripts/tester.ts`. If you're contributing, this is where you can create test handlers for any functions you build.
-To see it in action, ff to write some tests & handlers. ping me if you have any Qs
+Select the model you want to run; open dev tools (ctrl-shift-i) if you want to track progress.
 
-## Directory Structure
+---
+## Acknoledgements
 
-All the torch files are held in `/torch`. We try to match pytorch's API as best as ts allows. In here are a couple notable groups:
-- `tensor.ts`: Where the Tensor object is defined
-- `op(s)_*`: operations definitions, you'll find a lot of the custom code in `ops_artisanal`
-- `kernels_*`: GPU operation (kernel) definitions, this where functions are typically implemented
+a fork of [webgpu-torch](https://github.com/praeclarum/webgpu-torch) by [praeclarum](https://twitter.com/praeclarum)
+based on [this implementation](https://github.com/dome272/Diffusion-Models-pytorch)

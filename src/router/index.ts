@@ -4,12 +4,12 @@ import Diffuser from "../views/Diffuser.vue";
 
 const routes: Array<RouteRecordRaw> = [
   {
-    path: "/",
+    path: "/tests",
     name: "Tests",
     component: Tests,
   },
   {
-    path: "/diffuser",
+    path: "/",
     name: "Diffuser",
     component: Diffuser
   }
