@@ -1,5 +1,7 @@
 # Web Diffusion - a bare-bones image diffsuer built with WebGPU.
 
+[live link](https://web-diffusion.pages.dev/)
+
 Consumer hardware had long outgrown its demand to the point where, aside for gamers, there was really no reason to use technology beyond the intel i5. AI changed that: now consumers are running software that *requires* compute not normally met by personal computers. Chipmakers are already pushing out new products to make client side AI a possibility for developers, but for now you can make do with just a Ryzen 7 and some sort of GPU.
 
 The launch of WebGPU gave hardware-accelerated applications access to the most powerful distribution tool in history: the internet. And any casual web surfer can run AI software locally, via google search.
