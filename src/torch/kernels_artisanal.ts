@@ -30,6 +30,64 @@ function _defaultKernel({
 }
 
 export const kernels: { [name: string]: KernelSpec } = {
+    repeat: _defaultKernel({
+        name: "repeat",
+        parameters: [
+            {
+                name: "batch_in",
+                shaderType: "u32"
+            },
+            {
+                name: "channel_in",
+                shaderType: "u32"
+            },
+            {
+                name: "width_in",
+                shaderType: "u32"
+            },
+            {
+                name: "height_in",
+                shaderType: "u32"
+            },
+            {
+                name: "batch_repeat",
+                shaderType: "u32"
+            },
+            {
+                name: "channel_repeat",
+                shaderType: "u32"
+            },
+            {
+                name: "width_repeat",
+                shaderType: "u32"
+            },
+            {
+                name: "height_repeat",
+                shaderType: "u32"
+            },
+            {
+                name: "outputSize",
+                shaderType: "u32"
+            }
+        ],
+        workgroupCount: ["parameters.batch_in * parameters.batch_repeat", "parameters.channel_in * parameters.channel_repeat", "parameters.width_in * parameters.width_repeat * parameters.height_in * parameters.height_repeat"],
+        shader: `
+            let batch_input_idx = global_id.x % parameters.batch_in;
+            let channel_input_idx = global_id.y % parameters.channel_in;
+            let width_input_idx = (global_id.z / (parameters.height_in * parameters.height_repeat)) % (parameters.width_in);
+            let height_input_idx = global_id.z % parameters.height_in;
+            
+            let output_idx = global_id.x * (parameters.channel_in * parameters.channel_repeat * parameters.width_in * parameters.width_repeat * parameters.height_in * parameters.height_repeat)
+                                + global_id.y * (parameters.width_in * parameters.width_repeat * parameters.height_in * parameters.height_repeat)
+                                + global_id.z;
+            let input_idx = batch_input_idx * (parameters.channel_in * parameters.width_in * parameters.height_in)
+                                + channel_input_idx * (parameters.width_in * parameters.height_in)
+                                + width_input_idx * (parameters.height_in)
+                                + height_input_idx;
+            output[output_idx] = input[input_idx];
+            //output[output_idx] = f32(channel_input_idx);
+        `
+    }),
     copy: _defaultKernel({
         name: "copy",
         shader: `output[global_id.x] = input[global_id.x];`

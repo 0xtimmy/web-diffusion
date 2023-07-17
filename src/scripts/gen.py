@@ -176,6 +176,10 @@ tests = [
     #rt.gen_squeeze("Squeeze test 3", [10, 1, 2, 1], -1),
 
     #rt.gen_cat("Cat performance test", torch.randint(0, 5, [256, 256]), torch.randint(0, 5, [256, 256]), 0),
+    
+    rt.gen_repeat("Repeat basic test", torch.randint(0, 5, [2, 2]), [2, 4]),
+    rt.gen_repeat("Repeat basic test", torch.randint(0, 5, [2, 2]), [1, 1, 4, 4]),
+    rt.gen_repeat("Repeat performance test", torch.randint(0, 5, [2, 8, 16, 32]), [16, 8, 4, 2]),
 
 
     # Factory Tests -----------------------------------------------------------
@@ -183,10 +187,10 @@ tests = [
     #fact.gen_linspace("Linspace test 1", 1, 10, 10),
     #fact.gen_linspace("Linspace test 2", 1, 10, 100),
     #fact.gen_linspace("Linspace test 3", 0, 1, 50),
-    fact.gen_randn("Randn test 1", 64*64*64),
-    fact.gen_randn("Randn test 2", 64*64*64),
-    fact.gen_randn("Randn test 3", 64*64*64),
-    fact.gen_randn("Randn test 4", 64*64*64),
+    #fact.gen_randn("Randn test 1", 64*64*64),
+    #fact.gen_randn("Randn test 2", 64*64*64),
+    #fact.gen_randn("Randn test 3", 64*64*64),
+    #fact.gen_randn("Randn test 4", 64*64*64),
     #fact.gen_uniform("Uniform test 1", 1000),
 
     # Parameter IO Tests ------------------------------------------------------

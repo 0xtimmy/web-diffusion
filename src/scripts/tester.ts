@@ -140,10 +140,34 @@ const funcs: { [key: string]: (args: any, target: any, handleStep?: any) => Prom
     "pos_enc": test_pos_enc,
     "ddpm": test_ddpm,
     "randn": test_randn,
-    "uniform": test_uniform
+    "uniform": test_uniform,
+    "repeat": test_repeat,
 }
 
 // Tests
+
+async function test_repeat(args, target): Promise<test_result> {
+
+    const input = ops.tensor(args.input);
+    const start = Date.now();
+    const actual_output = ops.repeat(input, args.repeat);
+    const duration = Date.now() - start;
+
+    // old repeat
+    //const _start = Date.now();
+    //const _actual_output = ops._repeat(input, args.repeat);
+    //const _duration = Date.now() -_start;
+    //console.log(`new repeat took: ${duration / _duration} the time to complete`)
+
+    const target_output = ops.tensor(target);
+    const output_data = await actual_output.toArrayAsync();
+
+    if(array_eq(actual_output.shape, target_output.shape) > 0) return { res: false, output: output_data, duration: duration, msg: `mismatched shapes-- expected ${target_output.shape}, got ${actual_output.shape}` };
+    const diff = array_eq(output_data.flat(4), target.flat(4));
+    if(diff > 0.00001) return { res: false, output: output_data, duration: duration, msg: `mismatched tensor content, average diff: ${diff}` };
+    
+    return { res: true, output: output_data, duration: duration, msg: `average diff: ${diff}` };
+}
 
 async function test_randn(args, target): Promise<test_result> {
     const start = Date.now();
