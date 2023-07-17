@@ -41,12 +41,14 @@ export class Diffusion {
         //model.eval();
         const t_x = Date.now();
         let x = torch.randn([n, 3, this.img_size, this.img_size]);
+        let total_model_time = 0;
         console.log(`⏰ initial x generation took ${Date.now()-t_x}ms`);
         for(let i = this.noise_steps-1; i > 0; i--) {
             const t = torch.constant([n], i);
             const t_predicted_noise = Date.now();
             let predicted_noise = model.forward(x, t);
             console.log(`⏰ model.foward took ${Date.now()-t_predicted_noise}ms`);
+            total_model_time += Date.now()-t_predicted_noise;
             
             const t_indexing = Date.now();
             const alpha = torch.index(this.alpha, t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
@@ -98,6 +100,7 @@ export class Diffusion {
             }
         }
         //model.train();
+        console.log(`🟩 model took on average ${total_model_time / this.noise_steps}ms`);
         return x.clamp(-1, 1).scalar_add(1).scalar_div(2).cat(torch.ones([1, 1, ...Array.from(x.shape).splice(2)]), 1).scalar_mul(255);
     }
 

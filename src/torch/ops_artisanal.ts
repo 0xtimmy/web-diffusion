@@ -310,6 +310,7 @@ export function cat(a: Tensor, b: Tensor, dim: 0|1|2|3): Tensor {
     )[0];
 }
 
+/*
 export function _repeat(input: Tensor, shape: Shape): Tensor {
     if(input.shape.length > 4) throw new Error(`repeat only supports shapes four dimensions or less, instead got input shape: ${input.shape}`);
     if(shape.length > 4) throw new Error(`repeat only supports shapes four dimensions or less, instead got repeat shape: ${shape}`);
@@ -335,21 +336,28 @@ export function _repeat(input: Tensor, shape: Shape): Tensor {
     t2.destroy();
     return t3;
 }
+*/
 
 export function repeat(input: Tensor, shape: Shape): Tensor {
     if(input.shape.length > 4) throw new Error(`repeat only supports shapes four dimensions or less, instead got input shape: ${input.shape}`);
     if(shape.length > 4) throw new Error(`repeat only supports shapes four dimensions or less, instead got repeat shape: ${shape}`);
-    if(input.shape.length != shape.length) throw new Error(`repeat shape must have the same dimention as input shape, instead got input shape: ${input.shape} and repeat shape: ${shape}`);
 
-    const output_shape = input.shape.map((v, i) => { return v * shape[i]; });
+    const return_shape = shape.map((_, i) => { return (i < input.dim ? input.shape[input.shape.length-i-1] : 1) * shape[shape.length-i-1]}).reverse();
+
+    input = input.view([1, 1, 1, 1, ...input.shape].splice(input.shape.length, 4));
+    shape = [1, 1, 1, 1, ...shape].splice(shape.length, 4);
+    const output_shape = input.shape.map((v, i) => { return v * shape[i] });
+
 
     const params = {
         batch_in: input.shape[0],
-        batch_repeat: shape[0],
-        channel_in: input.dim > 1 ? input.shape[1] : 1,
-        channel_repeat: input.dim > 1 ? shape[1] : 1,
-        spacial_in: (input.dim > 2 ? input.shape[2]: 1) * (input.dim > 3 ? input.shape[3] : 1),
-        spacial_repeat: (input.dim > 2 ? shape[2]: 1) * (input.dim > 3 ? shape[3] : 1),
+        batch_repeat: output_shape[0] / input.shape[0],
+        channel_in: input.shape[1],
+        channel_repeat: output_shape[1] / input.shape[1],
+        width_in: input.shape[2],
+        width_repeat: output_shape[2] / input.shape[2],
+        height_in: input.shape[3],
+        height_repeat: output_shape[3] / input.shape[3],
         outputSize: shapeSize(output_shape)
     }
 
@@ -358,7 +366,7 @@ export function repeat(input: Tensor, shape: Shape): Tensor {
         { dtype: input.dtype },
         params,
         [output_shape]
-    )[0]
+    )[0].view(return_shape);
 }
 
 export function layernorm(input: Tensor, normalized_shape: Shape, weight?: Tensor, bias?: Tensor, eps=1e-5): Tensor {
