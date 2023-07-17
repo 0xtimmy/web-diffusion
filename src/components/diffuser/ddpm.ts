@@ -39,22 +39,31 @@ export class Diffusion {
         console.log(`Sampling ${n} new images...`);
         const sampleStart = Date.now();
         //model.eval();
+        const t_x = Date.now();
         let x = torch.randn([n, 3, this.img_size, this.img_size]);
+        console.log(`⏰ initial x generation took ${Date.now()-t_x}ms`);
         for(let i = this.noise_steps-1; i > 0; i--) {
             const t = torch.constant([n], i);
+            const t_predicted_noise = Date.now();
             let predicted_noise = model.forward(x, t);
+            console.log(`⏰ model.foward took ${Date.now()-t_predicted_noise}ms`);
             
+            const t_indexing = Date.now();
             const alpha = torch.index(this.alpha, t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
             const alpha_hat = torch.index(this.alpha_hat, t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
             const beta = torch.index(this.beta, t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
+            console.log(`⏰ indexing, alpha, alpha_hat, beta took ${Date.now()-t_indexing}ms`);
 
+            const t_noise = Date.now();
             let noise;
             if(i > 1) {
                 noise = torch.randn(x.shape);
             } else {
                 noise = torch.zeros(x.shape);
-            }       
+            }      
+            console.log(`⏰ noise gen took ${Date.now()-t_noise}ms`);
 
+            const t_denoising = Date.now();
             let one_div_sqrt_alpha = torch.sqrt(alpha).scalar_pow(-1);
             let sqrt_one_minus_alpha_hat = alpha_hat.scalar_mul(-1).scalar_add(1).sqrt();
             let one_minus_alpha = alpha.scalar_mul(-1).scalar_add(1);
@@ -73,6 +82,7 @@ export class Diffusion {
             
             nx = nx.add(beta_noise);
             beta_noise.destroy();
+            console.log(`⏰ denoising took ${Date.now()-t_denoising}ms`);
             
             console.log(`${(this.noise_steps-i)/this.noise_steps*100}% - ${Date.now() - sampleStart}ms`);
 

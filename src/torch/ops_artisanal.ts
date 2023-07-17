@@ -310,7 +310,10 @@ export function cat(a: Tensor, b: Tensor, dim: 0|1|2|3): Tensor {
     )[0];
 }
 
-export function repeat(input: Tensor, shape: Shape): Tensor {
+export function _repeat(input: Tensor, shape: Shape): Tensor {
+    if(input.shape.length > 4) throw new Error(`repeat only supports shapes four dimensions or less, instead got input shape: ${input.shape}`);
+    if(shape.length > 4) throw new Error(`repeat only supports shapes four dimensions or less, instead got repeat shape: ${shape}`);
+
     let t0 = input.copy();
     for(let x = 1; x < shape[0]; x++) {
         t0 = t0.cat(input, 0);
@@ -331,6 +334,31 @@ export function repeat(input: Tensor, shape: Shape): Tensor {
     }
     t2.destroy();
     return t3;
+}
+
+export function repeat(input: Tensor, shape: Shape): Tensor {
+    if(input.shape.length > 4) throw new Error(`repeat only supports shapes four dimensions or less, instead got input shape: ${input.shape}`);
+    if(shape.length > 4) throw new Error(`repeat only supports shapes four dimensions or less, instead got repeat shape: ${shape}`);
+    if(input.shape.length != shape.length) throw new Error(`repeat shape must have the same dimention as input shape, instead got input shape: ${input.shape} and repeat shape: ${shape}`);
+
+    const output_shape = input.shape.map((v, i) => { return v * shape[i]; });
+
+    const params = {
+        batch_in: input.shape[0],
+        batch_repeat: shape[0],
+        channel_in: input.dim > 1 ? input.shape[1] : 1,
+        channel_repeat: input.dim > 1 ? shape[1] : 1,
+        spacial_in: (input.dim > 2 ? input.shape[2]: 1) * (input.dim > 3 ? input.shape[3] : 1),
+        spacial_repeat: (input.dim > 2 ? shape[2]: 1) * (input.dim > 3 ? shape[3] : 1),
+        outputSize: shapeSize(output_shape)
+    }
+
+    return input.runKernel(
+        "repeat",
+        { dtype: input.dtype },
+        params,
+        [output_shape]
+    )[0]
 }
 
 export function layernorm(input: Tensor, normalized_shape: Shape, weight?: Tensor, bias?: Tensor, eps=1e-5): Tensor {

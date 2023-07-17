@@ -15,6 +15,24 @@ import time
 #    "log_config"?: logconfig,  // whether to log the test arguements and output
 #}
 
+def gen_repeat(message, input, repeat, log="always", log_config="fail"):
+    start = time.time()
+    output = input.repeat(repeat)
+    duration = time.time() - start
+
+    return {
+        "message": message,
+        "func": "repeat",
+        "args": {
+            "input": input.numpy().tolist(),
+            "repeat": repeat
+        },
+        "target": output.numpy().tolist(),
+        "duration": duration * 1000,
+        "log": log,
+        "log_config": log_config
+    }
+
 def gen_permute(message, input, permute, log="always", log_config="fail"):
     start = time.time()
     output = input.permute(permute)
