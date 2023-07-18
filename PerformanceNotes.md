@@ -5,8 +5,9 @@
 
 | Date | description | duration | incremental improvement | total improvement
 |----------|---------|--------- | ----------------------- | -----------------
-| 07/17/23 | base | 36702ms | 1 | 1
-| 07/12/23 | added repeat kernel | 8247ms | 4.45 | 4.45
+| 07/12/23 | base | 36702ms | 1 | 1
+| 07/17/23 | added repeat kernel | 9163ms | 4.00 | 4.00
+| 07/18/23 | played with the workload optimzer equation | 8547ms | 1.07 | 4.29
 
 # Function Specific
 

@@ -19,7 +19,6 @@ export type ShaderType =
 export interface KernelSpec {
     name: string;
     config: KernelConfigSpec[];
-    //workgroupSize: [ExprCode, ExprCode, ExprCode];
     parameters: KernelParamSpec[];
     workgroupCount: [ExprCode, ExprCode, ExprCode];
     inputs: KernelInputSpec[];
@@ -304,6 +303,8 @@ function _getOptimWorkgroupSize(workgroupCounts: [number, number, number], limit
     //console.log("getting optimal workgroup sizes...");
     //console.log("counts: ", workgroupCounts);
 
+    const thresh = 0.76;
+
     let x = 1;
     let xOptim = x;
     let y = 1;
@@ -311,14 +312,13 @@ function _getOptimWorkgroupSize(workgroupCounts: [number, number, number], limit
     let z = 1;
     let zOptim = z;
     const xcap = Math.min(workgroupCounts[0], limits.maxComputeWorkgroupSizeX);
+    for(; (x < xcap) && (xcap % x) / (xcap / x) < thresh && xOptim*yOptim*zOptim < limits.maxComputeInvocationsPerWorkgroup; x *= 2) { xOptim = x; }
     const ycap = Math.min(workgroupCounts[1], limits.maxComputeWorkgroupSizeY);
+    for(; (y < ycap) && (ycap % y) / (ycap / y) < thresh && xOptim*yOptim*zOptim < limits.maxComputeInvocationsPerWorkgroup; y *= 2) { yOptim = y; }
     const zcap = Math.min(workgroupCounts[2], limits.maxComputeWorkgroupSizeZ);
-    //console.log("caps: ", [xcap, ycap, zcap]);
-    //console.log("max invocations: ", limits.maxComputeInvocationsPerWorkgroup);
+    for(; (z < zcap) && (zcap % z) / (zcap / z) < thresh && xOptim*yOptim*zOptim < limits.maxComputeInvocationsPerWorkgroup; z *= 2) { zOptim = z; }
 
-    for(; (x < xcap) && (xcap % x) / (xcap / x) < 0.25 && xOptim*yOptim*zOptim < limits.maxComputeInvocationsPerWorkgroup; x *= 2) { xOptim = x; }
-    for(; (y < ycap) && (ycap % y) / (ycap / y) < 0.25 && xOptim*yOptim*zOptim < limits.maxComputeInvocationsPerWorkgroup; y *= 2) { yOptim = y; }
-    for(; (z < zcap) && (zcap % z) / (zcap / z) < 0.25 && xOptim*yOptim*zOptim < limits.maxComputeInvocationsPerWorkgroup; z *= 2) { zOptim = z; }
+    //console.log("xOptim: ", xOptim);
 
     return { x: xOptim, y: yOptim, z: zOptim };
 }
