@@ -68,9 +68,6 @@ export class Conv2d extends Module {
     }
 
     forward(input: Tensor): Tensor {
-        //this.reset_parameters();
-        if(this.weight.shape[0] != this.outChannels) throw new Error("fuck up 1");
-        if(this.weight.shape[1] != this.inChannels) throw new Error("fuck up 2");
         return ops.conv2d(input, this.weight, this.bias, this.stride, this.padding, this.dilation, this.groups);
 
     }

@@ -100,7 +100,7 @@ export class Diffusion {
             }
         }
         //model.train();
-        console.log(`🟩 model took on average ${total_model_time / this.noise_steps}ms`);
+        console.log(`🟩 model took on average ${total_model_time / (this.noise_steps-1)}ms`);
         return x.clamp(-1, 1).scalar_add(1).scalar_div(2).cat(torch.ones([1, 1, ...Array.from(x.shape).splice(2)]), 1).scalar_mul(255);
     }
 

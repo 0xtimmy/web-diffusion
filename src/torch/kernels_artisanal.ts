@@ -565,21 +565,20 @@ export const kernels: { [name: string]: KernelSpec } = {
             {
                 name: "input",
                 shaderType: "array<f32>"
-            }
+            },
         ],
         outputs: [
             {
                 name: "output",
                 shaderType: "array<f32>",
                 size:"batches"
-            }
+            },
         ],
-        //workgroupSize: [1, 1, 1],
-        workgroupCount: ["parameters.batches", 1, 1],
+        workgroupCount: ["parameters.batches", "parameters.batch_size", "1"],
         shader: `
             var batch_start: u32 = global_id.x * parameters.batch_size;
-
-            var sum: f32 = 0;
+            
+            var sum: f32 = 0.0;
             for(var i: u32 = 0; i < parameters.batch_size; i++) {
                 sum += input[batch_start + i];
             }

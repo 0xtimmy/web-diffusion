@@ -66,6 +66,8 @@ export class KernelWebGPU extends Kernel {
             entries: outputBindGroupLayoutEntries
         })
 
+        
+
         //console.log("constructing kernel with params: ", params);
         const workgroupCounts: [number, number, number] = params == null ? [1, 1, 1] : this.getWorkgroupCounts(this.getRunEnv(params));
         const workload = getKernelShaderCode(spec, config, workgroupCounts, this._gpuDevice);
@@ -125,9 +127,11 @@ export class KernelWebGPU extends Kernel {
         const maxCountPerDim = this._gpuDevice.limits.maxComputeWorkgroupsPerDimension;
         
         for(let i = 0; i < workgroupCountX;) {
+            const countX = Math.min(workgroupCountX - i, maxCountPerDim);
             for(let j = 0; j < workgroupCountY;) {
+                const countY = Math.min(workgroupCountY - j, maxCountPerDim);
                 for(let k = 0; k <workgroupCountZ;) {
-                    //console.log(`running kernel: ${this.key} with offset <${i}, ${j}, ${k}>`);
+                    const countZ = Math.min(workgroupCountZ - k, maxCountPerDim);
                     let paramsBufferSize = 3*getShaderTypeElementByteSize("u32");
                     for (let i = 0; i < this.spec.parameters.length; i++) {
                         const param = this.spec.parameters[i];
@@ -169,10 +173,6 @@ export class KernelWebGPU extends Kernel {
                     // Start a new command encoder
                     const commandEncoder = this._gpuDevice.createCommandEncoder();
 
-                    const countX = Math.min(workgroupCountX - i, maxCountPerDim);
-                    const countY = Math.min(workgroupCountY - j, maxCountPerDim);
-                    const countZ = Math.min(workgroupCountZ - k, maxCountPerDim);
-
                     // Encode the kernel using pass encoder
                     const passEncoder = commandEncoder.beginComputePass();
                     passEncoder.setPipeline(this._computePipeline);
@@ -190,12 +190,11 @@ export class KernelWebGPU extends Kernel {
                     this._gpuDevice.queue.submit([gpuCommands]);
                     (this.device as DeviceWebGPU).destroyBuffer(paramsBuffer);
 
-                    i += countX;
-                    j += countY;
                     k += countZ;
-                    
                 }
+                j += countY;
             }
+            i += countX;
         }
 
         // Return the storage output buffers
