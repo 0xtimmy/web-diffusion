@@ -26,13 +26,7 @@ export class SelfAttention extends torch.nn.Module {
     forward(x: torch.Tensor): torch.Tensor {
         x = torch.transpose(x.view([-1, this.channels, this.size * this.size]), 1, 2);
         let q = this.ln.forward(x);
-        let k = q.copy();
-        let v = q.copy();
-        let attention_value = this.mha.forward(q, k, v).output;
-        q.destroy();
-        k.destroy();
-        v.destroy();
-
+        let attention_value = this.mha.forward(q, q, q).output;
         attention_value = attention_value.add(x);
         const ff = this.ff_self.forward(attention_value);
         const output = ff.add(attention_value).transpose(2, 1).view([-1, this.channels, this.size, this.size]);

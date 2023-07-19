@@ -400,6 +400,7 @@ export class Tensor extends TensorBase {
         return this.transpose(0, 1);
     }
     transpose(dim0: number, dim1: number): Tensor {
+        if(dim0 == dim1) return this;
         const output = aops.transpose(this, dim0, dim1);
         this.destroy();
         return output;
@@ -2014,7 +2015,7 @@ export class Tensor extends TensorBase {
         dims: Array<number>
     ): Tensor {
         const output = aops.permute(this, dims);
-        this.destroy();
+        if(!this.destroyed) this.destroy();
         return output;
     }
 

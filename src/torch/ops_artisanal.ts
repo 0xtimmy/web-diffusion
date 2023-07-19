@@ -740,8 +740,6 @@ export function linear(
 
     if(typeof(bias) == 'undefined') {
         bias = factories.zeros(weight.shape[0]);
-    } else {
-        bias = bias.copy();
     }
 
     if(weight.shape[1] != input.shape[feature_dim]) throw new Error(`Expected last dimention of input and last dimention of weight to match, instead got input.shape = ${input.shape} & weight.shape = ${weight.shape}`);
@@ -751,8 +749,6 @@ export function linear(
     let output = mm(input.view([-1, input.shape[feature_dim]]), transpose(weight, 0, 1));
     output = output.add(repeat(bias.unsqueeze(0), [output.shape[0], 1]));
     output = output.view(output_shape)
-
-    bias.destroy();
 
     const duration = Date.now() - start;
     record_duration("linear", duration, shapeSize(input.shape));
@@ -854,8 +850,6 @@ export function permute(
         if(seen.includes(v)) throw new Error(`Permute cannot take duplicated dims: ${dims}`);
         seen.push(v);
     });
-
-    input = input.copy();
     
     for(let i = 0; i < dims.length; i++) {
         if(dims[i] < 0 || dims[i] >= dims.length) throw new Error(`No dimention ${dims[i]} in input shape: ${input.shape}`);

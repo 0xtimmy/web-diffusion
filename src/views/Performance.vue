@@ -13,6 +13,7 @@ import { init_device } from "@/components/device";
 import { UNet } from '@/components/diffuser/modules';
 import { Diffusion } from '@/components/diffuser/ddpm';
 import { report_durations } from '@/torch';
+import { report_kernel_stats } from '@/torch/kernel_webgpu';
 
 export default defineComponent({
     name: "Performance",
@@ -36,6 +37,7 @@ export default defineComponent({
                 return;
             });
             report_durations();
+            report_kernel_stats();
         }
     }
 })
