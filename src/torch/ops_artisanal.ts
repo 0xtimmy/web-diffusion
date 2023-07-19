@@ -738,10 +738,10 @@ export function linear(
     const output_shape = Array.from(input.shape);
     const feature_dim = input.shape.length - 1;
 
+    let needtofreeBias = false;
     if(typeof(bias) == 'undefined') {
+        needtofreeBias = true;
         bias = factories.zeros(weight.shape[0]);
-    } else {
-        bias = bias.copy();
     }
 
     if(weight.shape[1] != input.shape[feature_dim]) throw new Error(`Expected last dimention of input and last dimention of weight to match, instead got input.shape = ${input.shape} & weight.shape = ${weight.shape}`);
@@ -752,7 +752,7 @@ export function linear(
     output = output.add(repeat(bias.unsqueeze(0), [output.shape[0], 1]));
     output = output.view(output_shape)
 
-    bias.destroy();
+    if(needtofreeBias) bias.destroy();
 
     const duration = Date.now() - start;
     record_duration("linear", duration, shapeSize(input.shape));
@@ -834,8 +834,6 @@ export function softmax(
     const exps = exp(input).transpose(dim, input.shape.length-1);
     const sums = sum(exps, input.shape.length-1);
     const output = div(exps, sums).transpose(dim, input.shape.length-1);
-    exps.destroy();
-    sums.destroy();
 
     const duration = Date.now() - start;
     record_duration("softmax", duration, shapeSize(input.shape));
@@ -854,8 +852,6 @@ export function permute(
         if(seen.includes(v)) throw new Error(`Permute cannot take duplicated dims: ${dims}`);
         seen.push(v);
     });
-
-    input = input.copy();
     
     let untransposed = true;
 
@@ -863,7 +859,10 @@ export function permute(
         if(dims[i] < 0 || dims[i] >= dims.length) throw new Error(`No dimention ${dims[i]} in input shape: ${input.shape}`);
 
         if(i != dims[i]) {
-            if(untransposed) input = transpose(input, i, dims[i]);
+            if(untransposed) {
+                input = transpose(input, i, dims[i]);
+                untransposed = false;
+            }
             else input = input.transpose(i, dims[i]);
             dims[dims.indexOf(i)] = dims[i];
         }
