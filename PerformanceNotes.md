@@ -8,6 +8,10 @@
 | 07/12/23 | base | 36702ms | 1 | 1
 | 07/17/23 | added repeat kernel | 9163ms | 4.00 | 4.00
 | 07/18/23 | played with the workload optimzer equation | 8547ms | 1.07 | 4.29
+<<<<<<< Updated upstream
+=======
+| 07/19/23 | eliminated calls to copy | 6949ms | 1.22 | 5.28
+>>>>>>> Stashed changes
 
 # Function Specific
 
