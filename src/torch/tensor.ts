@@ -400,6 +400,7 @@ export class Tensor extends TensorBase {
         return this.transpose(0, 1);
     }
     transpose(dim0: number, dim1: number): Tensor {
+        if(dim0 == dim1) return this;
         const output = aops.transpose(this, dim0, dim1);
         this.destroy();
         return output;
