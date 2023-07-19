@@ -1,7 +1,8 @@
 <template>
     <div>
         <h2>Performance Measurements</h2>
-        <button @click="dryrun">run</button>
+        Noise steps: <input type="number" v-model="num_steps" /> <br>
+        <button @click="dryrun">dry run</button>
     </div>
 </template>
 
@@ -11,16 +12,22 @@ import * as torch from "@/torch"
 import { init_device } from "@/components/device";
 import { UNet } from '@/components/diffuser/modules';
 import { Diffusion } from '@/components/diffuser/ddpm';
+import { report_durations } from '@/torch';
 
 export default defineComponent({
     name: "Performance",
+    data() {
+        return {
+            num_steps: 10,
+        }
+    },
     mounted: async function() {
         await init_device();
     },
     methods: {
         dryrun: async function() {
             const model = new UNet()
-            const diffuser = new Diffusion({ noise_steps: 10, img_size: 64 });
+            const diffuser = new Diffusion({ noise_steps: this.num_steps, img_size: 64 });
             let lastIteration = Date.now();
             const res = await diffuser.sample(model, async (res: torch.Tensor, step_num: number) => { 
                 const finished_at = Date.now();
@@ -28,6 +35,7 @@ export default defineComponent({
                 lastIteration = finished_at;
                 return;
             });
+            report_durations();
         }
     }
 })

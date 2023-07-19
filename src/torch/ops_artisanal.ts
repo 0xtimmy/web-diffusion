@@ -7,11 +7,34 @@ import { Shape, defaultStrides, shapeSize , shapesEq} from "./shape";
 import * as factories from "./factories";
 //import * as ops from "./ops_opgen";
 
+const duration_averages: { [key: string]: { duration: number, total_num: number } } = {}
+
+function record_duration(key: string, duration: number, num: number) {
+    if(!duration_averages[key]) duration_averages[key] = { duration: 0, total_num: 0 };
+    duration_averages[key].duration = (duration_averages[key].duration * duration_averages[key].total_num + duration) / (duration_averages[key].total_num + num);
+    duration_averages[key].total_num = duration_averages[key].total_num + num;
+}
+
+export function report_durations() {
+    console.log(
+        Object.keys(duration_averages).sort((a, b) => {
+            return duration_averages[a].duration * duration_averages[a].total_num < duration_averages[b].duration * duration_averages[b].total_num ? 1 : -1;
+        }).map((key: string) => { 
+            const duration = `${duration_averages[key].duration}`;
+            const num = `${duration_averages[key].total_num}`;
+            const total = `${duration_averages[key].duration * duration_averages[key].total_num}`
+            return `function: ${key.padEnd(32, " ").slice(0, 32)} took on average: ${duration.padStart(32, " ")}ms across: ${num.padStart(16, " ")} calls, totalling: ${total.padStart(32, " ")}ms`;
+        }).join("\n")
+    );
+}
+
 // ------------------------------------
 // Start Custom
 // ------------------------------------
 export function silu(input: Tensor): Tensor {
-    return input.runKernel(
+    const start = Date.now();
+
+    const output = input.runKernel(
         "silu",
         { dtype: input.dtype },
         {
@@ -19,10 +42,15 @@ export function silu(input: Tensor): Tensor {
         },
         [input.shape]
     )[0]
+    const duration = Date.now() - start;
+    record_duration("silu", duration, shapeSize(input.shape));
+    return output;
 }
 
 export function gelu(input: Tensor): Tensor {
-    return input.runKernel(
+    const start = Date.now();
+
+    const output = input.runKernel(
         "gelu",
         { dtype: input.dtype },
         {
@@ -30,10 +58,16 @@ export function gelu(input: Tensor): Tensor {
         },
         [input.shape]
     )[0]
+    const duration = Date.now() - start;
+    record_duration("gelu", duration, shapeSize(input.shape));
+
+    return output;
 }
 
 export function sin(input: Tensor): Tensor {
-    return input.runKernel(
+    const start = Date.now();
+
+    const output = input.runKernel(
         "sin",
         { dtype: input.dtype },
         {
@@ -41,10 +75,16 @@ export function sin(input: Tensor): Tensor {
         },
         [input.shape]
     )[0]
+    const duration = Date.now() - start;
+    record_duration("sin", duration, shapeSize(input.shape));
+    
+    return output;
 }
 
 export function cos(input: Tensor): Tensor {
-    return input.runKernel(
+    const start = Date.now();
+
+    const output = input.runKernel(
         "cos",
         { dtype: input.dtype },
         {
@@ -52,77 +92,130 @@ export function cos(input: Tensor): Tensor {
         },
         [input.shape]
     )[0]
+    const duration = Date.now() - start;
+    record_duration("cos", duration, shapeSize(input.shape));
+
+    return output;
 }
 
 export function scalar_add(input: Tensor, alpha: number): Tensor {
-    return input.runKernel(
+    const start = Date.now();
+
+    const output = input.runKernel(
         "sadd", { dtype: input.dtype }, {
             alpha: alpha,
             outputSize: input.size
         }, [input.shape]
-    )[0]
+    )[0];
+    const duration = Date.now() - start;
+    record_duration("scalar_add", duration, shapeSize(input.shape));
+
+    return output;
 }
 
 export function scalar_sub(input: Tensor, alpha: number): Tensor {
-    return input.runKernel(
+    const start = Date.now();
+
+    const output = input.runKernel(
         "ssub", { dtype: input.dtype }, {
             alpha: alpha,
             outputSize: input.size
         }, [input.shape]
     )[0]
+    const duration = Date.now() - start;
+    record_duration("scalar_sub", duration, shapeSize(input.shape));
+
+    return output;
 }
 
 export function scalar_mul(input: Tensor, alpha: number): Tensor {
-    return input.runKernel(
+    const start = Date.now();
+
+
+    const output = input.runKernel(
         "smul", { dtype: input.dtype }, {
             alpha: alpha,
             outputSize: input.size
         }, [input.shape]
     )[0]
+    const duration = Date.now() - start;
+    record_duration("scalar_mul", duration, shapeSize(input.shape));
+
+    return output;
 }
 
 export function scalar_div(input: Tensor, alpha: number): Tensor {
-    return input.runKernel(
+    const start = Date.now();
+
+
+    const output = input.runKernel(
         "sdiv", { dtype: input.dtype }, {
             alpha: alpha,
             outputSize: input.size
         }, [input.shape]
     )[0]
+    const duration = Date.now() - start;
+    record_duration("scalar_div", duration, shapeSize(input.shape));
+
+    return output
 }
 
 export function min(input: Tensor, alpha: number): Tensor {
-    return input.runKernel(
+    const start = Date.now();
+
+
+    const output = input.runKernel(
         "min", { dtype: input.dtype }, {
             alpha: alpha,
             outputSize: input.size
         }, [input.shape]
     )[0]
+    const duration = Date.now() - start;
+    record_duration("min", duration, shapeSize(input.shape));
+
+    return output;
 }
 
 export function max(input: Tensor, alpha: number): Tensor {
-    return input.runKernel(
+    const start = Date.now();
+
+
+    const output = input.runKernel(
         "max", { dtype: input.dtype }, {
             alpha: alpha,
             outputSize: input.size
         }, [input.shape]
     )[0]
+    const duration = Date.now() - start;
+    record_duration("max", duration, shapeSize(input.shape));
+
+    return output
 }
 
 
 
 export function find_index(input: Tensor): Tensor {
-    return input.runKernel(
+    const start = Date.now();
+
+    const output = input.runKernel(
         "find_index",
         { dtype: input.dtype },
         {
             outputSize: input.size
         },
         [input.shape]
-    )[0]
+    )[0];
+    
+    const duration = Date.now() - start;
+    record_duration("find_index", duration, shapeSize(input.shape));
+
+    return output;
 }
 
 export function clamp(input: Tensor, low: number, high: number): Tensor {
-    return input.runKernel(
+    const start = Date.now();
+
+    const output = input.runKernel(
         "clamp",
         { dtype: input.dtype },
         { 
@@ -131,11 +224,18 @@ export function clamp(input: Tensor, low: number, high: number): Tensor {
             outputSize: shapeSize(input.shape) 
         },
         [input.shape],
-    )[0]
+    )[0];
+
+    const duration = Date.now() - start;
+    record_duration("clamp", duration, shapeSize(input.shape));
+
+    return output;
 }
 
 export function cumprod(input: Tensor, dim=0): Tensor {
-    return input.runKernel(
+    const start = Date.now();
+
+    const output = input.runKernel(
         "cumprod",
         { dtype: input.dtype },
         { 
@@ -144,26 +244,43 @@ export function cumprod(input: Tensor, dim=0): Tensor {
         },
         [input.shape]
     )[0]
+    const duration = Date.now() - start;
+    record_duration("cumprod", duration, shapeSize(input.shape));
+
+    return output;
 }
 
 export function pow(a: Tensor, b: Tensor): Tensor {
+    const start = Date.now();
+
     if(!shapesEq(a.shape, b.shape)) throw new Error(`pow reqires tensors to have the same shape, instead got: ${a.shape} and ${b.shape}`);
-    return a.runKernel(
+    const output = a.runKernel(
         "pow",
         { dtype: a.dtype },
         { outputSize: shapeSize(a.shape) },
         [a.shape],
         b
     )[0]
+    const duration = Date.now() - start;
+    record_duration("pow", duration, shapeSize(a.shape));
+
+    return output;
 }
 
 export function scalar_pow(a: Tensor, alpha: number): Tensor {
-    return a.runKernel(
+    const start = Date.now();
+
+
+    const output = a.runKernel(
         "scalar_pow",
         { dtype: a.dtype },
         { alpha: alpha, outputSize :shapeSize(a.shape) },
         [a.shape],
-    )[0]
+    )[0];
+    const duration = Date.now() - start;
+    record_duration("scalar_pow", duration, shapeSize(a.shape));
+
+    return output;
 }
 
 export function index(input: Tensor, index: Tensor): Tensor {
@@ -172,17 +289,26 @@ export function index(input: Tensor, index: Tensor): Tensor {
         return acc || v != index.shape[i];
     }, false)) throw new Error(`index expectes input and index tensors to be the same shape, instead got input shape: ${input.shape} and index shape: ${index.shape}`);
     */
+    const start = Date.now();
+
     if(input.shape.length > 1) console.error("index hasn't been built of dimensions greater than 1");
-    return input.runKernel(
+
+    const output = input.runKernel(
         "index",
         { dtype: input.dtype },
         { size: index.size },
         [index.shape],
         index
-    )[0]
+    )[0];
+    const duration = Date.now() - start;
+    record_duration("index", duration, shapeSize(input.shape));
+
+    return output;
 }
 
 export function add(a: Tensor, b: Tensor): Tensor {
+    const start = Date.now();
+
     if(shapeSize(a.shape) != shapeSize(b.shape)) throw new Error("trying to add mismatched shapes");
     let ascale = 1;
     let bscale = 1;
@@ -197,8 +323,8 @@ export function add(a: Tensor, b: Tensor): Tensor {
         })
         ascale = shapeSize(Array.from(b.shape).splice(b.shape.length));
     }
-    
-    return a.runKernel(
+
+    const output = a.runKernel(
         "add",
         { dtype: a.dtype },
         { 
@@ -209,27 +335,48 @@ export function add(a: Tensor, b: Tensor): Tensor {
         [a.shape],
         b
     )[0]
+
+    const duration = Date.now() - start;
+    record_duration("add", duration, shapeSize(a.shape));
+    
+    return output;
 }
 export function sub(a: Tensor, b: Tensor): Tensor {
-    return a.runKernel(
+    const start = Date.now();
+
+
+    const output = a.runKernel(
         "sub",
         { dtype: a.dtype },
         { outputSize: shapeSize(a.shape) },
         [a.shape],
         b
     )[0]
+    const duration = Date.now() - start;
+    record_duration("sub", duration, shapeSize(a.shape));
+
+    return output
 }
 export function mul(a: Tensor, b: Tensor): Tensor {
-    return a.runKernel(
+    const start = Date.now();
+
+
+    const output = a.runKernel(
         "mul",
         { dtype: a.dtype },
         { outputSize: shapeSize(a.shape) },
         [a.shape],
         b
     )[0]
+    const duration = Date.now() - start;
+    record_duration("mul", duration, shapeSize(a.shape));
+
+    return output
 }
 export function div(a: Tensor, b: Tensor): Tensor {
     //if(shapeSize(a.shape) != shapeSize(b.shape)) throw new Error("trying to add mismatched shapes");
+
+    const start = Date.now();
 
     let ascale = 1;
     let bscale = 1;
@@ -245,7 +392,7 @@ export function div(a: Tensor, b: Tensor): Tensor {
         bscale = shapeSize(Array.from(a.shape).splice(b.shape.length));
     }
 
-    return a.runKernel(
+    const output = a.runKernel(
         "div",
         { dtype: a.dtype },
         { 
@@ -256,17 +403,27 @@ export function div(a: Tensor, b: Tensor): Tensor {
         [a.shape],
         b
     )[0]
+    const duration = Date.now() - start;
+    record_duration("div", duration, shapeSize(a.shape));
+    return output;
 }
 export function sqrt(input: Tensor): Tensor {
-    return input.runKernel(
+    const start = Date.now();
+
+    const output = input.runKernel(
         "sqrt",
         { dtype: input.dtype },
         { outputSize: shapeSize(input.shape) },
         [input.shape],
     )[0]
+    const duration = Date.now() - start;
+    record_duration("sqrt", duration, shapeSize(input.shape));
+    return output;
 }
 
 export function cat(a: Tensor, b: Tensor, dim: 0|1|2|3): Tensor {
+    const start = Date.now();
+
     //throw new Error("cat not implemented yet");
     let part: number;
     let stride: number;
@@ -301,44 +458,21 @@ export function cat(a: Tensor, b: Tensor, dim: 0|1|2|3): Tensor {
         else return size;
     }).filter((v, i) => { return i < shape_len || v != 1});
 
-    return a.runKernel(
+    const output = a.runKernel(
         "cat",
         { dtype: a.dtype },
         params,
         [output_shape],
         b
     )[0];
+    const duration = Date.now() - start;
+    record_duration("cat", duration, shapeSize(output_shape));
+    return output;
 }
-
-/*
-export function _repeat(input: Tensor, shape: Shape): Tensor {
-    if(input.shape.length > 4) throw new Error(`repeat only supports shapes four dimensions or less, instead got input shape: ${input.shape}`);
-    if(shape.length > 4) throw new Error(`repeat only supports shapes four dimensions or less, instead got repeat shape: ${shape}`);
-
-    let t0 = input.copy();
-    for(let x = 1; x < shape[0]; x++) {
-        t0 = t0.cat(input, 0);
-    }
-    let t1 = t0.copy();
-    for(let y = 1; shape[1] && y < shape[1]; y++) {
-        t1 = t1.cat(t0, 1);
-    }
-    t0.destroy();
-    let t2 = t1.copy();
-    for(let z = 1; shape[2] && z < shape[2]; z++) {
-        t2 = t2.cat(t1, 2);
-    }
-    t1.destroy();
-    let t3 = t2.copy();
-    for(let w = 1; shape[3] && w < shape[3]; w++) {
-        t3 = t3.cat(t2, 3);
-    }
-    t2.destroy();
-    return t3;
-}
-*/
 
 export function repeat(input: Tensor, shape: Shape): Tensor {
+    const start = Date.now();
+
     if(input.shape.length > 4) throw new Error(`repeat only supports shapes four dimensions or less, instead got input shape: ${input.shape}`);
     if(shape.length > 4) throw new Error(`repeat only supports shapes four dimensions or less, instead got repeat shape: ${shape}`);
 
@@ -361,22 +495,26 @@ export function repeat(input: Tensor, shape: Shape): Tensor {
         outputSize: shapeSize(output_shape)
     }
 
-    return input.runKernel(
+    const output = input.runKernel(
         "repeat",
         { dtype: input.dtype },
         params,
         [output_shape]
     )[0].view(return_shape);
+    const duration = Date.now() - start;
+    record_duration("repeat", duration, shapeSize(output_shape));
+    return output;
 }
 
 export function layernorm(input: Tensor, normalized_shape: Shape, weight?: Tensor, bias?: Tensor, eps=1e-5): Tensor {
+    const start = Date.now();
+
     const params = {
         eps: eps,
         norm_size: shapeSize(normalized_shape),
         outputSize: input.size
     };
 
-    
     if(Array.from(normalized_shape).reduce((acc, v, i) => {
         return acc || v != input.shape[i + (input.shape.length - normalized_shape.length)];
     }, false)) throw new Error(`Layer norm "normalized_shape" must match the 1-n dimensions of the input, instead got input shape: ${input.shape} and normalized_shape: ${normalized_shape}`);
@@ -404,10 +542,15 @@ export function layernorm(input: Tensor, normalized_shape: Shape, weight?: Tenso
     if(needtofreeWeight) weight.destroy();
     if(needtofreeBias) bias.destroy();
 
+    const duration = Date.now() - start;
+    record_duration("layernorm", duration, shapeSize(input.shape));
+
     return output;
 }
 
 export function maxpool2d(input: Tensor, kernel_size: [number, number], stride?:[number,number], padding=[0,0], dilation=[1,1], ceil_mode=false): Tensor {
+    const start = Date.now();
+
     if(input.shape.length < 2) throw new Error("MaxPool2d requires a shape that's at least 2d");
     if(typeof(stride) == 'undefined') stride = kernel_size;
 
@@ -452,12 +595,16 @@ export function maxpool2d(input: Tensor, kernel_size: [number, number], stride?:
         outputSize: shapeSize(output_shape),
     };
 
-    return input.runKernel(
+    const output = input.runKernel(
         "maxpool2d",
         { dtype: input.dtype },
         params,
         [output_shape]
     )[0];
+    const duration = Date.now() - start;
+    record_duration("maxpool2d", duration, shapeSize(input.shape));
+
+    return output;
 }
 
 export function upsample(
@@ -468,6 +615,8 @@ export function upsample(
     align_corners=false,
     recompute_scale_factor=false,
 ) {
+    const start = Date.now();
+
     if(align_corners) throw new Error("align_corners not implemented!");
     if(recompute_scale_factor) throw new Error("recompute_scale_factor not implemented!");
     if(mode == "trilinear") throw new Error("trilinear not implemented!");
@@ -503,32 +652,16 @@ export function upsample(
         d_out: output_shape[4] ? output_shape[4] : 1,
         outputSize: shapeSize(output_shape)
     }
-    return input.runKernel(
+
+    const output = input.runKernel(
         "upsample",
         { dtype: input.dtype},
         params,
         [output_shape]
     )[0]
-}
-
-export function rand(
-    input: Tensor,
-    seed: number,
-): { output: Tensor, next_seed: number } {
-
-    const params = {
-        seed: seed,
-        outputSize: input.size
-    }
-    return {
-        output: input.runKernel(
-            "rand",
-            { dtype: input.dtype },
-            params,
-            [input.shape]
-        )[0],
-        next_seed: seed + params.outputSize
-    }
+    const duration = Date.now() - start;
+    record_duration("upsample", duration, shapeSize(output_shape));
+    return output;
 }
 
 export function box_muller(
@@ -536,45 +669,33 @@ export function box_muller(
     mean: number,
     std: number
 ): Tensor {
+    const start = Date.now();
+
     const params = {
         mean: mean,
         sdev: std,
         outputSize: shapeSize(input.shape) / 2
     }
     const output_shape = input.shape.splice(1);
-    return input.runKernel(
+
+    const output = input.runKernel(
         "box_muller",
         { dtype: input.dtype },
         params,
         [output_shape],
     )[0];
-}
+    const duration = Date.now() - start;
+    record_duration("box_muller", duration, shapeSize(input.shape));
 
-export function clt(
-    input: Tensor,
-    sample_size: number,
-    mean: number,
-    std: number
-): Tensor {
-    const output_shape = input.shape.splice(0,input.shape.length-1);
-    const params = {
-        sample_size: sample_size,
-        mean: mean,
-        sdev: std,
-        outputSize: shapeSize(output_shape)
-    }
-    return input.runKernel(
-        "clt",
-        { dtype: input.dtype },
-        params,
-        [output_shape],
-    )[0];
+    return output;
 }
 
 export function squeeze(
     input: Tensor,
     dim?: number
 ): Tensor {
+    const start = Date.now();
+
     if(dim <= -input.dim || dim > input.dim) throw new Error(`"dim" out of bounds; must be on the interval:  [${-input.dim}, ${input.dim}) for input tensor with dim: ${input.dim}`);
     if(dim < 0) dim = dim + input.dim;
     let new_shape = input.shape;
@@ -584,17 +705,27 @@ export function squeeze(
     } else {
         new_shape = input.shape.filter((size: number) => { return size != 1 });
     }
-    return input.withShape(new_shape, defaultStrides(new_shape));
+
+    const output = input.withShape(new_shape, defaultStrides(new_shape));
+    const duration = Date.now() - start;
+    record_duration("squeeze", duration, shapeSize(input.shape));
+
+    return output;
 }
 
 export function unsqueeze(
     input: Tensor,
     dim: number
 ): Tensor {
+    const start = Date.now();
+
     if(dim <= -input.dim - 1 || dim > input.dim + 1) throw new Error(`"dim" out of bounds; must be on the interval:  [${-input.dim - 1}, ${input.dim + 1}) for input tensor with dim: ${input.dim}`);
     if(dim < 0) dim = dim + input.dim + 1;
     const new_shape = [...input.shape.slice(0, dim), 1, ...input.shape.slice(dim)];
-    return input.withShape(new_shape, defaultStrides(new_shape));
+    const output = input.withShape(new_shape, defaultStrides(new_shape));
+    const duration = Date.now() - start;
+    record_duration("unsqueeze", duration, shapeSize(input.shape));
+    return output;
 }
 
 export function linear(
@@ -602,6 +733,8 @@ export function linear(
     weight: Tensor,
     bias?: Tensor,
 ): Tensor {
+    const start = Date.now();
+
     const output_shape = Array.from(input.shape);
     const feature_dim = input.shape.length - 1;
 
@@ -610,7 +743,6 @@ export function linear(
     } else {
         bias = bias.copy();
     }
-
 
     if(weight.shape[1] != input.shape[feature_dim]) throw new Error(`Expected last dimention of input and last dimention of weight to match, instead got input.shape = ${input.shape} & weight.shape = ${weight.shape}`);
     if(bias && bias.shape[0] != weight.shape[0]) throw new Error(`Expected bias to be 1D and match the first dimention of weight, instead got bias.shape = ${bias.shape} and weight.shape = ${weight.shape}`);
@@ -621,6 +753,9 @@ export function linear(
     output = output.view(output_shape)
 
     bias.destroy();
+
+    const duration = Date.now() - start;
+    record_duration("linear", duration, shapeSize(input.shape));
     return output;
 }
 
@@ -628,6 +763,8 @@ export function sum(
     input: Tensor,
     dim=0
 ): Tensor {
+    const start = Date.now();
+
     if(dim < 0 || dim >= input.shape.length) throw new Error(`Expected dim that's within the tensor but input has shape: ${input.shape} and got dim ${dim}`);
     const output_shape = dim == 0 ? [1] : Array.from(input.shape).splice(0, dim);
 
@@ -642,57 +779,66 @@ export function sum(
             { 
                 batches: batches,
                 batch_size: 2,
-                size: input.size 
             }, 
             [pass_shape]
         )[0];
         batch_size = shapeSize(Array.from(output.shape).splice(dim));
     }
 
-    return output.runKernel(
+    output = output.runKernel(
         "sum", 
         { dtype: input.dtype }, 
         { 
             batches: shapeSize(output_shape),
             batch_size: shapeSize(Array.from(output.shape).splice(dim)),
-            size: output.size 
         }, 
         [output_shape]
     )[0];
+
+    const duration = Date.now() - start;
+    record_duration("sum", duration, shapeSize(input.shape));
+
+    return output;
 }
 
 export function exp(
     input: Tensor
 ): Tensor {
-    return input.runKernel(
+    const start = Date.now();
+
+
+    const output = input.runKernel(
         "exp",
         { dtype: input.dtype },
         { outputSize: shapeSize(input.shape) },
         [input.shape]
     )[0]
+    const duration = Date.now() - start;
+    record_duration("exp", duration, shapeSize(input.shape));
+
+    return output;
 }
 
 export function softmax(
     input: Tensor,
     dim=0
 ): Tensor {
+    const start = Date.now();
+
     if(dim < 0 || dim >= input.shape.length) throw new Error(`Expected dim that's within the tensor but input has shape: ${input.shape} and got dim ${dim}`);
 
-    const batches = dim == 0 ? 1 : shapeSize(Array.from(input.shape).splice(0, dim));
-    const batch_size = input.shape[dim];
-    const stride = dim+1 == input.shape.length ? 1 : shapeSize(Array.from(input.shape).splice(dim+1));
-
-    const params = {
-        batches: batches,
-        batch_size: batch_size,
-        stride: stride
-    };
+    //const batches = dim == 0 ? 1 : shapeSize(Array.from(input.shape).splice(0, dim));
+    //const batch_size = input.shape[dim];
+    //const stride = dim+1 == input.shape.length ? 1 : shapeSize(Array.from(input.shape).splice(dim+1));
 
     const exps = exp(input).transpose(dim, input.shape.length-1);
     const sums = sum(exps, input.shape.length-1);
     const output = div(exps, sums).transpose(dim, input.shape.length-1);
     exps.destroy();
     sums.destroy();
+
+    const duration = Date.now() - start;
+    record_duration("softmax", duration, shapeSize(input.shape));
     return output;
 }
 
@@ -700,6 +846,8 @@ export function permute(
     input: Tensor,
     dims: Array<number>,
 ): Tensor {
+    const start = Date.now();
+
     if(dims.length != input.shape.length) throw new Error(`permute need the same number of dimentions as it's input, got: ${dims} but expected: ${input.shape} dimensions`);
     const seen = [];
     dims.forEach((v) => {
@@ -718,8 +866,11 @@ export function permute(
         }
         
     }
-    
-    return input
+
+    const output = input;
+    const duration = Date.now() - start;
+    record_duration("permute", duration, shapeSize(input.shape));
+    return output;
 }
 
 export function scaled_dot_product_attention(
@@ -730,6 +881,8 @@ export function scaled_dot_product_attention(
     dropout?: number,
     is_casual?: boolean,
 ): Tensor {
+    const start = Date.now();
+
     if(attn_mask) console.error("attention does not support attention masks");
     if(dropout) console.error("attention does not support dropout");
     if(is_casual) console.error("attention does not support is_causal");
@@ -747,7 +900,6 @@ export function scaled_dot_product_attention(
     let out = scalar_div(mm(query, key.transpose(1,2)), sqrt_dk);
     out = softmax(out, 1);
     out = mm(out, value);
-    return out.view(output_shape);
     */
 
     // batch the attention calculations
@@ -756,18 +908,15 @@ export function scaled_dot_product_attention(
     const key_batches = transpose(key, 1,2).chunk(batches, 0);
     const value_batches = chunk(value, batches);
 
-    //console.log("dot product input shapes: ", query_batches[0].shape, key_batches[0].shape);
     const dot_products = query_batches.map((q, i) => {
         const out = q.mm(key_batches[i]).scalar_div(sqrt_dk);
         key_batches[i].destroy();
         return out;
     });
-    //console.log("dot product shape: ", dot_products[0].shape);
 
     const softmaxxes = dot_products.map((dot_product) => {
         return dot_product.softmax(dot_product.shape.length-1);
     });
-    //console.log("softmaxxes shape: ", softmaxxes[0].shape);
 
     
     let outs = softmaxxes.map((batch, i) => {
@@ -775,14 +924,17 @@ export function scaled_dot_product_attention(
         value_batches[i].destroy();
         return out;
     })
-    //console.log("outs shape: ", outs[0].shape);
     
     let out = outs[0];
     for(let i = 1; i < batches; i++) {
         out = out.cat(outs[i], 0);
         outs[i].destroy();
     }
-    return out.view(output_shape);
+
+    const output = out.view(output_shape);
+    const duration = Date.now() - start;
+    record_duration("scaled_dot_product_attention", duration, shapeSize(query.shape));
+    return output;
 }
 
 
@@ -813,7 +965,6 @@ export function multihead_attention(
     need_weights=false,
     is_causal=false
 ): { output: Tensor, weights: Tensor | null } {
-
     const is_batched = _mha_shape_check(query, key, value, num_heads, key_padding_mask, attn_mask);
 
     if(!is_batched) {
@@ -928,7 +1079,6 @@ function _in_projection(
     b_k?: Tensor,
     b_v?: Tensor,
 ): { q: Tensor, k: Tensor, v: Tensor } {
-
     const Eq = q.shape[q.dim-1];
     const Ek = k.shape[k.dim-1];
     const Ev = v.shape[v.dim-1];
@@ -950,6 +1100,8 @@ export function chunk(
     chunks: number,
     dim=0
 ): Array<Tensor> {
+    const start = Date.now();
+
     if(input.shape[dim] % chunks != 0) throw new Error(`cannot chunk input of shape: ${input.shape} into ${chunks} even chunks along dim: ${dim}`);
     const output_shape = input.shape.map((v: number, i: number) => {
         if(i == dim) return v / chunks;
@@ -970,10 +1122,15 @@ export function chunk(
             [output_shape] 
         )[0]);
     }
-    return arr;
+
+    const output = arr;
+    const duration = Date.now() - start;
+    record_duration("chunk", duration, shapeSize(input.shape));
+    return output;
 }
 
 function _mha_shape_check(query: Tensor, key: Tensor, value: Tensor, num_heads: number, key_padding_mask?: Tensor, attn_mask?: Tensor) {
+    
     let is_batched;
 
     if (query.dim == 3) {
@@ -1010,6 +1167,8 @@ function _mha_shape_check(query: Tensor, key: Tensor, value: Tensor, num_heads: 
 }
 
 export function group_norm(input: Tensor, groups: number, weight?: Tensor, bias?: Tensor, eps=1e-5): Tensor {
+    const start = Date.now();
+
     if(input.dim < 2) throw new Error("group norm expects at least two dimenstions");
     if(input.shape[1] % groups != 0) throw new Error(`group norm expects group num to evenly divide channels but got input shape: ${input.shape} and group num: ${groups} (${input.shape[1] / groups})`);
 
@@ -1049,6 +1208,9 @@ export function group_norm(input: Tensor, groups: number, weight?: Tensor, bias?
     if(needtofreeWeight) weight.destroy();
     if(needtofreeBias) bias.destroy();
 
+    const duration = Date.now() - start;
+    record_duration("group_norm", duration, shapeSize(input.shape));
+
     return output;
 }
 
@@ -1074,6 +1236,8 @@ export function group_norm(input: Tensor, groups: number, weight?: Tensor, bias?
  * @returns 
  */
 export function conv2d(input: Tensor, weight: Tensor, bias?: Tensor, stride: number | [number, number]=1, padding: number | [number, number] | "valid" | "same"=0, dilation: number | [number, number]=1, groups=1): Tensor {
+    const start = Date.now();
+
     if (shouldCreateGradient(input, weight)) {
         //throw new Error("conv2d gradient not supported yet");
         //console.error("conv2d gradient not supported yet");
@@ -1133,80 +1297,57 @@ export function conv2d(input: Tensor, weight: Tensor, bias?: Tensor, stride: num
     )[0];
 
     if(needtofreeBias) bias.destroy();
+
+    const duration = Date.now() - start;
+    record_duration("conv2d", duration, shapeSize(input.shape));
     return output;
 }
 
 export function mm(input: Tensor, other: Tensor): Tensor {
+    const start = Date.now();
+
     if (shouldCreateGradient(input, other)) {
         throw new Error("mm gradient not supported yet");
-    } else {
-        let is_batched;
-        if(input.shape.length == 2) is_batched = false;
-        else if(input.shape.length == 3) is_batched = true;
-        else throw new Error(`Expected 2D tensors or 3D tensors (batched) got ${input.shape} and ${other.shape}`)
-
-        if(input.shape.length != other.shape.length) throw new Error(`Expected tensors to be of the same dimension, instead got got ${input.shape} and ${other.shape}`);
-        if(is_batched && input.shape[0] != other.shape[0]) throw new Error(`Expected tensors to have the same number of batches, instead got got ${input.shape} and ${other.shape}`);
-        if ((!is_batched && (input.shape[1] !== other.shape[0])) || (is_batched && (input.shape[2] !== other.shape[1]))) {
-            throw new Error(
-                `Expected tensors inner dimensions to be compatible, got ${input.shape} and ${other.shape}`
-            );
-        }
-        
-        const params = {
-            batches: is_batched ? input.shape[0] : 1,
-            resultRows: is_batched ? input.shape[1] : input.shape[0],
-            resultCols: is_batched ? other.shape[2] : other.shape[1],
-            trueInnerDim: is_batched ? input.shape[2] : input.shape[1],
-            alpha: 1.0,
-            innerDim: is_batched ? input.shape[2] : input.shape[1],
-            innerDimOffset: 0
-        };
-
-        //console.log("running linear with params: ", params);
-        //console.log("output shape: ", [...(is_batched ? [params.batches] : []), params.resultRows, params.resultCols])
-        /*
-        const a = input.runKernel(
-            "mm",
-            { resultDtype: input.dtype },
-            { ...params, innerDim: params.trueInnerDim / 4, innerDimOffset: 0 },
-            [[...(is_batched ? [params.batches] : []), params.resultRows, params.resultCols]],
-            other
-        )[0];
-        const b = input.runKernel(
-            "mm",
-            { resultDtype: input.dtype },
-            { ...params, innerDim: params.trueInnerDim * 2 / 4, innerDimOffset: params.trueInnerDim / 4 },
-            [[...(is_batched ? [params.batches] : []), params.resultRows, params.resultCols]],
-            other
-        )[0];
-        const c = input.runKernel(
-            "mm",
-            { resultDtype: input.dtype },
-            { ...params, innerDim: params.trueInnerDim * 3 / 4, innerDimOffset: params.trueInnerDim * 2 / 4 },
-            [[...(is_batched ? [params.batches] : []), params.resultRows, params.resultCols]],
-            other
-        )[0];
-        const d = input.runKernel(
-            "mm",
-            { resultDtype: input.dtype },
-            { ...params, innerDim: params.trueInnerDim, innerDimOffset: params.trueInnerDim * 3 / 4 },
-            [[...(is_batched ? [params.batches] : []), params.resultRows, params.resultCols]],
-            other
-        )[0];
-        return add(add(add(a, b), c), d);
-        */
-        return input.runKernel(
-            "mm",
-            { resultDtype: input.dtype },
-            params,
-            [[...(is_batched ? [params.batches] : []), params.resultRows, params.resultCols]],
-            other
-        )[0];
     }
+
+    let is_batched;
+    if(input.shape.length == 2) is_batched = false;
+    else if(input.shape.length == 3) is_batched = true;
+    else throw new Error(`Expected 2D tensors or 3D tensors (batched) got ${input.shape} and ${other.shape}`)
+
+    if(input.shape.length != other.shape.length) throw new Error(`Expected tensors to be of the same dimension, instead got got ${input.shape} and ${other.shape}`);
+    if(is_batched && input.shape[0] != other.shape[0]) throw new Error(`Expected tensors to have the same number of batches, instead got got ${input.shape} and ${other.shape}`);
+    if ((!is_batched && (input.shape[1] !== other.shape[0])) || (is_batched && (input.shape[2] !== other.shape[1]))) {
+        throw new Error(
+            `Expected tensors inner dimensions to be compatible, got ${input.shape} and ${other.shape}`
+        );
+    }
+    
+    const params = {
+        batches: is_batched ? input.shape[0] : 1,
+        resultRows: is_batched ? input.shape[1] : input.shape[0],
+        resultCols: is_batched ? other.shape[2] : other.shape[1],
+        trueInnerDim: is_batched ? input.shape[2] : input.shape[1],
+        alpha: 1.0,
+        innerDim: is_batched ? input.shape[2] : input.shape[1],
+        innerDimOffset: 0
+    };
+
+    const output = input.runKernel(
+        "mm",
+        { resultDtype: input.dtype },
+        params,
+        [[...(is_batched ? [params.batches] : []), params.resultRows, params.resultCols]],
+        other
+    )[0];
+    const duration = Date.now() - start;
+    record_duration("mm", duration, shapeSize(input.shape));
+    return output;
 }
 
 export function transpose(input: Tensor, dim0=0, dim1=1): Tensor {
+    const start = Date.now();
+
     if(dim1 == dim0) {
         return input.copy();
     } else if(dim1 < dim0) {
@@ -1230,21 +1371,30 @@ export function transpose(input: Tensor, dim0=0, dim1=1): Tensor {
         outputSize: input.size
     }
 
-    return input.runKernel(
+    const output = input.runKernel(
         "transpose", 
         { dtype: input.dtype },
         params,
         [newShape]
     )[0];
+    const duration = Date.now() - start;
+    record_duration("transpose", duration, shapeSize(input.shape));
+    return output;
 }
 
 export function copy(input: Tensor): Tensor {
-    return input.runKernel(
+    const start = Date.now();
+
+
+    const output = input.runKernel(
         "copy",
         { dtype: input.dtype },
         { outputSize: shapeSize(input.shape)},
         [input.shape]
     )[0]
+    const duration = Date.now() - start;
+    record_duration("copy", duration, shapeSize(input.shape));
+    return output;
 }
 
 

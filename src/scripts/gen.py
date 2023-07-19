@@ -64,9 +64,9 @@ tests = [
 
     #at.gen_mm("mm limits test 3 - 2048 x 2048", torch.randn([2048, 2048]), torch.randn([2048, 2048])),
 
-    #at.gen_sum("Sum test small", torch.ones(2, 2)),
-    #at.gen_sum("Sum test 100x100", torch.ones(100, 100)),
-    #t.gen_sum("Sum test 1000x1000", torch.ones(1000, 1000)),
+    at.gen_sum("Sum test small", torch.ones(4, 4)),
+    at.gen_sum("Sum test 100x100", torch.ones(100, 100)),
+    at.gen_sum("Sum test 1000x1000", torch.ones(1000, 1000)),
 
 
     # Functional Tests --------------------------------------------------------
@@ -177,9 +177,9 @@ tests = [
 
     #rt.gen_cat("Cat performance test", torch.randint(0, 5, [256, 256]), torch.randint(0, 5, [256, 256]), 0),
     
-    rt.gen_repeat("Repeat basic test", torch.randint(0, 5, [2, 2]), [2, 4]),
-    rt.gen_repeat("Repeat basic test", torch.randint(0, 5, [2, 2]), [1, 1, 4, 4]),
-    rt.gen_repeat("Repeat performance test", torch.randint(0, 5, [2, 8, 16, 32]), [16, 8, 4, 2]),
+    #rt.gen_repeat("Repeat basic test", torch.randint(0, 5, [2, 2]), [2, 4]),
+    #rt.gen_repeat("Repeat basic test", torch.randint(0, 5, [2, 2]), [1, 1, 4, 4]),
+    #rt.gen_repeat("Repeat performance test", torch.randint(0, 5, [2, 8, 16, 32]), [16, 8, 4, 2]),
 
 
     # Factory Tests -----------------------------------------------------------
