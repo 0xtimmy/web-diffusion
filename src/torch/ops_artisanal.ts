@@ -738,9 +738,7 @@ export function linear(
     const output_shape = Array.from(input.shape);
     const feature_dim = input.shape.length - 1;
 
-    let needtofreeBias = false;
     if(typeof(bias) == 'undefined') {
-        needtofreeBias = true;
         bias = factories.zeros(weight.shape[0]);
     }
 
@@ -751,8 +749,6 @@ export function linear(
     let output = mm(input.view([-1, input.shape[feature_dim]]), transpose(weight, 0, 1));
     output = output.add(repeat(bias.unsqueeze(0), [output.shape[0], 1]));
     output = output.view(output_shape)
-
-    if(needtofreeBias) bias.destroy();
 
     const duration = Date.now() - start;
     record_duration("linear", duration, shapeSize(input.shape));

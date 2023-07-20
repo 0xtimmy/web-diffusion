@@ -12,7 +12,13 @@ import {
     getShaderTypeElementByteSize,
 } from "./kernel";
 
-const buffers = [];
+let time_running = 0;
+let time_allocation = 0;
+let time_constructing = 0;
+
+export function report_kernel_stats() {
+    console.log(`time running: ${time_running}ms\ntime allocating: ${time_allocation}ms\ntime contructing: ${time_constructing}`);
+}
 
 export class KernelWebGPU extends Kernel {
     private _gpuDevice: GPUDevice;
@@ -24,6 +30,7 @@ export class KernelWebGPU extends Kernel {
 
     constructor(spec: KernelSpec, config: KernelConfig, device: Device, params: null | any =null) {
         super(spec, config, device);
+        const constr_start = Date.now();
         const gpuDevice = (device as any).gpuDevice;
         if (!gpuDevice) {
             throw new Error("Cannot create a GPU kernel without a GPU device");
@@ -89,6 +96,7 @@ export class KernelWebGPU extends Kernel {
                 entryPoint: "main",
             },
         });
+        time_constructing = time_constructing + (Date.now() - constr_start);
     }
     run(
         inputs: GPUBuffer[],
@@ -104,6 +112,7 @@ export class KernelWebGPU extends Kernel {
         const [workgroupCountX, workgroupCountY, workgroupCountZ] =
             this.getWorkgroupCounts(env);
 
+        const buf_start = Date.now();
         // Get input buffers with storage usage
         const storageInputs = this.spec.inputs.map((input, i) =>
             this.getStorageInputBuffer(
@@ -123,9 +132,11 @@ export class KernelWebGPU extends Kernel {
                 env
             )
         );
+        time_allocation = time_allocation + (Date.now() - buf_start);
 
         const maxCountPerDim = this._gpuDevice.limits.maxComputeWorkgroupsPerDimension;
         
+        const run_start = Date.now();
         for(let i = 0; i < workgroupCountX;) {
             const countX = Math.min(workgroupCountX - i, maxCountPerDim);
             for(let j = 0; j < workgroupCountY;) {
@@ -196,6 +207,7 @@ export class KernelWebGPU extends Kernel {
             }
             i += countX;
         }
+        time_running = time_running + (Date.now() - run_start);
 
         // Return the storage output buffers
         return storageOutputs;

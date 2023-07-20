@@ -2015,7 +2015,7 @@ export class Tensor extends TensorBase {
         dims: Array<number>
     ): Tensor {
         const output = aops.permute(this, dims);
-        this.destroy();
+        if(!this.destroyed) this.destroy();
         return output;
     }
 
