@@ -434,7 +434,7 @@ export class Module {
             const data = new Float32Array(buf);
             const shape = await (await fetch(`${dirname}/${completeName}/shape`)).json();
             const parameter = new Parameter(tensor(Array.from(data)).view(shape));
-            console.log("loading parameters: ", completeName);
+            //console.log("loading parameters: ", completeName);
             
             if(old.shape.length != parameter.shape.length || parameter.shape.reduce((acc, v, i) => {
                 return acc || v != old.shape[i];

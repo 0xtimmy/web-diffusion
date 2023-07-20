@@ -2,7 +2,8 @@
     <div>
         <h2>Web Diffusion</h2>
         Noise Steps: <input type="number" v-model="noiseSteps" /> <br>
-        Select Weights: <button @click="genPokemon" :disabled="active">Pokemon</button> <span v-if="done_loading_weights">✅</span><br>
+        Select Weights: <button @click="loadPokemon" :disabled="active">Pokemon</button> <span v-if="done_loading_weights">✅</span><br>
+        <button @click="gen">generate</button><br><br>
 
         <div ref="cycle-list" class="cycle-list">
 
@@ -16,6 +17,8 @@ import { init_device } from "@/components/device";
 import { UNet } from "@/components/diffuser/modules"
 import { Diffusion } from "@/components/diffuser/ddpm"
 import * as torch from "@/torch";
+
+let model = null
 
 export default defineComponent({
     name: "Diffuser",
@@ -31,22 +34,27 @@ export default defineComponent({
         this.model = new UNet();
     },
     methods: {
-        genPokemon: async function() {
+        loadPokemon: async function() {
             if(!this.active) {
-                this.weightsSelected = true;
                 console.log("loading weights...");
                 this.active = true;
-                const model = new UNet();
+                model = new UNet();
                 await model.loadStateDictFromURL("https://web-diffusion-worker.0xtimmy.workers.dev/parameters/pokemon");
-                console.log("✅ done loading weights");
+                console.log("✅ done");
                 this.done_loading_weights = true;
+                this.active = false;
+            }
+        },
+        gen: async function() {
+            if(!this.active) {
+                this.active = true;
                 const diffuser = new Diffusion({ noise_steps: this.noiseSteps, img_size: 64 });
                 const res = await diffuser.sample(model, async (res: torch.Tensor, step_num: number) => { 
                     await this.renderResult(res, `Iteration ${step_num}`);
                     return;
                 });
-                this.active = false;
                 this.renderResult(res, "final");
+                this.active = false;
             }
         },
         renderResult: async function(result: torch.Tensor, caption: string) {
@@ -68,7 +76,7 @@ export default defineComponent({
             const cap = document.createElement("div");
             cap.innerHTML = caption;
             box.appendChild(cap);
-            this.$refs["cycle-list"].appendChild(box);
+            this.$refs["cycle-list"].replaceChildren(box);
             return;
         }
     }
