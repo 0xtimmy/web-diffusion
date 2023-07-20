@@ -42,19 +42,19 @@ export class Diffusion {
         const t_x = Date.now();
         let x = torch.randn([n, 3, this.img_size, this.img_size]);
         let total_model_time = 0;
-        console.log(`⏰ initial x generation took ${Date.now()-t_x}ms`);
+        //console.log(`⏰ initial x generation took ${Date.now()-t_x}ms`);
         for(let i = this.noise_steps-1; i > 0; i--) {
             const t = torch.constant([n], i);
             const t_predicted_noise = Date.now();
             let predicted_noise = model.forward(x, t);
-            console.log(`⏰ model.foward took ${Date.now()-t_predicted_noise}ms`);
+            //console.log(`⏰ model.foward took ${Date.now()-t_predicted_noise}ms`);
             total_model_time += Date.now()-t_predicted_noise;
             
             const t_indexing = Date.now();
             const alpha = torch.index(this.alpha, t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
             const alpha_hat = torch.index(this.alpha_hat, t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
             const beta = torch.index(this.beta, t).repeat([1, x.shape[1], x.shape[2], x.shape[3]]);
-            console.log(`⏰ indexing, alpha, alpha_hat, beta took ${Date.now()-t_indexing}ms`);
+            //console.log(`⏰ indexing, alpha, alpha_hat, beta took ${Date.now()-t_indexing}ms`);
 
             const t_noise = Date.now();
             let noise;
@@ -63,7 +63,7 @@ export class Diffusion {
             } else {
                 noise = torch.zeros(x.shape);
             }      
-            console.log(`⏰ noise gen took ${Date.now()-t_noise}ms`);
+            //console.log(`⏰ noise gen took ${Date.now()-t_noise}ms`);
 
             const t_denoising = Date.now();
             let one_div_sqrt_alpha = torch.sqrt(alpha).scalar_pow(-1);
@@ -84,7 +84,7 @@ export class Diffusion {
             
             nx = nx.add(beta_noise);
             beta_noise.destroy();
-            console.log(`⏰ denoising took ${Date.now()-t_denoising}ms`);
+            //console.log(`⏰ denoising took ${Date.now()-t_denoising}ms`);
             
             console.log(`${(this.noise_steps-i)/this.noise_steps*100}% - ${Date.now() - sampleStart}ms`);
 
@@ -96,7 +96,7 @@ export class Diffusion {
                 let step = torch.clamp(x, -1, 1).scalar_add(1).scalar_div(2)
                 step = step.cat(torch.ones([1, 1, ...Array.from(x.shape).splice(2)]), 1);
                 step = step.scalar_mul(255)
-                await handleStep(step, i);
+                await handleStep(step, this.noise_steps-i);
             }
         }
         //model.train();

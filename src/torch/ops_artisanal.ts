@@ -830,8 +830,6 @@ export function softmax(
     const exps = exp(input).transpose(dim, input.shape.length-1);
     const sums = sum(exps, input.shape.length-1);
     const output = div(exps, sums).transpose(dim, input.shape.length-1);
-    exps.destroy();
-    sums.destroy();
 
     const duration = Date.now() - start;
     record_duration("softmax", duration, shapeSize(input.shape));
@@ -851,11 +849,17 @@ export function permute(
         seen.push(v);
     });
     
+    let untransposed = true;
+
     for(let i = 0; i < dims.length; i++) {
         if(dims[i] < 0 || dims[i] >= dims.length) throw new Error(`No dimention ${dims[i]} in input shape: ${input.shape}`);
 
         if(i != dims[i]) {
-            input = input.transpose(i, dims[i]);
+            if(untransposed) {
+                input = transpose(input, i, dims[i]);
+                untransposed = false;
+            }
+            else input = input.transpose(i, dims[i]);
             dims[dims.indexOf(i)] = dims[i];
         }
         
@@ -1343,7 +1347,7 @@ export function transpose(input: Tensor, dim0=0, dim1=1): Tensor {
     const start = Date.now();
 
     if(dim1 == dim0) {
-        return input.copy();
+        return input;
     } else if(dim1 < dim0) {
         const temp = dim0;
         dim0 = dim1;

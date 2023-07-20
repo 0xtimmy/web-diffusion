@@ -2,7 +2,7 @@
     <div>
         <h2>Web Diffusion</h2>
         Noise Steps: <input type="number" v-model="noiseSteps" /> <br>
-        Select Weights: <button @click="genPokemon" :disabled="active">Pokemon</button> <br>
+        Select Weights: <button @click="genPokemon" :disabled="active">Pokemon</button> <span v-if="done_loading_weights">✅</span><br>
 
         <div ref="cycle-list" class="cycle-list">
 
@@ -22,6 +22,7 @@ export default defineComponent({
     data() {
         return {
             active: false,
+            done_loading_weights: false,
             noiseSteps: 1000,
         }
     },
@@ -30,7 +31,7 @@ export default defineComponent({
         this.model = new UNet();
     },
     methods: {
-        genPokemon: async function(event) {
+        genPokemon: async function() {
             if(!this.active) {
                 this.weightsSelected = true;
                 console.log("loading weights...");
@@ -38,6 +39,7 @@ export default defineComponent({
                 const model = new UNet();
                 await model.loadStateDictFromURL("https://web-diffusion-worker.0xtimmy.workers.dev/parameters/pokemon");
                 console.log("✅ done loading weights");
+                this.done_loading_weights = true;
                 const diffuser = new Diffusion({ noise_steps: this.noiseSteps, img_size: 64 });
                 const res = await diffuser.sample(model, async (res: torch.Tensor, step_num: number) => { 
                     await this.renderResult(res, `Iteration ${step_num}`);
@@ -49,7 +51,6 @@ export default defineComponent({
         },
         renderResult: async function(result: torch.Tensor, caption: string) {
             result = result.squeeze(0).transpose(0, 1).transpose(1, 2);
-            console.log("result shape: ", result.shape);
             const data = await result.toArrayAsync();
             if(!this.active) console.log("Result: ", data);
             const img_data = new Uint8ClampedArray(data.flat(4) as any);
