@@ -16,12 +16,12 @@ export async function discoverWebGPUDevicesAsync(): Promise<boolean> {
     }
     const adapter = await (navigator as any).gpu.requestAdapter();
     const device = await adapter.requestDevice();
-    console.log(await adapter.requestAdapterInfo());
+    //console.log(await adapter.requestAdapterInfo());
     const id = "webgpu";
     const dev = new DeviceWebGPU(id, adapter, device);
     devices[id] = dev;
     webgpuDevice = dev;
-    console.log("Found WebGPU device", device);
+    //console.log("Found WebGPU device", device);
     return true;
 }
 
