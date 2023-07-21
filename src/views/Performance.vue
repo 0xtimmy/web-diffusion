@@ -1,8 +1,13 @@
 <template>
     <div>
-        <h2>Performance Measurements</h2>
-        Noise steps: <input type="number" v-model="num_steps" /> <br>
-        <button @click="dryrun">dry run</button>
+        <div v-if="device_available">
+            <h2>Performance Measurements</h2>
+            Noise steps: <input type="number" v-model="num_steps" /> <br>
+            <button @click="dryrun">dry run</button>
+        </div>
+        <div v-else>
+            Sorry, WebDiffsuion requires WebGPU to be available :(
+        </div>
     </div>
 </template>
 
@@ -19,11 +24,12 @@ export default defineComponent({
     name: "Performance",
     data() {
         return {
+            device_available: true,
             num_steps: 10,
         }
     },
     mounted: async function() {
-        await init_device();
+        this.device_available = await init_device();
     },
     methods: {
         dryrun: async function() {

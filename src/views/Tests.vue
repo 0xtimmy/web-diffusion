@@ -1,10 +1,15 @@
 <template>
     <div>
-        <h2>Tests</h2>
-        <input type="file" value="" @change="runTestfile">
-        <p>open the console -></p>
-        <!-- <button @click="upload">params</button> -->
-        <div ref="cycle-list"></div>
+        <div v-if="device_available">
+            <h2>Tests</h2>
+            <input type="file" value="" @change="runTestfile">
+            <p>open the console -></p>
+            <!-- <button @click="upload">params</button> -->
+            <div ref="cycle-list"></div>
+        </div>
+        <div v-else>
+            Sorry, WebDiffsuion requires WebGPU to be available :(
+        </div>
     </div>
 </template>
 
@@ -17,8 +22,13 @@ import * as torch from "@/torch"
 
 export default defineComponent({
     name: "Diffuser",
+    data() {
+        return {
+            device_available: true,
+        }
+    },
     mounted: async function() {
-        await init_device();
+        this.device_available = await init_device();
     },
     methods: {
         /*

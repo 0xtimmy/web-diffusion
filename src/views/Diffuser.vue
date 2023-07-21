@@ -1,12 +1,17 @@
 <template>
     <div>
         <h2>Web Diffusion</h2>
-        Noise Steps: <input type="number" v-model="noiseSteps" /> <br>
-        Select Weights: <button @click="loadPokemon" :disabled="active">Pokemon</button> <span v-if="done_loading_weights">✅</span><br>
-        <button @click="gen">generate</button><br><br>
+        <div v-if="device_available">
+            Noise Steps: <input type="number" v-model="noiseSteps" /> <br>
+            Select Weights: <button @click="loadPokemon" :disabled="active">Pokemon</button> <span v-if="done_loading_weights">✅</span><br>
+            <button @click="gen">generate</button><br><br>
 
-        <div ref="cycle-list" class="cycle-list">
+            <div ref="cycle-list" class="cycle-list">
 
+            </div>
+        </div>
+        <div v-else>
+            Sorry, WebDiffsuion requires WebGPU to be available :(
         </div>
     </div>
 </template>
@@ -24,13 +29,14 @@ export default defineComponent({
     name: "Diffuser",
     data() {
         return {
+            device_available: true,
             active: false,
             done_loading_weights: false,
             noiseSteps: 1000,
         }
     },
     mounted: async function() {
-        await init_device();
+        this.device_available = await init_device();
         this.model = new UNet();
     },
     methods: {
